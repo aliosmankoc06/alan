@@ -5667,7 +5667,7 @@ function toggleTheme() {
    uyarısı gösterir. Ama bu uyarı birkaç saniyede kayboluyor; sol
    menüdeki "Son kayıt" yazısı ise KALICI — istediğiniz an bakıp son
    kaydın ne zaman olduğunu görebilirsiniz, kaçırma endişesi olmadan. */
-function showSaveToast(offerUndo) {
+function showSaveToast(offerUndo, mesaj) {
   sonKayitZamaniniGuncelle();
   const root = document.getElementById("toast-root");
   if (!root) return;
@@ -5678,9 +5678,10 @@ function showSaveToast(offerUndo) {
     el.className = "toast";
     root.appendChild(el);
   }
+  const metin = mesaj || "Kaydedildi";
   el.innerHTML = offerUndo
-    ? `<span class="check">✓</span> Kaydedildi <button class="toast-undo" onclick="undoLastChange()">Geri Al</button>`
-    : `<span class="check">✓</span> Kaydedildi`;
+    ? `<span class="check">✓</span> ${metin} <button class="toast-undo" onclick="undoLastChange()">Geri Al</button>`
+    : `<span class="check">✓</span> ${metin}`;
   requestAnimationFrame(() => el.classList.add("show"));
   clearTimeout(el._hideTimer);
   el._hideTimer = setTimeout(() => { el.classList.remove("show"); }, offerUndo ? 5000 : 1400);

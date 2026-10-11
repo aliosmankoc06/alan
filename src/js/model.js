@@ -799,10 +799,42 @@ function save() {
     lastSnapshotWasDelete = !!window.__lastActionWasDelete;
   }
   window.__lastActionWasDelete = false;
+  S.__senkronZamani = new Date().toISOString();
   localStorage.setItem(LS_KEY, JSON.stringify(S));
   surumSenkronizeEt();
   scheduleProgramSenkronizeEt();
+  bulutaSenkronEt();
   if (typeof showSaveToast === "function") showSaveToast(!undoing && lastSnapshotWasDelete);
+}
+/* ============ Bilgisayarlar Arası Otomatik Senkronizasyon ============
+   Kullanıcı OneDrive kullanıyorsa (bkz. electron/main.js), her save()
+   çağrısında mevcut çalışma OneDrive'daki ortak dosyaya da yazılır.
+   Program açılışında (bkz. app.js) bulutSenkronunuKontrolEt() çağrılıp
+   o dosyadaki veri bu bilgisayardakinden daha yeniyse (başka bir
+   bilgisayarda kaydedilmişse) otomatik olarak buraya aktarılır — yedek
+   dosyası alıp elle yüklemeye gerek kalmaz. OneDrive yoksa (electron
+   dışı ortam ya da syncWrite/syncRead tanımsız) bu işlemler sessizce
+   atlanır, uygulama eskisi gibi sadece yerel çalışır. */
+function bulutaSenkronEt() {
+  if (!(window.desktop && window.desktop.isElectron && window.desktop.syncWrite)) return;
+  try { window.desktop.syncWrite(JSON.stringify(S)); } catch (e) {}
+}
+async function bulutSenkronunuKontrolEt() {
+  if (!(window.desktop && window.desktop.isElectron && window.desktop.syncRead)) return;
+  let raw;
+  try { raw = await window.desktop.syncRead(); } catch (e) { return; }
+  if (!raw) return;
+  let bulutState;
+  try { bulutState = JSON.parse(raw); } catch (e) { return; }
+  const bulutZaman = bulutState.__senkronZamani || "";
+  const yerelZaman = S.__senkronZamani || "";
+  if (!bulutZaman || bulutZaman <= yerelZaman) return;
+  S = normalizeState(bulutState);
+  localStorage.setItem(LS_KEY, JSON.stringify(S));
+  if (typeof renderTabbar === "function") renderTabbar();
+  if (typeof renderMain === "function") renderMain();
+  if (typeof renderSurumWidget === "function") renderSurumWidget();
+  if (typeof showSaveToast === "function") showSaveToast(false, "Veriler başka bir bilgisayardan senkronize edildi");
 }
 function scheduleProgramSenkronizeEt() {
   if (!Array.isArray(S.schedulePrograms) || !S.activeScheduleProgramId) return;

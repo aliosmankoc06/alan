@@ -114,6 +114,40 @@ ipcMain.handle("fs:read-file", async (evt, filePath) => {
   return fs.readFileSync(filePath, "utf-8");
 });
 
+/* ============ Bilgisayarlar Arası Otomatik Senkronizasyon ============
+   Veriler normalde sadece bu bilgisayara özel (localStorage) saklanır.
+   Kullanıcı OneDrive kullanıyorsa (Windows'ta kurulu/giriş yapılmışsa
+   OneDrive/OneDriveConsumer/OneDriveCommercial ortam değişkenlerinden
+   biri hep ayarlı olur), aynı veriyi ek olarak OneDrive'daki senkronize
+   bir klasöre de yazıyoruz. Böylece başka bir bilgisayarda program
+   açıldığında (OneDrive o dosyayı indirmiş olacağından) en güncel veri
+   otomatik olarak bulunup yükleniyor — elle yedek alıp yüklemeye gerek
+   kalmıyor. OneDrive yoksa bu özellik sessizce devre dışı kalır, uygulama
+   eskisi gibi sadece yerel olarak çalışmaya devam eder. */
+function oneDriveSenkronDosyasi() {
+  const kok = process.env.OneDrive || process.env.OneDriveConsumer || process.env.OneDriveCommercial;
+  if (!kok) return null;
+  return path.join(kok, "Alan Yönetim Sistemi", "veri-senkron.json");
+}
+
+ipcMain.handle("sync:read", async () => {
+  const dosya = oneDriveSenkronDosyasi();
+  if (!dosya || !fs.existsSync(dosya)) return null;
+  try { return fs.readFileSync(dosya, "utf-8"); } catch (e) { return null; }
+});
+
+ipcMain.handle("sync:write", async (evt, content) => {
+  const dosya = oneDriveSenkronDosyasi();
+  if (!dosya) return false;
+  try {
+    fs.mkdirSync(path.dirname(dosya), { recursive: true });
+    fs.writeFileSync(dosya, content, "utf-8");
+    return true;
+  } catch (e) { return false; }
+});
+
+ipcMain.handle("sync:available", async () => !!oneDriveSenkronDosyasi());
+
 ipcMain.handle("dialog:open-xlsx", async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     title: "Excel Dosyası Seç",

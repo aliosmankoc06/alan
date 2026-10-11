@@ -25,3 +25,5 @@ renderSidebarBrand();
 applyTheme(currentTheme());
 sonKayitBaslangicDurumunuGoster();
 renderSurumWidget();
+
+if (typeof bulutSenkronunuKontrolEt === "function") bulutSenkronunuKontrolEt();
