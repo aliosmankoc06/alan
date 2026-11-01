@@ -924,22 +924,24 @@ function extractProgramlarScheduleForExcel() {
   });
 }
 async function exportCurrentViewAsExcel(dosyaAdi, stacked) {
-  if (!window.desktop || !window.desktop.isElectron) { alert("Excel olarak indirme sadece masaüstü uygulamasında çalışır."); return; }
+  const belge = belgeAraci();
+  if (!belge) { alert("Excel olarak indirme için bu özellik yüklenemedi — internet bağlantını kontrol et."); return; }
   if (stacked) {
     const blocks = extractProgramlarScheduleForExcel();
     if (blocks.length === 0) { alert("Bu sayfada indirilecek bir tablo bulunamadı."); return; }
-    const path = await window.desktop.exportScheduleExcel(guvenliDosyaAdi(dosyaAdi) + ".xlsx", blocks);
+    const path = await belge.exportScheduleExcel(guvenliDosyaAdi(dosyaAdi) + ".xlsx", blocks);
     if (path) alert("Excel olarak kaydedildi:\n" + path);
     return;
   }
   const tables = extractPrintTables().filter(t => t.rows.length > 0);
   if (tables.length === 0) { alert("Bu sayfada indirilecek bir tablo bulunamadı."); return; }
   const sheets = tables.map((t, i) => ({ name: t.name || (tables.length > 1 ? "Tablo " + (i + 1) : "Sayfa1"), rows: t.rows }));
-  const path = await window.desktop.exportExcel(guvenliDosyaAdi(dosyaAdi) + ".xlsx", sheets);
+  const path = await belge.exportExcel(guvenliDosyaAdi(dosyaAdi) + ".xlsx", sheets);
   if (path) alert("Excel olarak kaydedildi:\n" + path);
 }
 async function exportCurrentViewAsWord(dosyaAdi, landscape) {
-  if (!window.desktop || !window.desktop.isElectron) { alert("Word olarak indirme sadece masaüstü uygulamasında çalışır."); return; }
+  const belge = belgeAraci();
+  if (!belge) { alert("Word olarak indirme için bu özellik yüklenemedi — internet bağlantını kontrol et."); return; }
   const area = document.querySelector(".print-area");
   if (!area) { alert("Bu sayfada indirilecek bir belge içeriği bulunamadı."); return; }
   // Word'ün HTML görüntüleyicileri (özellikle mobil) ".no-print{display:none}"
@@ -949,7 +951,7 @@ async function exportCurrentViewAsWord(dosyaAdi, landscape) {
   clone.querySelectorAll(".no-print").forEach(el => el.remove());
   const html = clone.innerHTML;
   if (!html.trim()) { alert("Bu sayfada indirilecek bir belge içeriği bulunamadı."); return; }
-  const path = await window.desktop.exportWord(guvenliDosyaAdi(dosyaAdi) + ".doc", html, !!landscape);
+  const path = await belge.exportWord(guvenliDosyaAdi(dosyaAdi) + ".doc", html, !!landscape);
   if (path) alert("Word olarak kaydedildi:\n" + path);
 }
 let indirMenuDosyaAdi = "";
@@ -1471,12 +1473,17 @@ function extractYillikPlanForExcel(p) {
   };
 }
 async function indirYillikPlanExcel(dosyaAdi) {
-  if (!window.desktop || !window.desktop.isElectron) { alert("Excel olarak indirme sadece masaüstü uygulamasında çalışır."); return; }
+  const belge = belgeAraci();
+  if (!belge) { alert("Excel olarak indirme için bu özellik yüklenemedi — internet bağlantını kontrol et."); return; }
   const p = S.yillikPlanlar.find(x => x.id === activePlanEntryId.yillik);
   if (!p) { alert("Önce bir ders seçin."); return; }
   const payload = extractYillikPlanForExcel(p);
-  const path = await window.desktop.exportYillikPlanExcel(guvenliDosyaAdi(dosyaAdi) + ".xlsx", payload);
-  if (path) alert("Excel olarak kaydedildi:\n" + path);
+  try {
+    const path = await belge.exportYillikPlanExcel(guvenliDosyaAdi(dosyaAdi) + ".xlsx", payload);
+    if (path) alert("Excel olarak kaydedildi:\n" + path);
+  } catch (e) {
+    alert("Bu ders, orijinal Excel şablonundaki 19 dersten biri değil — henüz Excel'e aktarılamıyor. (" + e.message + ")");
+  }
 }
 // Günlük Plan'ın Excel çıktısı — Yıllık Plan'la aynı yöntem: kullanıcının
 // kendi GÜNLÜK_PLANLAR.xlsx dosyası şablon olarak açılıp sadece değişen
@@ -1503,13 +1510,14 @@ function extractGunlukPlanForExcel(p) {
   };
 }
 async function indirGunlukPlanExcel(dosyaAdi) {
-  if (!window.desktop || !window.desktop.isElectron) { alert("Excel olarak indirme sadece masaüstü uygulamasında çalışır."); return; }
+  const belge = belgeAraci();
+  if (!belge) { alert("Excel olarak indirme için bu özellik yüklenemedi — internet bağlantını kontrol et."); return; }
   const p = S.gunlukPlanlar.find(x => x.id === activePlanEntryId.gunluk);
   if (!p) { alert("Önce bir ders seçin."); return; }
   if (!efektifDersGunu(p)) { alert("Önce 'Bilgileri Düzenle' ile bu dersin haftada hangi gün işlendiğini seçin (ya da Ders Programı'na işleyin)."); return; }
   const payload = extractGunlukPlanForExcel(p);
   try {
-    const path = await window.desktop.exportGunlukPlanExcel(guvenliDosyaAdi(dosyaAdi) + ".xlsx", payload);
+    const path = await belge.exportGunlukPlanExcel(guvenliDosyaAdi(dosyaAdi) + ".xlsx", payload);
     if (path) alert("Excel olarak kaydedildi:\n" + path);
   } catch (e) {
     alert("Bu ders, orijinal Excel şablonundaki 19 dersten biri değil — henüz Excel'e aktarılamıyor. (" + e.message + ")");
@@ -2232,9 +2240,10 @@ function extractNormKadroForExcel() {
   };
 }
 async function indirNormKadroExcel(dosyaAdi) {
-  if (!window.desktop || !window.desktop.isElectron) { alert("Excel olarak indirme sadece masaüstü uygulamasında çalışır."); return; }
+  const belge = belgeAraci();
+  if (!belge) { alert("Excel olarak indirme için bu özellik yüklenemedi — internet bağlantını kontrol et."); return; }
   const payload = extractNormKadroForExcel();
-  const path = await window.desktop.exportNormKadroExcel(guvenliDosyaAdi(dosyaAdi) + ".xlsx", payload);
+  const path = await belge.exportNormKadroExcel(guvenliDosyaAdi(dosyaAdi) + ".xlsx", payload);
   if (path) alert("Excel olarak kaydedildi:\n" + path);
 }
 
