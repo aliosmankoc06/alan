@@ -53,8 +53,8 @@ function bulutGirisEkraniniGoster() {
   root.innerHTML = `
   <div class="modal-bg" style="z-index:200;">
     <div class="modal" style="width:340px;">
-      <h3>Bulut Girişi</h3>
-      <p class="small">Verilerinin bilgisayarlar arasında otomatik senkronize olması için giriş yap. İstersen şimdilik atlayabilirsin — o zaman veriler sadece bu bilgisayarda kalır.</p>
+      <h3>Giriş Yap</h3>
+      <p class="small">Programı kullanmak ve değişikliklerin buluta otomatik kaydedilmesi için giriş yapman gerekiyor.</p>
       <label class="small">E-posta</label>
       <input type="email" id="bulut-eposta" style="width:100%" autocomplete="username">
       <label class="small">Şifre</label>
@@ -62,7 +62,6 @@ function bulutGirisEkraniniGoster() {
       <div id="bulut-giris-hata" class="small" style="color:var(--warn);margin-top:6px;"></div>
       <div class="row">
         <button class="btn primary" id="bulut-giris-btn" onclick="bulutGirisYap()">Giriş Yap</button>
-        <button class="btn" onclick="bulutGirisAtla()">Şimdilik Atla</button>
       </div>
     </div>
   </div>`;
@@ -70,9 +69,6 @@ function bulutGirisEkraniniGoster() {
 function bulutGirisEkraniniGizle() {
   const root = document.getElementById("bulut-giris-root");
   if (root) root.innerHTML = "";
-}
-function bulutGirisAtla() {
-  bulutGirisEkraniniGizle();
 }
 function bulutGirisYap() {
   const eposta = ((document.getElementById("bulut-eposta") || {}).value || "").trim();
