@@ -804,6 +804,7 @@ function save() {
   surumSenkronizeEt();
   scheduleProgramSenkronizeEt();
   bulutaSenkronEt();
+  if (typeof bulutaFirestoreSenkronEt === "function") bulutaFirestoreSenkronEt();
   if (typeof showSaveToast === "function") showSaveToast(!undoing && lastSnapshotWasDelete);
 }
 /* ============ Bilgisayarlar Arası Otomatik Senkronizasyon ============

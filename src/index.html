@@ -40,6 +40,7 @@
       </div>
       <div class="small" id="son-kayit-metni">Henüz kayıt yok</div>
       <div id="surum-widget"></div>
+      <div id="bulut-durum" class="small"></div>
     </div>
     <div class="sidebar-search">
       <input type="text" id="global-search-input" placeholder="Ara: sınıf, öğretmen, öğrenci, makine..." autocomplete="off" oninput="onGlobalSearchInput(this.value)" onkeydown="if(event.key==='Escape'){this.value='';onGlobalSearchInput('');this.blur();}">
@@ -53,8 +54,13 @@
   </div>
 </div>
 <div id="modal-root"></div>
+<div id="bulut-giris-root"></div>
 <div id="toast-root" class="no-print"></div>
 
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="js/bulut.js"></script>
 <script src="js/icons.js"></script>
 <script src="js/curriculum-data.js"></script>
 <script src="js/ders-bilgi-formu-data.js"></script>

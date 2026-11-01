@@ -27,3 +27,4 @@ sonKayitBaslangicDurumunuGoster();
 renderSurumWidget();
 
 if (typeof bulutSenkronunuKontrolEt === "function") bulutSenkronunuKontrolEt();
+if (typeof bulutBaslat === "function") bulutBaslat();
