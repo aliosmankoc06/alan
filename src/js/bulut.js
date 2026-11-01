@@ -25,6 +25,13 @@ function bulutBaslat() {
   try {
     firebase.initializeApp(BULUT_FIREBASE_CONFIG);
     bulutDb = firebase.firestore();
+    // İnternet yokken yapılan kayıtlar diskte (IndexedDB) bekletilir;
+    // internet geri geldiğinde (program kapatılıp açılsa bile) otomatik
+    // olarak buluta gönderilir — kullanıcının ayrıca bir şey yapmasına
+    // gerek yok. Aynı anda birden fazla pencere açıksa etkinleşemez,
+    // o durumda da sorun değil: sadece bu "kuyruklama" özelliği devre
+    // dışı kalır, normal senkronizasyon yine çalışır.
+    bulutDb.enablePersistence().catch(() => {});
   } catch (e) { return; }
   firebase.auth().onAuthStateChanged(kullanici => {
     if (kullanici) {
