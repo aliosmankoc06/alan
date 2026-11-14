@@ -455,10 +455,20 @@ function viewStajOgrenciler() {
   <div class="card no-print">
     <h2>Öğrenci Ekle</h2>
     <div class="grid3">
-      <div><label class="small">Sınıf</label><input type="text" id="ns-sinif" placeholder="örn. 12/A" style="width:100%"></div>
+      <div><label class="small">Sınıf</label>
+        <select id="ns-sinif" style="width:100%" onchange="nsSinifDegisti()">
+          <option value="">— seçin —</option>
+          ${ogrenciListesiSiniflari().map(s => `<option value="${escHtml(s)}">${escHtml(s)}</option>`).join("")}
+        </select>
+      </div>
       <div><label class="small">Okul No</label><input type="text" id="ns-okulno" style="width:100%"></div>
       <div><label class="small">Ad Soyad</label><input type="text" id="ns-ad" style="width:100%"></div>
-      <div><label class="small">Dal</label><input type="text" id="ns-dal" placeholder="örn. MBO" style="width:100%"></div>
+      <div><label class="small">Dal</label>
+        <select id="ns-dal" style="width:100%">
+          <option value="">— —</option>
+          ${havuzDalSecenekleri().map(d => `<option value="${d.value}">${escHtml(d.label)}</option>`).join("")}
+        </select>
+      </div>
       <div><label class="small">İşletme (opsiyonel)</label><select id="ns-isletme" style="width:100%">${studentIsletmeOptions()}</select></div>
     </div>
     <div class="row" style="max-width:200px"><button class="btn primary" onclick="addStudent()">Ekle</button></div>
@@ -513,10 +523,8 @@ function viewStajTercihler() {
       <tr>
         <td>${st.okulNo || ''}</td>
         <td>${escHtml(st.ad)}</td>
-        <td class="no-print"><input type="text" value="${escHtml(st.tercihler)}" placeholder="1. tercih, 2. tercih, ..." style="width:100%;" onchange="updateStudentAlan('${st.id}','tercihler',this.value)"></td>
-        <td class="print-only-cell">${escHtml(st.tercihler || '—')}</td>
-        <td class="no-print"><input type="text" value="${escHtml(st.istemiyor)}" placeholder="istemediği işletmeler" style="width:100%;" onchange="updateStudentAlan('${st.id}','istemiyor',this.value)"></td>
-        <td class="print-only-cell">${escHtml(st.istemiyor || '—')}</td>
+        <td>${tercihHucresiHtml(st, "tercihler", true)}</td>
+        <td>${tercihHucresiHtml(st, "istemiyor", false)}</td>
       </tr>`).join("");
     return `<div class="card" style="overflow-x:auto;"><h2 style="margin-top:0;">${escHtml(sinif)}</h2><table><tr><th>Okul No</th><th>Ad Soyad</th><th>Tercihleri (öncelik sırasıyla virgülle)</th><th>İstemediği İşletmeler (virgülle)</th></tr>${rows}</table></div>`;
   }).join("") : `<div class="card"><p class="small">Henüz öğrenci eklenmedi — önce Öğrenciler sekmesinden ekleyin.</p></div>`;
@@ -532,13 +540,46 @@ function viewStajTercihler() {
   </div>`;
 }
 /* -- Sekme 4: İşletme Kontenjanları -- */
+function isletmeTalepListesi(isl) { return (isl.talep || "").split(",").map(s => s.trim()).filter(Boolean); }
+function isletmeTalepYaz(isl, liste) { isl.talep = liste.join(", "); save(); renderMain(); }
+function isletmeTalepEkle(isletmeId, ogrenciAdi) {
+  if (!ogrenciAdi) return;
+  const isl = isletmeById(isletmeId);
+  if (!isl) return;
+  const liste = isletmeTalepListesi(isl);
+  if (!liste.includes(ogrenciAdi)) liste.push(ogrenciAdi);
+  isletmeTalepYaz(isl, liste);
+}
+function isletmeTalepKaldir(isletmeId, index) {
+  const isl = isletmeById(isletmeId);
+  if (!isl) return;
+  const liste = isletmeTalepListesi(isl);
+  liste.splice(index, 1);
+  isletmeTalepYaz(isl, liste);
+}
+function isletmeTalepHucresiHtml(isl) {
+  const liste = isletmeTalepListesi(isl);
+  const kalanlar = S.students.map(s => s.ad).filter(ad => ad && !liste.includes(ad));
+  const chipler = liste.map((ad, i) => `
+    <div style="display:flex;align-items:center;gap:4px;background:var(--panel-2);border-radius:6px;padding:2px 5px;margin-bottom:3px;font-size:11.5px;">
+      <span style="flex:1;">${escHtml(ad)}</span>
+      <span onclick="isletmeTalepKaldir('${isl.id}',${i})" style="cursor:pointer;color:var(--warn);" title="Kaldır">✕</span>
+    </div>`).join("");
+  const ekleDropdown = kalanlar.length
+    ? `<select class="no-print" onchange="if(this.value){isletmeTalepEkle('${isl.id}',this.value);this.value='';}" style="width:100%;font-size:11px;">
+        <option value="">+ Öğrenci ekle…</option>
+        ${kalanlar.map(ad => `<option value="${escHtml(ad)}">${escHtml(ad)}</option>`).join("")}
+      </select>`
+    : (S.students.length ? `<span class="small no-print">Tüm öğrenciler eklendi</span>` : `<span class="small no-print">Önce Öğrenciler sekmesinden öğrenci ekleyin</span>`);
+  return `<div class="no-print" style="min-width:170px;">${chipler}${ekleDropdown}</div><span class="print-only-inline">${escHtml(liste.join(", ") || "—")}</span>`;
+}
 function viewStajKontenjanlar() {
   const dallar = [...new Set(S.students.map(s => s.dal).filter(Boolean))];
   const kontenjanRows = S.isletmeler.map(isl => `
     <tr>
       <td>${escHtml(isl.name)}</td>
       ${dallar.map(d => `<td><input type="number" min="0" value="${escHtml(isl.kontenjanlar[d] || '')}" style="width:60px;" onchange="setIsletmeKontenjan('${isl.id}','${jsq(d)}',this.value)"></td>`).join("")}
-      <td><input type="text" value="${escHtml(isl.talep)}" placeholder="örn. Ali Rıza Yetim, Mehmet Mamak" style="width:220px;" onchange="setIsletmeTalep('${isl.id}',this.value)"></td>
+      <td>${isletmeTalepHucresiHtml(isl)}</td>
     </tr>`).join("") || `<tr><td colspan="${dallar.length + 2}" class="small">Önce Ders Programı &gt; Koordinatörlük'ten işletme ekleyin.</td></tr>`;
   return `
   <div class="card no-print">
@@ -637,6 +678,18 @@ function stajListedenTopluEkleUygula() {
   save(); closeModal(); renderMain();
   alert(eklenen ? `${eklenen} öğrenci eklendi.` : "Eklenecek yeni öğrenci bulunamadı (hepsi zaten listede ya da seçilen sınıfta kayıt yok).");
 }
+function nsSinifDegisti() {
+  const sinif = document.getElementById("ns-sinif").value;
+  const dalSel = document.getElementById("ns-dal");
+  const kod = dalForSinif(sinif);
+  if (kod && Array.from(dalSel.options).some(o => o.value === kod)) dalSel.value = kod;
+}
+function esSinifDegisti() {
+  const sinif = document.getElementById("es-sinif").value;
+  const dalSel = document.getElementById("es-dal");
+  const kod = dalForSinif(sinif);
+  if (kod && Array.from(dalSel.options).some(o => o.value === kod)) dalSel.value = kod;
+}
 function addStudent() {
   const sinif = document.getElementById("ns-sinif").value.trim();
   const okulNo = document.getElementById("ns-okulno").value.trim();
@@ -660,10 +713,18 @@ function editStudent(id) {
     <div class="modal-bg" onclick="if(event.target===this) closeModal()">
       <div class="modal" style="width:420px;">
         <h3>Öğrenciyi Düzenle</h3>
-        <label class="small">Sınıf</label><input type="text" id="es-sinif" value="${escHtml(st.sinif || '')}" style="width:100%">
+        <label class="small">Sınıf</label>
+        <select id="es-sinif" style="width:100%" onchange="esSinifDegisti()">
+          <option value="">— seçin —</option>
+          ${ogrenciListesiSiniflari().map(s => `<option value="${escHtml(s)}" ${st.sinif === s ? "selected" : ""}>${escHtml(s)}</option>`).join("")}
+        </select>
         <label class="small">Okul No</label><input type="text" id="es-okulno" value="${escHtml(st.okulNo || '')}" style="width:100%">
         <label class="small">Ad Soyad</label><input type="text" id="es-ad" value="${escHtml(st.ad || '')}" style="width:100%">
-        <label class="small">Dal</label><input type="text" id="es-dal" value="${escHtml(st.dal || '')}" style="width:100%">
+        <label class="small">Dal</label>
+        <select id="es-dal" style="width:100%">
+          <option value="">— —</option>
+          ${havuzDalSecenekleri().map(d => `<option value="${d.value}" ${st.dal === d.value ? "selected" : ""}>${escHtml(d.label)}</option>`).join("")}
+        </select>
         <p class="small">Not ortalaması "Not Ortalamaları", tercihleri "Tercihler" sekmesinden girilir.</p>
         <div class="row">
           <button class="btn primary" onclick="saveStudentEdit('${id}')">Kaydet</button>
@@ -693,17 +754,61 @@ function updateStudentAlan(id, field, value) {
   if (st) st[field] = value.trim();
   save();
 }
+/* Tercihler/istemediği işletmeler artık elle yazılmıyor — S.isletmeler'den
+   seçilen, "virgülle ayrılmış isim listesi" olarak aynı eski formatta
+   saklanan bir çip listesi. Format aynı kaldığı için stajOtomatikYerlestir()
+   içindeki split(",")+trIcerir() eşleştirmesine dokunmaya gerek kalmadı. */
+function ogrenciTercihListesi(st, field) { return (st[field] || "").split(",").map(s => s.trim()).filter(Boolean); }
+function ogrenciTercihYaz(st, field, liste) { st[field] = liste.join(", "); save(); renderMain(); }
+function ogrenciTercihEkle(id, field, isletmeAdi) {
+  if (!isletmeAdi) return;
+  const st = S.students.find(s => s.id === id);
+  if (!st) return;
+  const liste = ogrenciTercihListesi(st, field);
+  if (!liste.includes(isletmeAdi)) liste.push(isletmeAdi);
+  ogrenciTercihYaz(st, field, liste);
+}
+function ogrenciTercihSirasiDegistir(id, field, index, yon) {
+  const st = S.students.find(s => s.id === id);
+  if (!st) return;
+  const liste = ogrenciTercihListesi(st, field);
+  const hedef = index + yon;
+  if (hedef < 0 || hedef >= liste.length) return;
+  const tmp = liste[index]; liste[index] = liste[hedef]; liste[hedef] = tmp;
+  ogrenciTercihYaz(st, field, liste);
+}
+function ogrenciTercihKaldir(id, field, index) {
+  const st = S.students.find(s => s.id === id);
+  if (!st) return;
+  const liste = ogrenciTercihListesi(st, field);
+  liste.splice(index, 1);
+  ogrenciTercihYaz(st, field, liste);
+}
+function tercihHucresiHtml(st, field, siraliMi) {
+  const liste = ogrenciTercihListesi(st, field);
+  const kalanlar = S.isletmeler.map(i => i.name).filter(ad => !liste.includes(ad));
+  const chipler = liste.map((ad, i) => `
+    <div style="display:flex;align-items:center;gap:4px;background:var(--panel-2);border-radius:6px;padding:2px 5px;margin-bottom:3px;font-size:11.5px;">
+      ${siraliMi ? `<b>${i + 1}.</b>` : ""}
+      <span style="flex:1;">${escHtml(ad)}</span>
+      ${siraliMi ? `
+        <span onclick="ogrenciTercihSirasiDegistir('${st.id}','${field}',${i},-1)" style="cursor:pointer;" title="Yukarı taşı">▲</span>
+        <span onclick="ogrenciTercihSirasiDegistir('${st.id}','${field}',${i},1)" style="cursor:pointer;" title="Aşağı taşı">▼</span>` : ""}
+      <span onclick="ogrenciTercihKaldir('${st.id}','${field}',${i})" style="cursor:pointer;color:var(--warn);" title="Kaldır">✕</span>
+    </div>`).join("");
+  const ekleDropdown = kalanlar.length
+    ? `<select class="no-print" onchange="if(this.value){ogrenciTercihEkle('${st.id}','${field}',this.value);this.value='';}" style="width:100%;font-size:11px;">
+        <option value="">+ İşletme ekle…</option>
+        ${kalanlar.map(ad => `<option value="${escHtml(ad)}">${escHtml(ad)}</option>`).join("")}
+      </select>`
+    : (S.isletmeler.length ? `<span class="small no-print">Tüm işletmeler eklendi</span>` : `<span class="small no-print">Önce Koordinatörlük'ten işletme ekleyin</span>`);
+  return `<div class="no-print" style="min-width:170px;">${chipler}${ekleDropdown}</div><span class="print-only-inline">${escHtml(liste.join(", ") || "—")}</span>`;
+}
 function setIsletmeKontenjan(isletmeId, dal, value) {
   const isl = isletmeById(isletmeId);
   if (!isl) return;
   if (!isl.kontenjanlar) isl.kontenjanlar = {};
   isl.kontenjanlar[dal] = value.trim();
-  save();
-}
-function setIsletmeTalep(isletmeId, value) {
-  const isl = isletmeById(isletmeId);
-  if (!isl) return;
-  isl.talep = value.trim();
   save();
 }
 function yerlestirmeSirasiPill(sira) {
@@ -2152,6 +2257,11 @@ function normKadroOgrenciSayisiniListedenDoldur(classId, sinifAdi) {
   S.normKadro.ogrenciSayilari[classId] = n;
   save(); renderMain();
 }
+function koordSatirOgrenciSayisiniListedenDoldur(id, sinifAdi) {
+  const n = ogrencilerForSinif(sinifAdi).length;
+  if (!n) { alert(`"${sinifAdi}" için Öğrenci Listesi'nde henüz kayıt yok. Önce Öğrenci Listesi modülünden PDF yükleyin veya bu satır için bir Sınıf seçin.`); return; }
+  updateKoordSatir(id, "ogrenciSayisi", String(n));
+}
 function addKoordSatir() {
   S.normKadro.koordinatorlukSatirlari.push({ id: uid("nk"), dal: "", sinif: "", ogrenciSayisi: "", haftalikSaat: 24, grupSayisi: 1 });
   save(); renderMain();
@@ -2213,6 +2323,8 @@ function viewNormKadro() {
   }).join("") || `<tr><td colspan="8" class="small">Ders Programı → Sınıflar ve Ders Atama'dan sınıflara ders atadıkça burada otomatik listelenecek.</td></tr>`;
 
   let koordToplam = 0;
+  const koordSinifSecenekleri = ogrenciListesiSiniflari();
+  const koordDalSecenekleri = S.dalTanimlari.map(d => "Koordinatörlük – " + d.ad);
   const koordRows = S.normKadro.koordinatorlukSatirlari.map(r => {
     siraNo++;
     // Koordinatörlük grup sayısı, sınıfın fiziksel şube/kontenjan bölünmesiyle
@@ -2220,13 +2332,21 @@ function viewNormKadro() {
     const grup = r.grupSayisi || 1;
     const toplam = (r.haftalikSaat || 0) * grup;
     koordToplam += toplam;
+    const sinifListesi = (r.sinif && !koordSinifSecenekleri.includes(r.sinif)) ? [r.sinif, ...koordSinifSecenekleri] : koordSinifSecenekleri;
+    const dalListesi = (r.dal && !koordDalSecenekleri.includes(r.dal)) ? [r.dal, ...koordDalSecenekleri] : koordDalSecenekleri;
     return `<tr>
       <td>${siraNo}</td>
-      <td class="no-print"><input type="text" value="${escHtml(r.sinif)}" placeholder="örn. 12-A" style="width:60px" onchange="updateKoordSatir('${r.id}','sinif',this.value)"></td>
+      <td class="no-print"><select style="width:100px" onchange="updateKoordSatir('${r.id}','sinif',this.value)">
+        <option value="">—</option>
+        ${sinifListesi.map(s => `<option value="${escHtml(s)}" ${r.sinif === s ? "selected" : ""}>${escHtml(s)}</option>`).join("")}
+      </select></td>
       <td class="print-only-cell">${escHtml(r.sinif)}</td>
-      <td class="no-print"><input type="number" min="0" value="${r.ogrenciSayisi}" style="width:56px" onchange="updateKoordSatir('${r.id}','ogrenciSayisi',this.value)"></td>
+      <td class="no-print"><input type="number" min="0" value="${r.ogrenciSayisi}" style="width:56px" onchange="updateKoordSatir('${r.id}','ogrenciSayisi',this.value)"> <button class="btn" style="padding:2px 6px;font-size:10px;" onclick="koordSatirOgrenciSayisiniListedenDoldur('${r.id}','${jsq(r.sinif)}')" title="Öğrenci Listesi modülündeki güncel sayıyla doldur">↺</button></td>
       <td class="print-only-cell">${r.ogrenciSayisi}</td>
-      <td class="no-print"><input type="text" value="${escHtml(r.dal)}" placeholder="örn. Koordinatörlük – Makine Bakım Onarım Dalı" style="width:100%" onchange="updateKoordSatir('${r.id}','dal',this.value)"></td>
+      <td class="no-print"><select style="width:100%" onchange="updateKoordSatir('${r.id}','dal',this.value)">
+        <option value="">—</option>
+        ${dalListesi.map(d => `<option value="${escHtml(d)}" ${r.dal === d ? "selected" : ""}>${escHtml(d)}</option>`).join("")}
+      </select></td>
       <td class="print-only-cell">${escHtml(r.dal)}</td>
       <td class="no-print"><input type="number" min="0" value="${r.haftalikSaat}" style="width:56px" onchange="updateKoordSatir('${r.id}','haftalikSaat',this.value)"></td>
       <td class="print-only-cell">${r.haftalikSaat}</td>
@@ -3360,6 +3480,13 @@ function savePerformansAgirliklari(tur) {
 function kayitById(id) { return S.performansKayitlari.find(x => x.id === id); }
 function addPerformansKayit(tur) {
   if (!activePerformansSinif || !activePerformansDonem) { alert("Önce sınıf ve dönem seçin."); return; }
+  const cls = S.classes.find(c => c.name === activePerformansSinif);
+  const dersler = cls ? assignedCoursesForClass(cls) : [];
+  // Bu sınıfa Ders Programı'ndan atanmış ders varsa oradan seçtiriyoruz —
+  // yoksa (ör. henüz atama yapılmamış bir sınıf) elle yazmaya düşüyor.
+  const dersAlani = dersler.length
+    ? `<select id="pf-ders" style="width:100%"><option value="">— seçin —</option>${dersler.map(d => `<option value="${escHtml(d.name)}">${escHtml(d.name)}</option>`).join("")}</select>`
+    : `<input type="text" id="pf-ders" placeholder="örn. Temel İmalat İşlemleri" style="width:100%">`;
   const root = document.getElementById("modal-root");
   root.innerHTML = `
     <div class="modal-bg" onclick="if(event.target===this) closeModal()">
@@ -3367,7 +3494,7 @@ function addPerformansKayit(tur) {
         <h3>${tur === 'odev' ? 'Yeni Performans Ödevi Dersi' : 'Yeni Ders İçi Performans Dersi'}</h3>
         <p class="small">${escHtml(activePerformansSinif)} · ${escHtml(activePerformansDonem)}</p>
         <input type="hidden" id="pf-tur" value="${tur}">
-        <label class="small">Ders</label><input type="text" id="pf-ders" placeholder="örn. Temel İmalat İşlemleri" style="width:100%">
+        <label class="small">Ders</label>${dersAlani}
         <div class="row">
           <button class="btn primary" onclick="saveNewPerformansKayit()">Ekle</button>
           <button class="btn" onclick="closeModal()">İptal</button>
@@ -3391,6 +3518,8 @@ function saveNewPerformansKayit() {
 function editPerformansKayitMeta(id) {
   const k = kayitById(id);
   if (!k) return;
+  const sinifSecenekleri = ogrenciListesiSiniflari();
+  const sinifListesiNihai = sinifSecenekleri.includes(k.sinif) ? sinifSecenekleri : [k.sinif].concat(sinifSecenekleri).filter(Boolean);
   const root = document.getElementById("modal-root");
   root.innerHTML = `
     <div class="modal-bg" onclick="if(event.target===this) closeModal()">
@@ -3398,7 +3527,10 @@ function editPerformansKayitMeta(id) {
         <h3>Kayıt Bilgilerini Düzenle</h3>
         <p class="small">Sınıf/dönem yanlış geldiyse (örn. Excel'de yazım hatası varsa) burada düzeltebilirsiniz.</p>
         <label class="small">Ders</label><input type="text" id="pf-ders" value="${escHtml(k.ders)}" style="width:100%">
-        <label class="small">Sınıf / Şube</label><input type="text" id="pf-sinif" value="${escHtml(k.sinif)}" style="width:100%">
+        <label class="small">Sınıf / Şube</label>
+        <select id="pf-sinif" style="width:100%">
+          ${sinifListesiNihai.map(s => `<option value="${escHtml(s)}" ${k.sinif === s ? "selected" : ""}>${escHtml(s)}</option>`).join("")}
+        </select>
         <label class="small">Dönem</label>
         <select id="pf-donem" style="width:100%">
           <option value="1. Dönem" ${k.donem === '1. Dönem' ? 'selected' : ''}>1. Dönem</option>
