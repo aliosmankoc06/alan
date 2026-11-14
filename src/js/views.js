@@ -70,9 +70,11 @@ function setDalFiltresi(id) {
 function renderDalFiltresiWidget() {
   const el = document.getElementById("dal-switcher");
   if (!el) return;
-  if (!S.dalTanimlari.length) { el.innerHTML = ""; return; }
+  if (!S.dalTanimlari.length) { el.innerHTML = ""; el.className = "dal-switcher no-print"; return; }
   const options = [`<option value="ALL">Tüm Dallar</option>`]
     .concat(S.dalTanimlari.map(d => `<option value="${d.id}" ${d.id === dalFiltresi ? "selected" : ""}>${escHtml(d.ad || "Dal")}</option>`));
+  const aktifDal = dalTanimiById(dalFiltresi);
+  el.className = "dal-switcher no-print" + (aktifDal ? " dal-switcher-" + aktifDal.renkKey : "");
   el.innerHTML = `<label>Aktif Dal</label><select onchange="setDalFiltresi(this.value)">${options.join("")}</select>`;
 }
 
@@ -590,7 +592,7 @@ function dalForSinif(sinif) {
   return cls ? cls.dal : "";
 }
 function stajListedenTopluEkleModal() {
-  const siniflar = ogrenciListesiSiniflari();
+  const siniflar = ogrenciListesiSiniflariDalaGore();
   const root = document.getElementById("modal-root");
   root.innerHTML = `
     <div class="modal-bg" onclick="if(event.target===this) closeModal()">
@@ -1944,9 +1946,10 @@ function ogrenciListesiSiniflari() {
   S.classes.filter(c => c.grade > 0 && !c.excludeFromDistribution).forEach(c => set.add(c.name));
   return Array.from(set).sort((a, b) => a.localeCompare(b, "tr"));
 }
-/* ogrenciListesiSiniflari() Staj/Beceri Sınavı/Kalfalık-Ustalık'ın öğrenci
-   seçicilerinde de kullanıldığı için oraya dokunmadan, sadece Öğrenci
-   Listesi ekranı için Dal süzgeçli bir sarmalayıcı. */
+/* ogrenciListesiSiniflari()'ın Dal süzgeçli hâli — Öğrenci Listesi, Staj
+   Yerleştirme ve Beceri Sınavı/Kalfalık-Ustalık'ın "listeden toplu ekle"
+   seçicilerinin hepsi bunu kullanır, böylece Aktif Dal süzgeci her yerde
+   tutarlı çalışır. */
 function ogrenciListesiSiniflariDalaGore() {
   const liste = ogrenciListesiSiniflari();
   if (dalFiltresi === "ALL") return liste;
@@ -3999,7 +4002,7 @@ function snEkAlanlariHesapla(kind) {
   return kind === "ku" ? { tur: activeKuTur, dal: activeKuDal } : { sinif: activeBeceriSinif, dal: aktifDalIcinEkle() };
 }
 function snListedenTopluEkleModal(kind) {
-  const siniflar = ogrenciListesiSiniflari();
+  const siniflar = ogrenciListesiSiniflariDalaGore();
   const onerilenSinif = kind === "bs" ? activeBeceriSinif : (siniflar[0] || "");
   const root = document.getElementById("modal-root");
   root.innerHTML = `
@@ -6525,8 +6528,24 @@ function dalIpucuChipHtml(sinifAdi) {
   const dal = sube ? dalTanimiForSube(sube) : null;
   return dal ? `<span class="dal-chip dal-chip-${dal.renkKey}" title="Ayarlar &gt; Dallar ile eşleşme (bilgi amaçlı)">${escHtml(dal.ad)}</span>` : "";
 }
+/* Sınıflar ve Ders Atama listesini de Aktif Dal süzgecine göre daraltır —
+   zamanlayıcının kendi c.dal/DAL_LABELS kategorisine ve dağıtım mantığına
+   dokunmadan, sadece bu listede gösterilen sınıfları filtreler. İdari
+   Görevler satırı (şube harfi ayrıştırılamaz) her zaman gösterilir. */
+function sinifListesiDalaGore() {
+  const liste = S.classes.filter(c => !c.id.startsWith("isletme-"));
+  if (dalFiltresi === "ALL") return liste;
+  return liste.filter(c => {
+    const sube = sinifAdindanSubeAyikla(c.name);
+    if (!sube) return true;
+    const dal = dalTanimiForSube(sube);
+    return !dal || dal.id === dalFiltresi;
+  });
+}
 function viewSinif() {
-  const listHtml = S.classes.filter(c => !c.id.startsWith("isletme-")).map(c => `
+  const gorunenSiniflar = sinifListesiDalaGore();
+  if (!gorunenSiniflar.some(c => c.id === activeClassId)) activeClassId = gorunenSiniflar[0] ? gorunenSiniflar[0].id : null;
+  const listHtml = gorunenSiniflar.map(c => `
     <div class="list-item ${c.id === activeClassId ? 'active' : ''}" onclick="setActiveClass('${c.id}')">
       <span>${c.name} <span class="small">(${DAL_LABELS[c.dal] || c.dal})</span> ${dalIpucuChipHtml(c.name)} ${c.excludeFromDistribution ? '<span class="pill warn">Dahil değil</span>' : ''}</span>
       <span style="display:flex;gap:8px;flex-shrink:0;margin-left:6px;">

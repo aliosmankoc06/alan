@@ -82,9 +82,12 @@ a:hover{text-decoration:underline;}
 }
 .sidebar-search input::placeholder{color:#8492B0;}
 .sidebar-search input:focus{outline:none;border-color:var(--accent-2);background:rgba(255,255,255,0.12);}
-.dal-switcher{padding:10px 17px 13px;border-bottom:1px solid rgba(255,255,255,0.09);}
+.dal-switcher{padding:10px 17px 13px 14px;border-bottom:1px solid rgba(255,255,255,0.09);border-left:3px solid transparent;transition:border-color .15s ease;}
 .dal-switcher label{display:block;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:#7986A6;margin-bottom:5px;font-weight:600;}
 .dal-switcher select{width:100%;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:8px;color:#fff;font-size:12.5px;padding:7px 9px;font-family:inherit;}
+.dal-switcher-accent{border-left-color:var(--accent-2);}
+.dal-switcher-teal{border-left-color:#3FD9AC;}
+.dal-switcher-warn{border-left-color:#E8938A;}
 .dal-switcher select:focus{outline:none;border-color:var(--accent-2);}
 #global-search-results{
   display:none;position:absolute;left:12px;right:12px;top:calc(100% - 4px);z-index:80;
