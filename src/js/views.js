@@ -2882,10 +2882,15 @@ function readMakineForm() {
     notlar: document.getElementById("mk-notlar").value.trim()
   };
 }
+function odaSecenekleriHtml(seciliAd) {
+  const adlar = S.rooms.map(r => r.name).filter(Boolean);
+  const liste = (seciliAd && !adlar.includes(seciliAd)) ? [seciliAd, ...adlar] : adlar;
+  return `<option value="">— seçin —</option>${liste.map(ad => `<option value="${escHtml(ad)}" ${seciliAd === ad ? "selected" : ""}>${escHtml(ad)}</option>`).join("")}`;
+}
 function makineFormAlanlari(m) {
   const v = f => escHtml(m ? m[f] || "" : "");
   return `
-    <label class="small">Laboratuvar / Atölye</label><input type="text" id="mk-lab" value="${v('lab')}" placeholder="örn. B3 - İmalat İşlemleri Atölyesi" style="width:100%">
+    <label class="small">Laboratuvar / Atölye</label><select id="mk-lab" style="width:100%">${odaSecenekleriHtml(m ? m.lab : "")}</select>
     <label class="small">Makine Adı</label><input type="text" id="mk-ad" value="${v('ad')}" style="width:100%">
     <label class="small">Marka</label><input type="text" id="mk-marka" value="${v('marka')}" style="width:100%">
     <label class="small">Model</label><input type="text" id="mk-model" value="${v('model')}" style="width:100%">
@@ -3068,7 +3073,7 @@ function renderMakineOzetTablosu(list) {
   const rows = list.map((m, i) => `
     <tr>
       <td>${i + 1}</td>
-      <td class="no-print"><input type="text" value="${escHtml(m.lab)}" style="width:100%" onchange="updateMakineField('${m.id}','lab',this.value)"></td>
+      <td class="no-print"><select style="width:100%" onchange="updateMakineField('${m.id}','lab',this.value)">${odaSecenekleriHtml(m.lab)}</select></td>
       <td class="print-only-cell">${escHtml(m.lab)}</td>
       <td class="no-print"><input type="text" value="${escHtml(m.ad)}" style="width:100%" onchange="updateMakineField('${m.id}','ad',this.value)"></td>
       <td class="print-only-cell">${escHtml(m.ad)}</td>
@@ -3169,7 +3174,7 @@ function addDurumTespit() {
     <div class="modal-bg" onclick="if(event.target===this) closeModal()">
       <div class="modal" style="width:420px;">
         <h3>Yeni Durum Tespit Formu</h3>
-        <label class="small">Atölye / Laboratuvar</label><input type="text" id="dt-atolye" placeholder="örn. B3 - İmalat İşlemleri Atölyesi" style="width:100%">
+        <label class="small">Atölye / Laboratuvar</label><select id="dt-atolye" style="width:100%">${odaSecenekleriHtml("")}</select>
         <label class="small">Tarih</label><input type="text" id="dt-tarih" style="width:100%">
         <label class="small">Atölye/Lab. Şefi</label><input type="text" id="dt-atolyesefi" style="width:100%">
         <label class="small">Okul Müdürü</label><input type="text" id="dt-okulmuduru" style="width:100%">
@@ -3204,7 +3209,7 @@ function editDurumTespitMeta(id) {
     <div class="modal-bg" onclick="if(event.target===this) closeModal()">
       <div class="modal" style="width:420px;">
         <h3>Form Bilgilerini Düzenle</h3>
-        <label class="small">Atölye / Laboratuvar</label><input type="text" id="dt-atolye" value="${escHtml(f.atolye)}" style="width:100%">
+        <label class="small">Atölye / Laboratuvar</label><select id="dt-atolye" style="width:100%">${odaSecenekleriHtml(f.atolye)}</select>
         <label class="small">Tarih</label><input type="text" id="dt-tarih" value="${escHtml(f.tarih)}" style="width:100%">
         <label class="small">Atölye/Lab. Şefi</label><input type="text" id="dt-atolyesefi" value="${escHtml(f.atolyeSefi)}" style="width:100%">
         <label class="small">Okul Müdürü</label><input type="text" id="dt-okulmuduru" value="${escHtml(f.okulMuduru)}" style="width:100%">
@@ -6322,6 +6327,7 @@ function viewAyarlar() {
   </div>
   ${renderAkademikTakvimKarti()}
   ${renderDalTanimlariKarti()}
+  ${renderOdaTanimlariKarti()}
   ${renderImzaSirkuleriKarti()}`;
 }
 const DAL_SUBE_HARFLERI = ["A", "B", "C", "D", "E", "F"];
@@ -6370,6 +6376,35 @@ function deleteDalTanimi(id) {
   S.dalTanimlari = S.dalTanimlari.filter(x => x.id !== id);
   if (dalFiltresi !== "ALL" && !S.dalTanimlari.some(d => d.id === dalFiltresi)) dalFiltresi = "ALL";
   save(); renderMain(); renderDalFiltresiWidget();
+}
+function renderOdaTanimlariKarti() {
+  const rows = S.rooms.map(r => `
+    <tr>
+      <td><input type="text" placeholder="örn. B3 - İmalat İşlemleri Atölyesi" value="${escHtml(r.name)}" style="width:100%;min-width:260px;" onchange="updateOdaAdi('${r.id}',this.value)"></td>
+      <td><button class="btn danger" onclick="deleteOda('${r.id}')">Sil</button></td>
+    </tr>`).join("");
+  return `
+  <div class="card">
+    <h2>Laboratuvar / Atölye Listesi</h2>
+    <p class="small">Makine Envanteri ve Durum Tespit Formu'ndaki "Laboratuvar/Atölye" alanları bu listeden seçilir — elle yazarken oluşan küçük farklılıklar (ör. "B3" / "B-3") yüzünden aynı atölyenin iki farklı isimle görünmesini önler. Ders Programı'ndaki mekan/çakışma kontrolü de bu listeyi kullanır.</p>
+    <table><thead><tr><th>Laboratuvar / Atölye Adı</th><th></th></tr></thead>
+    <tbody>${rows || `<tr><td colspan="2" class="small">Henüz tanımlanmadı.</td></tr>`}</tbody></table>
+    <div class="row"><button class="btn" onclick="addOda()">Laboratuvar/Atölye Ekle</button></div>
+  </div>`;
+}
+function addOda() {
+  S.rooms.push({ id: uid("r"), name: "" });
+  save(); renderMain();
+}
+function updateOdaAdi(id, value) {
+  const r = roomById(id);
+  if (r) r.name = value.trim();
+  save(); renderMain();
+}
+function deleteOda(id) {
+  if (!confirm("Bu laboratuvar/atölye silinsin mi? Bu adı zaten kullanan makine/form kayıtları etkilenmez, sadece listeden kaldırılır.")) return;
+  S.rooms = S.rooms.filter(x => x.id !== id);
+  save(); renderMain();
 }
 function renderImzaSirkuleriKarti() {
   const rows = S.imzaSirkuleri.map(k => `
