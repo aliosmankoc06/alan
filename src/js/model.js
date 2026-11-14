@@ -943,6 +943,28 @@ function sinifAdindanSubeAyikla(sinifAdi) {
   return m ? (m[1] || m[2]) : null;
 }
 
+/* Zamanlayıcının kendi eski/sabit dal kategorisi (DAL_LABELS) ile yeni,
+   Ayarlar'dan yönetilen S.dalTanimlari arasındaki köprü. "Gerçek" bir dal
+   olmayan, zamanlayıcıya özgü kategoriler (9. sınıf ortak, seçmeli, idari
+   vb.) hariç tutulur. */
+const DAL_OZEL_KATEGORILER = ["ORTAK9", "SERT", "ORTAK", "IDARI", "HERDAL"];
+/* S.dalTanimlari'ndeki bir dalın, zamanlayıcının eski kodundaki (ör. "MBO")
+   karşılığını bulur — o dalın şubelerinden birine ait, programa dahil
+   (excludeFromDistribution olmayan) ve "özel kategori" olmayan gerçek bir
+   sınıfın class.dal değerine bakarak. Böylece Kalfalık/Ustalık, Beceri
+   Sınavı ve Ders Havuzu ekranlarında gösterilen isim Ayarlar'daki güncel
+   dal adını kullanabilir, ama kayıtlı veride hâlâ eski kod saklanmaya
+   devam eder — var olan kayıtlar bozulmaz, zamanlayıcı etkilenmez. */
+function dalTanimindanEskiDalKodu(dalTanimId) {
+  const dt = dalTanimiById(dalTanimId);
+  if (!dt) return null;
+  for (const sube of (dt.subeler || [])) {
+    const cls = S.classes.find(c => !c.excludeFromDistribution && c.dal && !DAL_OZEL_KATEGORILER.includes(c.dal) && sinifAdindanSubeAyikla(c.name) === sube);
+    if (cls) return cls.dal;
+  }
+  return null;
+}
+
 function assignedCoursesForClass(cls) {
   return (cls.assignments || []).map(a => courseById(a.courseId)).filter(Boolean);
 }

@@ -412,6 +412,14 @@ function stajBySinif() {
     if (!bySinif[key]) bySinif[key] = [];
     bySinif[key].push(st);
   });
+  if (dalFiltresi !== "ALL") {
+    Object.keys(bySinif).forEach(key => {
+      const sube = sinifAdindanSubeAyikla(key);
+      if (!sube) return; // ayrıştırılamadı: her zaman göster
+      const dal = dalTanimiForSube(sube);
+      if (dal && dal.id !== dalFiltresi) delete bySinif[key];
+    });
+  }
   return bySinif;
 }
 /* -- Sekme 1: Öğrenciler (roster + ekleme) -- */
@@ -1809,8 +1817,17 @@ let activeDbfDersAdi = null;
 function dbfKayitlar() { return (typeof DERS_BILGI_FORMLARI !== "undefined" ? DERS_BILGI_FORMLARI : []); }
 function dbfProgramlar() { return [...new Set(dbfKayitlar().map(r => r.program))]; }
 function dbfSiniflar(program) {
-  return [...new Set(dbfKayitlar().filter(r => r.program === program).map(r => r.sinif))]
+  let siniflar = [...new Set(dbfKayitlar().filter(r => r.program === program).map(r => r.sinif))]
     .sort((a, b) => a.localeCompare(b, "tr", { numeric: true }));
+  if (dalFiltresi !== "ALL") {
+    siniflar = siniflar.filter(s => {
+      const sube = sinifAdindanSubeAyikla(s);
+      if (!sube) return true; // MESEM gibi şubesiz (geneli kapsayan) kayıtlar her zaman görünür
+      const dal = dalTanimiForSube(sube);
+      return !dal || dal.id === dalFiltresi;
+    });
+  }
+  return siniflar;
 }
 function dbfDersler(program, sinif) {
   return dbfKayitlar().filter(r => r.program === program && r.sinif === sinif)
@@ -4179,18 +4196,28 @@ function snIsDosyasiKriterAciklamasi() {
   </div>`;
 }
 
-/* ---- Kalfalık / Ustalık Sınavı (MESEM öğrencileri) ---- */
+/* ---- Kalfalık / Ustalık Sınavı (MESEM öğrencileri) ----
+   Dal butonları artık Ayarlar > Dallar'dan (S.dalTanimlari) geliyor —
+   bir dal yeniden adlandırılırsa veya yeni bir dal eklenirse burada da
+   görünür. activeKuDal, mevcut kayıtlarla (S.kalfalikUstalik.kayitlar[].dal)
+   uyumlu kalsın diye hâlâ eski kodu ("MBO"/"BMI") saklıyor — bkz.
+   dalTanimindanEskiDalKodu(). */
 let activeKuTur = "kalfalik";
 let activeKuDal = "MBO";
 function setKuTur(t) { activeKuTur = t; renderMain(); }
 function setKuDal(d) { activeKuDal = d; renderMain(); }
+function kuDalSecenekleri() {
+  return S.dalTanimlari.map(dt => ({ id: dalTanimindanEskiDalKodu(dt.id), label: dt.ad })).filter(d => d.id);
+}
 function viewKalfalikUstalik() {
   const turlar = [{ id: "kalfalik", label: "Kalfalık Sınavı" }, { id: "ustalik", label: "Ustalık Sınavı" }];
-  const dallar = [{ id: "MBO", label: DAL_LABELS.MBO }, { id: "BMI", label: DAL_LABELS.BMI }];
+  const dallar = kuDalSecenekleri();
+  if (!dallar.some(d => d.id === activeKuDal)) activeKuDal = dallar[0] ? dallar[0].id : "MBO";
   const turBar = `<div class="row no-print" style="flex-wrap:wrap;">${turlar.map(t => `<button class="btn ${t.id === activeKuTur ? 'primary' : ''}" onclick="setKuTur('${t.id}')">${t.label}</button>`).join("")}</div>`;
-  const dalBar = `<div class="row no-print" style="flex-wrap:wrap;margin-top:6px;">${dallar.map(d => `<button class="btn ${d.id === activeKuDal ? 'primary' : ''}" onclick="setKuDal('${d.id}')">${d.label}</button>`).join("")}</div>`;
+  const dalBar = `<div class="row no-print" style="flex-wrap:wrap;margin-top:6px;">${dallar.map(d => `<button class="btn ${d.id === activeKuDal ? 'primary' : ''}" onclick="setKuDal('${d.id}')">${escHtml(d.label)}</button>`).join("")}</div>`;
   const kayitlar = S.kalfalikUstalik.kayitlar.filter(k => k.tur === activeKuTur && k.dal === activeKuDal);
-  const baslik = (activeKuTur === "kalfalik" ? "MESEM Kalfalık" : "MESEM Ustalık") + " Beceri Sınavı Değerlendirme Çizelgesi — " + DAL_LABELS[activeKuDal];
+  const aktifDalAdi = (dallar.find(d => d.id === activeKuDal) || {}).label || DAL_LABELS[activeKuDal] || activeKuDal;
+  const baslik = (activeKuTur === "kalfalik" ? "MESEM Kalfalık" : "MESEM Ustalık") + " Beceri Sınavı Değerlendirme Çizelgesi — " + aktifDalAdi;
   const dosyaAdi = baslik;
   return `
   <div class="card no-print">
@@ -4214,14 +4241,21 @@ function viewKalfalikUstalik() {
 /* ---- Beceri Sınavı (İşletmelerde Beceri Eğitimi — AMP 12. sınıf) ---- */
 let activeBeceriSinif = "12-A";
 function setBeceriSinif(s) { activeBeceriSinif = s; renderMain(); }
+/* Bir sınıf adının Ayarlar > Dallar'daki güncel dal adını döndürür;
+   eşleşme yoksa zamanlayıcının eski dal etiketine düşer. */
+function sinifIcinDalAdi(sinifAdi, eskiKod) {
+  const sube = sinifAdindanSubeAyikla(sinifAdi);
+  const yeniDal = sube ? dalTanimiForSube(sube) : null;
+  return yeniDal ? yeniDal.ad : (DAL_LABELS[eskiKod] || eskiKod);
+}
 function viewBeceriSinavi() {
   const siniflarKaynagi = S.classes.filter(c => c.grade === 12 && !c.excludeFromDistribution);
   const siniflar = siniflarKaynagi.length ? siniflarKaynagi.map(c => ({ id: c.name, dal: c.dal })) : [{ id: "12-A", dal: "MBO" }, { id: "12-B", dal: "BMI" }];
   if (!siniflar.some(s => s.id === activeBeceriSinif)) activeBeceriSinif = siniflar[0].id;
   const aktifSinifTanimi = siniflar.find(s => s.id === activeBeceriSinif) || siniflar[0];
-  const sinifBar = `<div class="row no-print" style="flex-wrap:wrap;">${sekmeDropdown("beceri-sinif", siniflar.map(s => ({ value: s.id, label: s.id + " — " + (DAL_LABELS[s.dal] || s.dal) })), activeBeceriSinif, "setBeceriSinif('{v}')")}</div>`;
+  const sinifBar = `<div class="row no-print" style="flex-wrap:wrap;">${sekmeDropdown("beceri-sinif", siniflar.map(s => ({ value: s.id, label: s.id + " — " + sinifIcinDalAdi(s.id, s.dal) })), activeBeceriSinif, "setBeceriSinif('{v}')")}</div>`;
   const kayitlar = S.beceriSinavi.kayitlar.filter(k => k.sinif === activeBeceriSinif);
-  const baslik = "İşletmelerde Beceri Eğitimi Yıl Sonu Beceri Sınavı Değerlendirme Çizelgesi — " + activeBeceriSinif + " — " + (DAL_LABELS[aktifSinifTanimi.dal] || aktifSinifTanimi.dal);
+  const baslik = "İşletmelerde Beceri Eğitimi Yıl Sonu Beceri Sınavı Değerlendirme Çizelgesi — " + activeBeceriSinif + " — " + sinifIcinDalAdi(aktifSinifTanimi.id, aktifSinifTanimi.dal);
   const dosyaAdi = baslik;
   return `
   <div class="card no-print">
@@ -5327,7 +5361,18 @@ let activeSinavKagitId = null;
 
 function soruById(id) { return S.sinavHavuzu.sorular.find(x => x.id === id); }
 function kagitById(id) { return S.sinavKagitlari.find(x => x.id === id); }
-function sinavSiniflari() { return S.classes.filter(c => c.grade > 0).slice().sort((a, b) => a.name.localeCompare(b.name, "tr", { numeric: true })); }
+function sinavSiniflari() {
+  let list = S.classes.filter(c => c.grade > 0).slice().sort((a, b) => a.name.localeCompare(b.name, "tr", { numeric: true }));
+  if (dalFiltresi !== "ALL") {
+    list = list.filter(c => {
+      const sube = sinifAdindanSubeAyikla(c.name);
+      if (!sube) return true;
+      const dal = dalTanimiForSube(sube);
+      return !dal || dal.id === dalFiltresi;
+    });
+  }
+  return list;
+}
 function selectSinavSinif(classId) { activeSinavSinifId = classId; activeSinavCourseId = null; activeSinavTab = "havuz"; renderMain(); }
 function selectSinavCourse(courseId) { activeSinavCourseId = courseId; activeSinavTab = "havuz"; renderMain(); }
 function setSinavTab(id) { activeSinavTab = id; renderMain(); }
@@ -6194,13 +6239,27 @@ function openSavedProgramsModal() {
 }
 
 /* ---- Ders Havuzu ---- */
+/* Zamanlayıcının sabit 5 kategorisi (ORTAK9/MBO/BMI/SERT/HERDAL) aynı
+   kalır (course.dal'ın değer kümesi değişmiyor, zamanlayıcı etkilenmiyor)
+   — sadece MBO/BMI gibi gerçek bir dala karşılık gelenlerin GÖRÜNEN adı
+   Ayarlar > Dallar'dan (S.dalTanimlari) geliyorsa onunla gösterilir,
+   yoksa eski sabit etikete düşer. */
+function eskiDalKoduEtiketi(kod) {
+  for (const dt of S.dalTanimlari) {
+    if (dalTanimindanEskiDalKodu(dt.id) === kod) return dt.ad;
+  }
+  return DAL_LABELS[kod] || kod;
+}
+function havuzDalSecenekleri() {
+  return ["ORTAK9", "MBO", "BMI", "SERT", "HERDAL"].map(kod => ({ value: kod, label: eskiDalKoduEtiketi(kod) }));
+}
 function viewHavuz() {
   const rows = S.courses.filter(c => c.id !== KOORD_COURSE_ID).map(c => `
     <tr>
       <td class="no-print"><input type="text" value="${escHtml(c.code)}" style="width:70px;" onchange="updateCourseCode('${c.id}', this.value)"></td>
       <td class="print-only-cell">${escHtml(c.code)}</td>
       <td>${c.name}</td>
-      <td>${DAL_LABELS[c.dal] || c.dal}</td>
+      <td>${escHtml(eskiDalKoduEtiketi(c.dal))}</td>
       <td>${c.grade}</td>
       <td>${c.hours}</td>
       <td>${(c.blocks || []).join("+")}</td>
@@ -6220,11 +6279,7 @@ function viewHavuz() {
       <div><label class="small">Ders Adı</label><input type="text" id="nc-name" style="width:100%"></div>
       <div><label class="small">Dal</label>
         <select id="nc-dal" style="width:100%">
-          <option value="ORTAK9">9. Sınıf Ortak</option>
-          <option value="MBO">Makine Bakım Onarım</option>
-          <option value="BMI">Bilgisayarlı Makine İmalatı</option>
-          <option value="SERT">Sertifika / Seçmeli</option>
-          <option value="HERDAL">Tüm Dallar</option>
+          ${havuzDalSecenekleri().map(d => `<option value="${d.value}">${escHtml(d.label)}</option>`).join("")}
         </select>
       </div>
       <div><label class="small">Sınıf Seviyesi</label>
@@ -6272,11 +6327,7 @@ function editCourse(id) {
         <label class="small">Ders Adı</label><input type="text" id="ec-name" value="${escHtml(c.name)}" style="width:100%">
         <label class="small">Dal</label>
         <select id="ec-dal" style="width:100%">
-          <option value="ORTAK9" ${c.dal === 'ORTAK9' ? 'selected' : ''}>9. Sınıf Ortak</option>
-          <option value="MBO" ${c.dal === 'MBO' ? 'selected' : ''}>Makine Bakım Onarım</option>
-          <option value="BMI" ${c.dal === 'BMI' ? 'selected' : ''}>Bilgisayarlı Makine İmalatı</option>
-          <option value="SERT" ${c.dal === 'SERT' ? 'selected' : ''}>Sertifika / Seçmeli</option>
-          <option value="HERDAL" ${c.dal === 'HERDAL' ? 'selected' : ''}>Tüm Dallar</option>
+          ${havuzDalSecenekleri().map(d => `<option value="${d.value}" ${c.dal === d.value ? 'selected' : ''}>${escHtml(d.label)}</option>`).join("")}
         </select>
         <label class="small">Sınıf Seviyesi</label>
         <select id="ec-grade" style="width:100%">${[9,10,11,12].map(g => `<option ${c.grade === g ? 'selected' : ''}>${g}</option>`).join("")}</select>
@@ -6558,7 +6609,7 @@ function viewSinif() {
   if (!gorunenSiniflar.some(c => c.id === activeClassId)) activeClassId = gorunenSiniflar[0] ? gorunenSiniflar[0].id : null;
   const listHtml = gorunenSiniflar.map(c => `
     <div class="list-item ${c.id === activeClassId ? 'active' : ''}" onclick="setActiveClass('${c.id}')">
-      <span>${c.name} <span class="small">(${DAL_LABELS[c.dal] || c.dal})</span> ${c.excludeFromDistribution ? '<span class="pill warn">Dahil değil</span>' : ''}</span>
+      <span>${c.name} <span class="small">(${escHtml(eskiDalKoduEtiketi(c.dal))})</span> ${c.excludeFromDistribution ? '<span class="pill warn">Dahil değil</span>' : ''}</span>
       <span style="display:flex;gap:8px;flex-shrink:0;margin-left:6px;">
         <span onclick="event.stopPropagation(); editClass('${c.id}');" style="cursor:pointer;" title="Sınıfı düzenle">✎</span>
         <span onclick="event.stopPropagation(); deleteClass('${c.id}');" style="cursor:pointer;" title="Sınıfı sil">✕</span>
