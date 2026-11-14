@@ -17,6 +17,10 @@ const BULUT_FIREBASE_CONFIG = {
   measurementId: "G-8X2ELT4260"
 };
 
+// TEMP: tüm düzenlemeler bitene kadar giriş zorunlu değil — test kolaylığı
+// için geçici olarak kapatıldı. En son true yapılacak.
+const BULUT_GIRIS_ZORUNLU = false;
+
 let bulutDb = null;
 let bulutDinleyiciDurdur = null;
 
@@ -53,7 +57,7 @@ function bulutBaslat() {
         } else {
           if (bulutDinleyiciDurdur) { bulutDinleyiciDurdur(); bulutDinleyiciDurdur = null; }
           bulutDurumGoster(null);
-          bulutGirisEkraniniGoster();
+          if (BULUT_GIRIS_ZORUNLU) bulutGirisEkraniniGoster();
         }
       });
     });
