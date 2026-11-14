@@ -2293,7 +2293,7 @@ function viewOgrenciListesi() {
       </div>
       <p class="small" style="margin-top:8px;">Kız Öğrenci Sayısı: ${kiz} · Erkek Öğrenci Sayısı: ${erkek} · Toplam: ${ogrenciler.length}</p>
     </div>
-  </div>` : `<div class="card small" style="text-align:center;padding:30px 20px;">Henüz hiçbir sınıf için öğrenci listesi yok. Yukarıdan PDF yükleyebilir ya da bir sınıf seçip elle ekleyebilirsiniz.</div>`}`;
+  </div>` : `<div class="card small" style="text-align:center;padding:30px 20px;">Henüz hiçbir sınıf için öğrenci listesi yok. Yukarıdan "Sınıf Listesi PDF Yükle" ile e-Okul'dan aldığınız listeyi yükleyin.</div>`}`;
 }
 
 /* ---- Norm Kadro ----
@@ -6416,22 +6416,45 @@ function dalChipHtml(d) {
   if (!d) return "";
   return `<span class="dal-chip dal-chip-${d.renkKey}">${escHtml(d.ad || "Dal")}</span>`;
 }
+const DAL_RENK_SECENEKLERI = [
+  { value: "accent", label: "Mavi" },
+  { value: "teal", label: "Yeşil" },
+  { value: "warn", label: "Turuncu" }
+];
+/* Bir dalın şubelerine karşılık gelen gerçek sınıfları (S.classes) canlı
+   olarak gösterir — kullanıcı hangi gerçek sınıfların bu dala dahil
+   olduğunu, sınıf adlarını tek tek ezberlemeden görebilsin diye. */
+function dalKapsadigiSiniflar(d) {
+  return S.classes.filter(c => c.grade > 0 && !c.excludeFromDistribution && (d.subeler || []).includes(sinifAdindanSubeAyikla(c.name)))
+    .map(c => c.name).sort((a, b) => a.localeCompare(b, "tr", { numeric: true }));
+}
 function renderDalTanimlariKarti() {
-  const rows = S.dalTanimlari.map(d => `
+  const rows = S.dalTanimlari.map(d => {
+    const kapsananSiniflar = dalKapsadigiSiniflar(d);
+    return `
     <tr>
-      <td><input type="text" placeholder="Dal adı" value="${escHtml(d.ad)}" style="width:100%;min-width:200px;" onchange="updateDalTanimi('${d.id}','ad',this.value)"></td>
+      <td>
+        <input type="text" placeholder="Dal adı" value="${escHtml(d.ad)}" style="width:100%;min-width:180px;" onchange="updateDalTanimi('${d.id}','ad',this.value)">
+        <div style="margin-top:4px;">${dalChipHtml(d)}</div>
+      </td>
       <td>${DAL_SUBE_HARFLERI.map(h => `<label style="display:inline-flex;align-items:center;gap:3px;margin-right:10px;">
           <input type="checkbox" ${d.subeler.includes(h) ? "checked" : ""} onchange="updateDalSubeleri('${d.id}','${h}',this.checked)"> ${h}
         </label>`).join("")}</td>
-      <td>${dalChipHtml(d)}</td>
+      <td>
+        <select style="width:100%;min-width:100px;" onchange="updateDalTanimi('${d.id}','renkKey',this.value)">
+          ${DAL_RENK_SECENEKLERI.map(r => `<option value="${r.value}" ${d.renkKey === r.value ? "selected" : ""}>${r.label}</option>`).join("")}
+        </select>
+      </td>
+      <td class="small" style="min-width:160px;">${kapsananSiniflar.length ? escHtml(kapsananSiniflar.join(", ")) : "<span style=\"color:var(--muted,#888);\">Henüz eşleşen sınıf yok</span>"}</td>
       <td><button class="btn danger" onclick="deleteDalTanimi('${d.id}')">Sil</button></td>
-    </tr>`).join("");
+    </tr>`;
+  }).join("");
   return `
   <div class="card">
     <h2>Dallar</h2>
-    <p class="small">Alanınız birden fazla dala ayrılıyorsa (örn. Makine Bakım Onarım / Bilgisayarlı Makine İmalatı) burada tanımlayın ve hangi şube harflerinin hangi dala ait olduğunu işaretleyin. Bir dal kapandığında şubelerini kaldırmanız, yeni bir dal açıldığında ise buradan eklemeniz yeterli — Öğrenci Listesi, Performans, Norm Kadro, Yıllık/Günlük Plan ve sol menüdeki Dal süzgeci otomatik güncellenir. Bir dalı silmek, ona ait öğrenci/plan kayıtlarını silmez — sadece süzgeçten kaldırır.</p>
-    <table><thead><tr><th>Dal Adı</th><th>Şubeler</th><th>Rozet</th><th></th></tr></thead>
-    <tbody>${rows || `<tr><td colspan="4" class="small">Henüz dal tanımlanmadı.</td></tr>`}</tbody></table>
+    <p class="small">Alanınız birden fazla dala ayrılıyorsa (örn. Makine Bakım Onarım / Bilgisayarlı Makine İmalatı) burada tanımlayın ve hangi şube harflerinin hangi dala ait olduğunu işaretleyin. Bir dal kapandığında şubelerini kaldırmanız, yeni bir dal açıldığında ise buradan eklemeniz yeterli — Öğrenci Listesi, Performans, Norm Kadro, Yıllık/Günlük Plan ve sol menüdeki Dal süzgeci otomatik güncellenir. Bir şube harfi zaten başka bir dala işaretliyse, yeni dala işaretlediğinizde oradan otomatik kaldırılır (bir şube aynı anda sadece bir dala ait olabilir). Bir dalı silmek, ona ait öğrenci/plan kayıtlarını silmez — sadece süzgeçten kaldırır.</p>
+    <table><thead><tr><th>Dal Adı</th><th>Şubeler</th><th>Renk</th><th>Kapsadığı Sınıflar</th><th></th></tr></thead>
+    <tbody>${rows || `<tr><td colspan="5" class="small">Henüz dal tanımlanmadı.</td></tr>`}</tbody></table>
     <div class="row"><button class="btn" onclick="addDalTanimi()">Dal Ekle</button></div>
   </div>`;
 }
@@ -6447,10 +6470,12 @@ function updateDalTanimi(id, field, value) {
   save(); renderMain(); renderDalFiltresiWidget();
 }
 function updateDalSubeleri(id, harf, checked) {
+  const eskiSahip = S.dalTanimlari.find(d => d.id !== id && d.subeler.includes(harf));
   S.dalTanimlari.forEach(d => { d.subeler = d.subeler.filter(s => s !== harf); });
   const d = S.dalTanimlari.find(x => x.id === id);
   if (d && checked) d.subeler.push(harf);
   save(); renderMain(); renderDalFiltresiWidget();
+  if (checked && eskiSahip && d) alert(`"${harf}" şubesi daha önce "${eskiSahip.ad || "(adsız dal)"}" dalına işaretliydi — artık "${d.ad || "(adsız dal)"}" dalına taşındı.`);
 }
 function deleteDalTanimi(id) {
   if (!confirm("Bu dal silinsin mi? Bu dala atanmış sınıflar/kayıtlar silinmez, sadece dal süzgecinde artık ayrı gösterilmez.")) return;
