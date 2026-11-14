@@ -5742,7 +5742,7 @@ function renderSidebarBrand() {
 /* ---- Karanlık Mod ---- */
 const THEME_KEY = "aok-theme-v1";
 function currentTheme() {
-  try { return localStorage.getItem(THEME_KEY) || "light"; } catch (e) { return "light"; }
+  try { return localStorage.getItem(THEME_KEY) || "dark"; } catch (e) { return "dark"; }
 }
 function applyTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme);
@@ -6951,9 +6951,10 @@ function renderSurumWidget() {
       <span onclick="event.stopPropagation(); deleteVersion('${jsq(v.id)}');" style="cursor:pointer;" title="Bu kaydı sil">✕</span>
     </div>`).join("");
   el.innerHTML = `
-    <div class="tab-dropdown no-print" style="display:block;width:100%;margin-top:6px;">
-      <button class="btn" style="width:100%;font-size:12px;" onclick="toggleTabDropdown('surum-secici')" title="Kaydedilmiş isimli kayıtlar arasında geçiş yapın">
-        📁 ${aktif ? escHtml(aktif.name) : "İsimsiz çalışma"} ▾
+    <div class="tab-dropdown no-print surum-chip-wrap">
+      <button class="surum-chip" onclick="toggleTabDropdown('surum-secici')" title="Kaydedilmiş isimli kayıtlar arasında geçiş yapın">
+        <span class="surum-chip-ad">${aktif ? escHtml(aktif.name) : "İsimsiz Çalışma"}</span>
+        ${icon("chevron")}
       </button>
       <div id="tabdd-surum-secici" class="tab-dropdown-menu" style="left:0;right:0;width:auto;">
         ${items || '<div class="tab-dropdown-item small">Henüz isimli bir kayıt yok</div>'}

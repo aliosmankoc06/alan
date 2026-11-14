@@ -8,7 +8,7 @@
 <script>
   (function () {
     try {
-      var t = localStorage.getItem("aok-theme-v1") || "light";
+      var t = localStorage.getItem("aok-theme-v1") || "dark";
       document.documentElement.setAttribute("data-theme", t);
     } catch (e) {}
   })();
@@ -35,12 +35,12 @@
     <div class="school-line" id="sidebar-school-line">Soma Mesleki ve Teknik Anadolu Lisesi<br>Makine Teknolojisi Alanı</div>
     <div class="dal-switcher no-print" id="dal-switcher"></div>
     <div class="save-status-bar no-print">
-      <div class="row" style="gap:6px;margin:0;">
-        <button class="btn" id="kaydet-btn" onclick="kaydetManuel()" style="flex:1;font-size:12px;padding-left:4px;padding-right:4px;">💾 Kaydet</button>
-        <button class="btn" onclick="farkliKaydetSurum()" style="flex:1;font-size:12px;padding-left:4px;padding-right:4px;" title="Şu anki çalışmayı yeni bir isimle kaydet">Farklı Kaydet</button>
+      <div id="surum-widget"></div>
+      <div class="save-row">
+        <button class="save-btn" id="kaydet-btn" onclick="kaydetManuel()">Kaydet</button>
+        <button class="save-btn-ghost" onclick="farkliKaydetSurum()" title="Şu anki çalışmayı yeni bir isimle kaydet">Farklı Kaydet</button>
       </div>
       <div class="small" id="son-kayit-metni">Henüz kayıt yok</div>
-      <div id="surum-widget"></div>
       <div id="bulut-durum" class="small"></div>
     </div>
     <div class="sidebar-search">
