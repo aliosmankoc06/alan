@@ -1951,11 +1951,7 @@ function importOgrenciListesiFromWord() {
     }).catch(e => alert("Yükleme hatası: " + e.message));
   });
 }
-function addOgrenci(sinif) {
-  S.ogrenciListesi.push({ id: uid("og"), sinif, okulNo: "", ad: "", soyad: "", cinsiyet: "Erkek", pansiyon: "" });
-  save(); renderMain();
-}
-function updateOgrenci(id, field, value) {
+function updateOgrenciListesi(id, field, value) {
   const o = S.ogrenciListesi.find(x => x.id === id);
   if (!o) return;
   o[field] = value;
@@ -1975,15 +1971,15 @@ function viewOgrenciListesi() {
   const rows = ogrenciler.map((o, i) => `
     <tr>
       <td>${i + 1}</td>
-      <td><input class="no-print" type="text" value="${escHtml(o.okulNo)}" style="width:70px" onchange="updateOgrenci('${o.id}','okulNo',this.value)"><span class="print-only-inline">${escHtml(o.okulNo)}</span></td>
-      <td><input class="no-print" type="text" value="${escHtml(o.ad)}" style="width:130px" onchange="updateOgrenci('${o.id}','ad',this.value)"><span class="print-only-inline">${escHtml(o.ad)}</span></td>
-      <td><input class="no-print" type="text" value="${escHtml(o.soyad)}" style="width:130px" onchange="updateOgrenci('${o.id}','soyad',this.value)"><span class="print-only-inline">${escHtml(o.soyad)}</span></td>
-      <td class="no-print"><select onchange="updateOgrenci('${o.id}','cinsiyet',this.value)">
+      <td><input class="no-print" type="text" value="${escHtml(o.okulNo)}" style="width:70px" onchange="updateOgrenciListesi('${o.id}','okulNo',this.value)"><span class="print-only-inline">${escHtml(o.okulNo)}</span></td>
+      <td><input class="no-print" type="text" value="${escHtml(o.ad)}" style="width:130px" onchange="updateOgrenciListesi('${o.id}','ad',this.value)"><span class="print-only-inline">${escHtml(o.ad)}</span></td>
+      <td><input class="no-print" type="text" value="${escHtml(o.soyad)}" style="width:130px" onchange="updateOgrenciListesi('${o.id}','soyad',this.value)"><span class="print-only-inline">${escHtml(o.soyad)}</span></td>
+      <td class="no-print"><select onchange="updateOgrenciListesi('${o.id}','cinsiyet',this.value)">
         <option value="Erkek" ${o.cinsiyet === "Erkek" ? "selected" : ""}>Erkek</option>
         <option value="Kız" ${o.cinsiyet === "Kız" ? "selected" : ""}>Kız</option>
       </select></td>
       <td class="print-only-cell">${escHtml(o.cinsiyet)}</td>
-      <td><input class="no-print" type="text" value="${escHtml(o.pansiyon)}" placeholder="-" style="width:80px" onchange="updateOgrenci('${o.id}','pansiyon',this.value)"><span class="print-only-inline">${escHtml(o.pansiyon || "-")}</span></td>
+      <td><input class="no-print" type="text" value="${escHtml(o.pansiyon)}" placeholder="-" style="width:80px" onchange="updateOgrenciListesi('${o.id}','pansiyon',this.value)"><span class="print-only-inline">${escHtml(o.pansiyon || "-")}</span></td>
       <td class="no-print"><button class="btn danger" onclick="deleteOgrenci('${o.id}')">Sil</button></td>
     </tr>`).join("");
   const erkek = ogrenciler.filter(o => o.cinsiyet === "Erkek").length;
