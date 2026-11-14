@@ -6520,14 +6520,6 @@ function idariOgretmenEkle(clsId, teacherId) {
   cls.assignments.push({ id: uid("a"), courseId: "pbo-6", eligibleTeacherIds: [teacherId], teacherCount: 1, roomIds: [] });
   save(); renderMain();
 }
-/* Sadece bilgi amaçlı: yeni (kullanıcı tanımlı) Dal ile zamanlayıcının kendi
-   dal kategorisini (DAL_LABELS/c.dal) karşılaştırma rozeti — hiçbir şeyi
-   filtrelemez/değiştirmez, sadece olası tutarsızlığı görünür kılar. */
-function dalIpucuChipHtml(sinifAdi) {
-  const sube = sinifAdindanSubeAyikla(sinifAdi);
-  const dal = sube ? dalTanimiForSube(sube) : null;
-  return dal ? `<span class="dal-chip dal-chip-${dal.renkKey}" title="Ayarlar &gt; Dallar ile eşleşme (bilgi amaçlı)">${escHtml(dal.ad)}</span>` : "";
-}
 /* Sınıflar ve Ders Atama listesini de Aktif Dal süzgecine göre daraltır —
    zamanlayıcının kendi c.dal/DAL_LABELS kategorisine ve dağıtım mantığına
    dokunmadan, sadece bu listede gösterilen sınıfları filtreler. İdari
@@ -6547,7 +6539,7 @@ function viewSinif() {
   if (!gorunenSiniflar.some(c => c.id === activeClassId)) activeClassId = gorunenSiniflar[0] ? gorunenSiniflar[0].id : null;
   const listHtml = gorunenSiniflar.map(c => `
     <div class="list-item ${c.id === activeClassId ? 'active' : ''}" onclick="setActiveClass('${c.id}')">
-      <span>${c.name} <span class="small">(${DAL_LABELS[c.dal] || c.dal})</span> ${dalIpucuChipHtml(c.name)} ${c.excludeFromDistribution ? '<span class="pill warn">Dahil değil</span>' : ''}</span>
+      <span>${c.name} <span class="small">(${DAL_LABELS[c.dal] || c.dal})</span> ${c.excludeFromDistribution ? '<span class="pill warn">Dahil değil</span>' : ''}</span>
       <span style="display:flex;gap:8px;flex-shrink:0;margin-left:6px;">
         <span onclick="event.stopPropagation(); editClass('${c.id}');" style="cursor:pointer;" title="Sınıfı düzenle">✎</span>
         <span onclick="event.stopPropagation(); deleteClass('${c.id}');" style="cursor:pointer;" title="Sınıfı sil">✕</span>
