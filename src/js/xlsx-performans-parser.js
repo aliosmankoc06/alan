@@ -12,7 +12,7 @@
    sütunları arasındaki 8 sütun, her kriterin ayrı ayrı girilen
    puanıdır (gerçek çizelgede olduğu gibi). */
 
-function cellText(v) {
+function performansCellText(v) {
   if (v === null || v === undefined) return "";
   if (v instanceof Date) return v.toLocaleDateString("tr-TR");
   return String(v).trim();
@@ -23,7 +23,7 @@ function findLabelRowIndex(rows, prefix) {
   for (let i = 0; i < Math.min(rows.length, 8); i++) {
     const row = rows[i] || [];
     for (let c = 0; c < row.length; c++) {
-      if (cellText(row[c]).toUpperCase().startsWith(target)) return i;
+      if (performansCellText(row[c]).toUpperCase().startsWith(target)) return i;
     }
   }
   return -1;
@@ -33,12 +33,12 @@ function labelValue(rows, prefix) {
   if (i < 0) return "";
   const row = rows[i] || [];
   for (let c = 0; c < row.length; c++) {
-    const t = cellText(row[c]);
+    const t = performansCellText(row[c]);
     if (!t.toUpperCase().startsWith(prefix.toUpperCase())) continue;
     const rest = t.slice(t.indexOf(":") + 1).trim();
     if (rest) return rest;
     for (let c2 = c + 1; c2 < row.length; c2++) {
-      const v = cellText(row[c2]).replace(/^:\s*/, "").trim();
+      const v = performansCellText(row[c2]).replace(/^:\s*/, "").trim();
       if (v) return v;
     }
   }
@@ -46,19 +46,19 @@ function labelValue(rows, prefix) {
 }
 function findHeaderRowIndex(rows) {
   for (let i = 0; i < rows.length; i++) {
-    const row = (rows[i] || []).map(v => cellText(v).toUpperCase());
+    const row = (rows[i] || []).map(v => performansCellText(v).toUpperCase());
     if (row.some(c => c.includes("SIRA")) && row.some(c => c.includes("OKUL NO"))) return i;
   }
   return -1;
 }
 
-function parsePerformansWorkbook(filePath, XLSX) {
-  const wb = XLSX.readFile(filePath, { cellDates: true });
+function parsePerformansWorkbook(filePathOrWb, XLSX) {
+  const wb = typeof filePathOrWb === "string" ? XLSX.readFile(filePathOrWb, { cellDates: true }) : filePathOrWb;
   const kayitlar = [];
   wb.SheetNames.forEach(sheetName => {
     const ws = wb.Sheets[sheetName];
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: "" });
-    const turMetin = cellText(rows[1] && rows[1][0]);
+    const turMetin = performansCellText(rows[1] && rows[1][0]);
     const tur = /^\s*2\./.test(turMetin) ? "odev" : "dersici";
     const ders = labelValue(rows, "Ders");
     const sinif = labelValue(rows, "Sınıf").replace(/\//g, "-");
@@ -67,7 +67,7 @@ function parsePerformansWorkbook(filePath, XLSX) {
 
     const dersRowIdx = findLabelRowIndex(rows, "Ders");
     const dersRow = rows[dersRowIdx] || [];
-    let colToplam = dersRow.findIndex(v => cellText(v).toUpperCase().includes("TOPLAM"));
+    let colToplam = dersRow.findIndex(v => performansCellText(v).toUpperCase().includes("TOPLAM"));
     if (colToplam < 0) colToplam = 11;
 
     const headerIdx = findHeaderRowIndex(rows);
@@ -76,7 +76,7 @@ function parsePerformansWorkbook(filePath, XLSX) {
     const ogrenciler = [];
     for (let r = headerIdx + 1; r < rows.length; r++) {
       const row = rows[r] || [];
-      const ad = cellText(row[2]);
+      const ad = performansCellText(row[2]);
       if (!ad) continue;
       const puanlar = [];
       for (let c = 3; c < colToplam; c++) {
@@ -85,8 +85,8 @@ function parsePerformansWorkbook(filePath, XLSX) {
       }
       while (puanlar.length < 8) puanlar.push(0);
       ogrenciler.push({
-        sira: cellText(row[0]),
-        okulNo: cellText(row[1]),
+        sira: performansCellText(row[0]),
+        okulNo: performansCellText(row[1]),
         ad,
         puanlar: puanlar.slice(0, 8)
       });
@@ -96,4 +96,4 @@ function parsePerformansWorkbook(filePath, XLSX) {
   return { kayitlar };
 }
 
-module.exports = { parsePerformansWorkbook };
+if (typeof module !== "undefined") module.exports = { parsePerformansWorkbook };

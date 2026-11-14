@@ -802,10 +802,11 @@ function notOrtalamalariIceAktar() {
   notOrtalamalariUygula(kayitlar);
 }
 function notOrtalamalariExcelYukle() {
-  if (!window.desktop || !window.desktop.isElectron) { alert("Excel yükleme sadece masaüstü uygulamasında çalışır."); return; }
-  window.desktop.openXlsxDialog().then(filePath => {
+  const belge = belgeAraci();
+  if (!belge) { alert("Excel yükleme için bu özellik yüklenemedi — internet bağlantını kontrol et."); return; }
+  belge.openXlsxDialog().then(filePath => {
     if (!filePath) return;
-    window.desktop.importNotOrtalamaXlsx(filePath).then(result => {
+    belge.importNotOrtalamaXlsx(filePath).then(result => {
       const kayitlar = result.kayitlar || [];
       if (!kayitlar.length) { alert("Bu dosyada Okul No ve Not/Ortalama sütunları bulunamadı."); return; }
       notOrtalamalariUygula(kayitlar);
@@ -813,10 +814,11 @@ function notOrtalamalariExcelYukle() {
   });
 }
 function wordDosyasiniTextareayaYukle(textareaId, uygulaFn) {
-  if (!window.desktop || !window.desktop.isElectron) { alert("Word yükleme sadece masaüstü uygulamasında çalışır."); return; }
-  window.desktop.openWordDialog().then(filePath => {
+  const belge = belgeAraci();
+  if (!belge) { alert("Word yükleme için bu özellik yüklenemedi — internet bağlantını kontrol et."); return; }
+  belge.openWordDialog().then(filePath => {
     if (!filePath) return;
-    window.desktop.importWordTable(filePath).then(result => {
+    belge.importWordTable(filePath).then(result => {
       const text = (result && result.text) || "";
       if (!text.trim()) { alert("Bu Word dosyasında okunabilir bir tablo/metin bulunamadı."); return; }
       document.getElementById(textareaId).value = text;
@@ -1180,10 +1182,11 @@ function mergePlanImportResult(result) {
   return { yillik, gunluk };
 }
 function importPlanFromExcel() {
-  if (!window.desktop || !window.desktop.isElectron) { alert("Excel yükleme sadece masaüstü uygulamasında çalışır."); return; }
-  window.desktop.openXlsxDialog().then(filePath => {
+  const belge = belgeAraci();
+  if (!belge) { alert("Excel yükleme için bu özellik yüklenemedi — internet bağlantını kontrol et."); return; }
+  belge.openXlsxDialog().then(filePath => {
     if (!filePath) return;
-    window.desktop.importPlanXlsx(filePath).then(result => {
+    belge.importPlanXlsx(filePath).then(result => {
       const eklenen = mergePlanImportResult(result);
       if (eklenen.yillik === 0 && eklenen.gunluk === 0 && !result.takvim) {
         alert("Bu dosyada tanıdığım bir Yıllık Plan / Günlük Plan / Takvim sayfası bulunamadı.");
@@ -1913,10 +1916,11 @@ function mergeOgrenciListesiImport(result) {
   return { eklenen, guncellenen };
 }
 function importOgrenciListesiFromPdf() {
-  if (!window.desktop || !window.desktop.isElectron) { alert("PDF yükleme sadece masaüstü uygulamasında çalışır."); return; }
-  window.desktop.openPdfDialog().then(filePath => {
+  const belge = belgeAraci();
+  if (!belge) { alert("PDF yükleme için bu özellik yüklenemedi — internet bağlantını kontrol et."); return; }
+  belge.openPdfDialog().then(filePath => {
     if (!filePath) return;
-    window.desktop.importOgrenciPdf(filePath).then(result => {
+    belge.importOgrenciPdf(filePath).then(result => {
       if (!result.siniflar || !result.siniflar.length) {
         alert("Bu PDF'te tanıdığım bir e-Okul Sınıf Listesi bulunamadı. Dosyanın e-Okul'dan alınan \"Sınıf Listesi\" raporu olduğundan emin olun.");
         return;
@@ -1930,10 +1934,11 @@ function importOgrenciListesiFromPdf() {
   });
 }
 function importOgrenciListesiFromWord() {
-  if (!window.desktop || !window.desktop.isElectron) { alert("Word yükleme sadece masaüstü uygulamasında çalışır."); return; }
-  window.desktop.openWordDialog().then(filePath => {
+  const belge = belgeAraci();
+  if (!belge) { alert("Word yükleme için bu özellik yüklenemedi — internet bağlantını kontrol et."); return; }
+  belge.openWordDialog().then(filePath => {
     if (!filePath) return;
-    window.desktop.importOgrenciWord(filePath).then(result => {
+    belge.importOgrenciWord(filePath).then(result => {
       if (!result.siniflar || !result.siniflar.length) {
         alert("Bu Word dosyasında tanıdığım bir e-Okul Sınıf Listesi bulunamadı. Dosyanın e-Okul'dan alınan \"Sınıf Listesi\" raporu olduğundan emin olun.");
         return;
@@ -2858,10 +2863,11 @@ function renderMakineOzetTablosu(list) {
   </div>`;
 }
 function importEnvanterFromExcel() {
-  if (!window.desktop || !window.desktop.isElectron) { alert("Excel yükleme sadece masaüstü uygulamasında çalışır."); return; }
-  window.desktop.openXlsxDialog().then(filePath => {
+  const belge = belgeAraci();
+  if (!belge) { alert("Excel yükleme için bu özellik yüklenemedi — internet bağlantını kontrol et."); return; }
+  belge.openXlsxDialog().then(filePath => {
     if (!filePath) return;
-    window.desktop.importEnvanterXlsx(filePath).then(result => {
+    belge.importEnvanterXlsx(filePath).then(result => {
       const makineler = result.makineler || [];
       if (!makineler.length) { alert("Bu dosyada tanıdığım bir makine envanteri tablosu bulunamadı."); return; }
       let eklenen = 0, guncellenen = 0;
@@ -3340,10 +3346,11 @@ function removeOgrenci(kayitId, id) {
   save(); renderMain();
 }
 function importPerformansFromExcel() {
-  if (!window.desktop || !window.desktop.isElectron) { alert("Excel yükleme sadece masaüstü uygulamasında çalışır."); return; }
-  window.desktop.openXlsxDialog().then(filePath => {
+  const belge = belgeAraci();
+  if (!belge) { alert("Excel yükleme için bu özellik yüklenemedi — internet bağlantını kontrol et."); return; }
+  belge.openXlsxDialog().then(filePath => {
     if (!filePath) return;
-    window.desktop.importPerformansXlsx(filePath).then(result => {
+    belge.importPerformansXlsx(filePath).then(result => {
       const kayitlar = result.kayitlar || [];
       if (!kayitlar.length) { alert("Bu dosyada tanıdığım bir performans değerlendirme tablosu bulunamadı."); return; }
       let eklenen = 0, guncellenen = 0;

@@ -3,11 +3,11 @@ const path = require("path");
 const fs = require("fs");
 const XLSX = require("xlsx");
 const ExcelJS = require("exceljs");
-const { parsePlanWorkbook } = require("./xlsx-plan-parser");
-const { parseEnvanterWorkbook } = require("./xlsx-envanter-parser");
-const { parsePerformansWorkbook } = require("./xlsx-performans-parser");
+const { parsePlanWorkbook } = require("../src/js/xlsx-plan-parser");
+const { parseEnvanterWorkbook } = require("../src/js/xlsx-envanter-parser");
+const { parsePerformansWorkbook } = require("../src/js/xlsx-performans-parser");
 const pdfParse = require("pdf-parse");
-const { parseOgrenciPdf } = require("./pdf-ogrenci-parser");
+const { parseOgrenciPdf } = require("../src/js/pdf-ogrenci-parser");
 const mammoth = require("mammoth");
 const WordExtractor = require("word-extractor");
 

@@ -431,6 +431,217 @@ async function webExportWord(defaultName, innerHtml, landscape) {
   return defaultName;
 }
 
+/* ---- Dosya seçme diyalogları (Electron'daki dialog:open-* ipc'lerin
+   tarayıcı karşılığı: gizli bir <input type="file">, seçilen File nesnesi
+   Promise ile dönüyor; iptal edilirse null döner — Electron'daki
+   "iptal edilirse null" davranışıyla aynı). */
+function webOpenFileDialog(accept) {
+  return new Promise(resolve => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = accept;
+    input.style.display = "none";
+    let yanitlandi = false;
+    function temizle() {
+      yanitlandi = true;
+      if (input.parentNode) input.parentNode.removeChild(input);
+    }
+    input.addEventListener("change", () => {
+      if (yanitlandi) return;
+      const file = input.files && input.files[0];
+      temizle();
+      resolve(file || null);
+    });
+    input.addEventListener("cancel", () => {
+      if (yanitlandi) return;
+      temizle();
+      resolve(null);
+    });
+    document.body.appendChild(input);
+    input.click();
+  });
+}
+function webOpenXlsxDialog() { return webOpenFileDialog(".xlsx,.xls"); }
+function webOpenWordDialog() { return webOpenFileDialog(".doc,.docx"); }
+function webOpenPdfDialog() { return webOpenFileDialog(".pdf"); }
+
+/* ---- Excel içe aktarma (SheetJS ile, Electron'daki import:* ipc'lerin
+   tarayıcı karşılığı — aynı parsePlanWorkbook/parseEnvanterWorkbook/
+   parsePerformansWorkbook fonksiyonları, dosya yolu yerine hazır workbook
+   nesnesi vererek çağrılıyor; bkz. xlsx-*-parser.js'teki filePathOrWb). ---- */
+async function webReadWorkbook(file, opts) {
+  if (typeof XLSX === "undefined") throw new Error("Excel kütüphanesi yüklenemedi — internet bağlantını kontrol et.");
+  const buf = await file.arrayBuffer();
+  return XLSX.read(buf, Object.assign({ type: "array" }, opts || {}));
+}
+async function webImportPlanXlsx(file) {
+  const wb = await webReadWorkbook(file);
+  return parsePlanWorkbook(wb, XLSX);
+}
+async function webImportEnvanterXlsx(file) {
+  const wb = await webReadWorkbook(file, { cellDates: true });
+  return parseEnvanterWorkbook(wb, XLSX);
+}
+async function webImportPerformansXlsx(file) {
+  const wb = await webReadWorkbook(file, { cellDates: true });
+  return parsePerformansWorkbook(wb, XLSX);
+}
+async function webImportNotOrtalamaXlsx(file) {
+  const wb = await webReadWorkbook(file);
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+  let okulNoCol = 0, notCol = 1, basladi = 0;
+  for (let r = 0; r < Math.min(rows.length, 5); r++) {
+    const row = rows[r].map(c => String(c).trim().toLocaleLowerCase("tr-TR"));
+    const oIdx = row.findIndex(c => c.includes("okul") && c.includes("no"));
+    const nIdx = row.findIndex(c => c.includes("not") || c.includes("ortalama") || c.includes("puan"));
+    if (oIdx >= 0 && nIdx >= 0) { okulNoCol = oIdx; notCol = nIdx; basladi = r + 1; break; }
+  }
+  const kayitlar = [];
+  for (let r = basladi; r < rows.length; r++) {
+    const okulNo = String(rows[r][okulNoCol] !== undefined ? rows[r][okulNoCol] : "").trim();
+    const not_ = String(rows[r][notCol] !== undefined ? rows[r][notCol] : "").trim();
+    if (!okulNo) continue;
+    kayitlar.push({ okulNo, not: not_ });
+  }
+  return { kayitlar };
+}
+
+/* ---- Word içe aktarma (mammoth tarayıcı sürümüyle — Electron'daki
+   extractWordRows/parseOgrenciWordRows'un aynısı, sadece mammoth.
+   convertToHtml'e {path} yerine {arrayBuffer} veriliyor. Eski .doc
+   formatı (word-extractor Node'a özgü) tarayıcıda desteklenmiyor. ---- */
+function webCleanCellText(html) {
+  return html.replace(/<[^>]+>/g, " ").replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/\s+/g, " ").trim();
+}
+function webHtmlTableRows(html) {
+  const rows = [];
+  const trRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+  let trM;
+  while ((trM = trRe.exec(html))) {
+    const cellRe = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
+    const cells = [];
+    let cM;
+    while ((cM = cellRe.exec(trM[1]))) {
+      cells.push(webCleanCellText(cM[1]));
+    }
+    if (cells.length) rows.push(cells);
+  }
+  return rows;
+}
+function webHtmlToRows(html) {
+  const rows = [];
+  const blockRe = /<table[^>]*>[\s\S]*?<\/table>|<p[^>]*>[\s\S]*?<\/p>/gi;
+  let m;
+  while ((m = blockRe.exec(html))) {
+    const block = m[0];
+    if (/^<table/i.test(block)) {
+      webHtmlTableRows(block).forEach(r => rows.push(r));
+    } else {
+      const text = webCleanCellText(block);
+      if (text) rows.push([text]);
+    }
+  }
+  return rows;
+}
+function webRowsToTabText(rows) {
+  return rows.map(r => r.join("\t")).join("\n");
+}
+async function webExtractWordRows(file) {
+  if (!/\.docx$/i.test(file.name || "")) {
+    throw new Error("Eski .doc formatı tarayıcıda desteklenmiyor — dosyayı Word'de açıp \"Farklı Kaydet\" ile .docx olarak kaydedip tekrar deneyin.");
+  }
+  if (typeof mammoth === "undefined") throw new Error("Word kütüphanesi yüklenemedi — internet bağlantını kontrol et.");
+  const buf = await file.arrayBuffer();
+  const { value: html } = await mammoth.convertToHtml({ arrayBuffer: buf });
+  const rows = webHtmlToRows(html);
+  if (rows.length) return rows;
+  const { value: text } = await mammoth.extractRawText({ arrayBuffer: buf });
+  return text.split(/\r?\n/).map(l => l.trim()).filter(Boolean).map(l => l.split(/\t+/));
+}
+async function webImportWordTable(file) {
+  const rows = await webExtractWordRows(file);
+  return { text: webRowsToTabText(rows) };
+}
+const WEB_BASLIK_REGEX_WORD = /(AMP|MESEM)\s*-\s*(\d{1,2})\.\s*Sınıf\s*\/\s*([A-ZÇĞİÖŞÜ])\s*Şubesi\s*\(([^)]*)\)/i;
+function webParseOgrenciWordRows(rows) {
+  const sonuclar = [];
+  let mevcut = null;
+  let colIdx = null;
+  rows.forEach(cells => {
+    const joined = cells.join(" ");
+    const baslikM = WEB_BASLIK_REGEX_WORD.exec(joined);
+    if (baslikM) {
+      if (mevcut && mevcut.ogrenciler.length) sonuclar.push(mevcut);
+      const program = baslikM[1].toUpperCase();
+      const grade = Number(baslikM[2]);
+      const sube = baslikM[3].toUpperCase();
+      const alanAdi = baslikM[4].trim();
+      mevcut = { program, sinif: grade + "-" + sube, grade, sube, alanAdi, ogrenciler: [] };
+      colIdx = null;
+      return;
+    }
+    if (!mevcut) return;
+    const norm = cells.map(c => c.toLocaleLowerCase("tr-TR").replace(/[.\s]+/g, ""));
+    const oIdx = norm.findIndex(c => c.includes("öğrenci") && c.includes("no"));
+    const adIdx = norm.findIndex(c => c === "adı" || c === "adi" || c === "ad");
+    if (oIdx >= 0 && adIdx >= 0) {
+      colIdx = {
+        okulNo: oIdx,
+        ad: adIdx,
+        soyad: norm.findIndex(c => c.includes("soyad")),
+        cinsiyet: norm.findIndex(c => c.includes("cinsiyet")),
+        pansiyon: norm.findIndex(c => c.includes("pansiyon"))
+      };
+      return;
+    }
+    if (!colIdx) return;
+    const okulNo = (cells[colIdx.okulNo] || "").trim();
+    if (!/^\d+$/.test(okulNo)) return;
+    const ad = (cells[colIdx.ad] || "").trim();
+    const soyad = colIdx.soyad >= 0 ? (cells[colIdx.soyad] || "").trim() : "";
+    if (!ad && !soyad) return;
+    let cinsiyet = colIdx.cinsiyet >= 0 ? (cells[colIdx.cinsiyet] || "").trim() : "";
+    cinsiyet = /^(Erkek|Kız)$/i.test(cinsiyet) ? cinsiyet[0].toUpperCase() + cinsiyet.slice(1).toLowerCase() : "";
+    const pansiyon = colIdx.pansiyon >= 0 ? (cells[colIdx.pansiyon] || "").trim() : "";
+    mevcut.ogrenciler.push({ okulNo, ad, soyad, cinsiyet, pansiyon });
+  });
+  if (mevcut && mevcut.ogrenciler.length) sonuclar.push(mevcut);
+  return { siniflar: sonuclar };
+}
+async function webImportOgrenciWord(file) {
+  const rows = await webExtractWordRows(file);
+  return webParseOgrenciWordRows(rows);
+}
+
+/* ---- PDF içe aktarma (pdf.js ile — Electron'daki pdf-ogrenci-parser.js'in
+   parsePage'i aynen kullanılıyor; pdf.js'in getTextContent() öğeleri de
+   {str, transform:[...,x,y]} biçiminde olduğu için pdf-parse'ın pagerender
+   kancasıyla aynı {str,x,y} şekline çevirmek yeterli). ---- */
+let webPdfWorkerYapilandirildi = false;
+function webPdfWorkerYapilandir() {
+  if (webPdfWorkerYapilandirildi || typeof pdfjsLib === "undefined") return;
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+  webPdfWorkerYapilandirildi = true;
+}
+async function webImportOgrenciPdf(file) {
+  if (typeof pdfjsLib === "undefined") throw new Error("PDF kütüphanesi yüklenemedi — internet bağlantını kontrol et.");
+  webPdfWorkerYapilandir();
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  const sonuclar = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const textContent = await page.getTextContent();
+    const items = textContent.items
+      .filter(it => it.str && it.str.trim() !== "")
+      .map(it => ({ str: it.str, x: it.transform[4], y: it.transform[5] }));
+    const parsed = parsePage(items);
+    if (parsed) sonuclar.push(parsed);
+  }
+  return { siniflar: sonuclar };
+}
+
 if (typeof window !== "undefined") {
   window.webBelgeler = {
     exportExcel: webExportExcel,
@@ -438,6 +649,16 @@ if (typeof window !== "undefined") {
     exportYillikPlanExcel: webExportYillikPlanExcel,
     exportGunlukPlanExcel: webExportGunlukPlanExcel,
     exportNormKadroExcel: webExportNormKadroExcel,
-    exportWord: webExportWord
+    exportWord: webExportWord,
+    openXlsxDialog: webOpenXlsxDialog,
+    openWordDialog: webOpenWordDialog,
+    openPdfDialog: webOpenPdfDialog,
+    importPlanXlsx: webImportPlanXlsx,
+    importEnvanterXlsx: webImportEnvanterXlsx,
+    importPerformansXlsx: webImportPerformansXlsx,
+    importNotOrtalamaXlsx: webImportNotOrtalamaXlsx,
+    importWordTable: webImportWordTable,
+    importOgrenciWord: webImportOgrenciWord,
+    importOgrenciPdf: webImportOgrenciPdf
   };
 }

@@ -104,4 +104,4 @@ async function parseOgrenciPdf(filePath, pdfParse) {
   return { siniflar: sonuclar };
 }
 
-module.exports = { parseOgrenciPdf };
+if (typeof module !== "undefined") module.exports = { parseOgrenciPdf, parsePage };

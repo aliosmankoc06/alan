@@ -16,7 +16,7 @@
 
 const AY_REGEX = /Ocak|Şubat|Mart|Nisan|Mayıs|Haziran|Temmuz|Ağustos|Eylül|Ekim|Kasım|Aralık/;
 
-function cellText(v) {
+function planCellText(v) {
   if (v === null || v === undefined) return "";
   if (v instanceof Date) return v.toLocaleDateString("tr-TR");
   return String(v).trim();
@@ -31,11 +31,11 @@ function sheetMeta(rows) {
   for (let i = 0; i < Math.min(rows.length, 10); i++) {
     const row = rows[i] || [];
     for (let c = 0; c < row.length; c++) {
-      const label = cellText(row[c]).toUpperCase().trim();
+      const label = planCellText(row[c]).toUpperCase().trim();
       const key = map[label];
       if (!key || meta[key]) continue;
       for (let c2 = c + 1; c2 < row.length; c2++) {
-        let val = cellText(row[c2]).replace(/^:\s*/, "").trim();
+        let val = planCellText(row[c2]).replace(/^:\s*/, "").trim();
         if (val) {
           if (key === "sinif") val = val.replace(/(\d{1,2})\s*\/\s*([A-ZİÖÜÇŞĞ])/, "$1-$2");
           meta[key] = val;
@@ -47,9 +47,9 @@ function sheetMeta(rows) {
   return meta;
 }
 
-function findHeaderRow(rows, requiredCols) {
+function planFindHeaderRow(rows, requiredCols) {
   for (let i = 0; i < rows.length; i++) {
-    const row = (rows[i] || []).map(v => cellText(v).toUpperCase());
+    const row = (rows[i] || []).map(v => planCellText(v).toUpperCase());
     if (requiredCols.every(col => row.some(cell => cell === col))) return { rowIndex: i, cols: row };
   }
   return null;
@@ -103,10 +103,10 @@ function parseTakvimSheet(ws, XLSX) {
   for (const row of rows) {
     if (!row || !row.length) continue;
     for (let c = 0; c < row.length; c++) {
-      const label = cellText(row[c]);
+      const label = planCellText(row[c]);
       if (label === "ÖĞRETİM YILI SEÇ" && !ogretimYili) {
         for (let c2 = c + 1; c2 < row.length; c2++) {
-          const val = cellText(row[c2]);
+          const val = planCellText(row[c2]);
           if (val) { ogretimYili = val; break; }
         }
       }
@@ -115,7 +115,7 @@ function parseTakvimSheet(ws, XLSX) {
         const key = SINAV_TARIHI_KEY[m[1] + "-" + m[2]];
         if (key) {
           for (let c2 = c + 1; c2 < row.length; c2++) {
-            const val = cellText(row[c2]).replace(/^:\s*/, "").trim();
+            const val = planCellText(row[c2]).replace(/^:\s*/, "").trim();
             if (val) { sinavTarihleri[key] = val; break; }
           }
         }
@@ -123,25 +123,25 @@ function parseTakvimSheet(ws, XLSX) {
       const sinif = siniflandirOnemliGun(label);
       if (sinif && !onemliGunler[sinif[0]][sinif[1]]) {
         for (let c2 = c + 1; c2 < row.length; c2++) {
-          const val = cellText(row[c2]).replace(/^:\s*/, "").trim();
+          const val = planCellText(row[c2]).replace(/^:\s*/, "").trim();
           if (val) { onemliGunler[sinif[0]][sinif[1]] = val; break; }
         }
       }
     }
     const no = Number(row[0]);
     if (Number.isInteger(no) && no > 0 && row[1]) {
-      const c1 = cellText(row[1]);
+      const c1 = planCellText(row[1]);
       if (/^\d{1,2}\.\d{1,2}\.\d{4}$/.test(c1)) {
         /* [Hafta No, Pazartesi tarihi, Tarih Aralığı, Tatil mi?, Tatil Adı] biçimi */
         haftalar.push({
-          no, pazartesi: c1, tarihAraligi: cellText(row[2]),
-          tatilMi: cellText(row[3]) === "EVET", tatilAdi: cellText(row[4])
+          no, pazartesi: c1, tarihAraligi: planCellText(row[2]),
+          tatilMi: planCellText(row[3]) === "EVET", tatilAdi: planCellText(row[4])
         });
       } else if (c1) {
         /* [Hafta No, Tarih Aralığı, Tatil mi?, Tatil Adı] biçimi (Pazartesi sütunu yok) */
         haftalar.push({
           no, pazartesi: "", tarihAraligi: c1,
-          tatilMi: cellText(row[2]) === "EVET", tatilAdi: cellText(row[3])
+          tatilMi: planCellText(row[2]) === "EVET", tatilAdi: planCellText(row[3])
         });
       }
     }
@@ -161,7 +161,7 @@ function parseTakvimSheet(ws, XLSX) {
 function parseGunlukSheet(ws, XLSX, sheetName) {
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false });
   const meta = sheetMeta(rows);
-  const header = findHeaderRow(rows, ["TARİH", "KONU", "KAZANIM"]);
+  const header = planFindHeaderRow(rows, ["TARİH", "KONU", "KAZANIM"]);
   if (!header || !meta.ders) return null;
   const colIndex = name => header.cols.indexOf(name);
   const idx = {
@@ -173,12 +173,12 @@ function parseGunlukSheet(ws, XLSX, sheetName) {
   const haftaIcerik = {};
   for (let r = header.rowIndex + 1; r < rows.length; r++) {
     const row = rows[r] || [];
-    const tarih = cellText(row[idx.tarih]);
+    const tarih = planCellText(row[idx.tarih]);
     if (!/^\d{1,2}\.\d{1,2}\.\d{4}/.test(tarih)) continue; // tatil satırı ya da boş — atla
     const no = r - header.rowIndex;
-    const konu = cellText(row[idx.konu]), kazanim = cellText(row[idx.kazanim]),
-      giris = cellText(row[idx.giris]), gelisme = cellText(row[idx.gelisme]), sonuc = cellText(row[idx.sonuc]),
-      yontem = cellText(row[idx.yontem]), arac = cellText(row[idx.arac]), olcme = cellText(row[idx.olcme]);
+    const konu = planCellText(row[idx.konu]), kazanim = planCellText(row[idx.kazanim]),
+      giris = planCellText(row[idx.giris]), gelisme = planCellText(row[idx.gelisme]), sonuc = planCellText(row[idx.sonuc]),
+      yontem = planCellText(row[idx.yontem]), arac = planCellText(row[idx.arac]), olcme = planCellText(row[idx.olcme]);
     if (!konu && !kazanim && !giris && !gelisme && !sonuc && !yontem && !arac && !olcme) continue;
     haftaIcerik[no] = { konu, kazanim, giris, gelisme, sonuc, yontem, arac, olcme };
   }
@@ -202,7 +202,7 @@ const ARAC_BASLIK = "KULLANILAN EĞİTİM TEKNOLOJİLERİ,\nARAÇ VE GEREÇLER";
 function parseYillikSheet(ws, XLSX, takvimHaftalar, sheetName) {
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false });
   const meta = sheetMeta(rows);
-  const header = findHeaderRow(rows, ["TARİH", "KAZANIMLAR", "KONULAR"]);
+  const header = planFindHeaderRow(rows, ["TARİH", "KAZANIMLAR", "KONULAR"]);
   if (!header || !meta.ders) return null;
   const colIndex = name => header.cols.indexOf(name);
   const idx = {
@@ -213,15 +213,15 @@ function parseYillikSheet(ws, XLSX, takvimHaftalar, sheetName) {
   let siradakiNo = 1;
   for (let r = header.rowIndex + 1; r < rows.length; r++) {
     const row = rows[r] || [];
-    const tarih = cellText(row[idx.tarih]);
+    const tarih = planCellText(row[idx.tarih]);
     if (!tarih || !AY_REGEX.test(tarih)) continue;
     const eslesen = (takvimHaftalar || []).find(tk => tk.tarihAraligi && tk.tarihAraligi === tarih);
     if (eslesen && eslesen.tatilMi) continue; // tatil haftası — içerik yok, atla
-    const kazanimlar = cellText(row[idx.kazanimlar]);
-    const konular = cellText(row[idx.konular]);
-    const yontem = cellText(row[idx.yontem]);
-    const arac = cellText(row[idx.arac]);
-    const degerlendirme = cellText(row[idx.degerlendirme]);
+    const kazanimlar = planCellText(row[idx.kazanimlar]);
+    const konular = planCellText(row[idx.konular]);
+    const yontem = planCellText(row[idx.yontem]);
+    const arac = planCellText(row[idx.arac]);
+    const degerlendirme = planCellText(row[idx.degerlendirme]);
     if (!kazanimlar && !konular && !yontem && !arac && !degerlendirme) continue;
     const no = eslesen ? eslesen.no : siradakiNo;
     haftaIcerik[no] = { kazanimlar, konular, yontem, arac, degerlendirme };
@@ -232,8 +232,8 @@ function parseYillikSheet(ws, XLSX, takvimHaftalar, sheetName) {
     sistem: sistemFromSinif(meta.sinif), haftaIcerik, kaynakSayfaAdi: sheetName || "" };
 }
 
-function parsePlanWorkbook(filePath, XLSX) {
-  const wb = XLSX.readFile(filePath);
+function parsePlanWorkbook(filePathOrWb, XLSX) {
+  const wb = typeof filePathOrWb === "string" ? XLSX.readFile(filePathOrWb) : filePathOrWb;
   const result = { takvim: null, yillikPlanlar: [], gunlukPlanlar: [] };
   const takvimSheetName = wb.SheetNames.find(sn => /TAKVİM/i.test(sn));
   if (takvimSheetName) {
@@ -252,4 +252,4 @@ function parsePlanWorkbook(filePath, XLSX) {
   return result;
 }
 
-module.exports = { parsePlanWorkbook };
+if (typeof module !== "undefined") module.exports = { parsePlanWorkbook };
