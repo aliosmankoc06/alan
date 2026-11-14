@@ -7244,9 +7244,9 @@ function renderEditableTeacherGrid(teacherId) {
   const t = teacherById(teacherId);
   if (!t) return `<p class="small">Öğretmen seçin.</p>`;
   const grid = teacherWeeklySchedule(teacherId);
-  const legend = Object.values(GRADE_COLORS).map(c =>
+  const legend = Object.keys(GRADE_COLORS).map(grade =>
     `<span style="display:inline-flex;align-items:center;gap:5px;margin-right:12px;font-size:11.5px;">
-      <span style="width:12px;height:12px;border-radius:3px;background:${c.bg};border:1px solid ${c.ink};display:inline-block;"></span>${c.label}
+      <span class="grade-swatch grade-cell-${grade}"></span>${GRADE_COLORS[grade].label}
     </span>`
   ).join("");
   const gridMultiSelect = multiSelectMode && activeTeacherId === teacherId;
@@ -7279,9 +7279,9 @@ function renderEditableTeacherGrid(teacherId) {
         const course = courseById(cell.courseId);
         const cls = classById(cell.classId);
         const isKoord = cell.courseId === KOORD_COURSE_ID;
-        const gc = isKoord ? { bg: "#EDE3F5", ink: "#5B3A85" } : gradeColor(cls ? cls.grade : 0);
-        html += `<td><div class="sched-cell filled" style="background:${gc.bg};${selStyle}" ${eventAttrs}>
-          <div class="c1" style="color:${gc.ink};">${isKoord ? 'Koordinatörlük' : (course ? course.name : '?')}${cell.locked ? ' 🔒' : ''}</div>
+        const gradeCls = isKoord ? "grade-cell-koord" : "grade-cell-" + (cls ? cls.grade : 0);
+        html += `<td><div class="sched-cell filled ${gradeCls}" style="${selStyle}" ${eventAttrs}>
+          <div class="c1">${isKoord ? 'Koordinatörlük' : (course ? course.name : '?')}${cell.locked ? ' 🔒' : ''}</div>
           <div class="c2">${isKoord ? (cell.isletme || 'İşletme belirlenmedi') : (cls ? cls.name : '')}</div>
         </div></td>`;
       } else if (off) {
