@@ -1206,15 +1206,41 @@ function deletePlanEntry(kind, id) {
   save();
   renderMain();
 }
+/* Sınıf seçilince Ders alanı, o sınıfa Ders Programı'ndan gerçekten atanmış
+   derslerden seçime dönüşür (Performans/Dönem Raporları'ndaki aynı desen);
+   atama yoksa (örn. henüz program kurulmamış bir sınıf) serbest metne düşer.
+   Her iki durumda da aynı "ap-ders" id'si kullanılır, böylece
+   saveNewPlanEntry/saveEditedPlanEntry hiçbir değişiklik gerektirmez. */
+function planDersAlaniHtml(mevcutSinif, mevcutDers) {
+  const cls = S.classes.find(c => c.name === mevcutSinif);
+  const dersler = cls ? assignedCoursesForClass(cls) : [];
+  if (!dersler.length) return `<input type="text" id="ap-ders" value="${escHtml(mevcutDers || "")}" placeholder="Ders adı" style="width:100%">`;
+  return `<select id="ap-ders" style="width:100%">
+    <option value="">— seçin —</option>
+    ${dersler.map(d => `<option value="${escHtml(d.name)}" ${mevcutDers === d.name ? "selected" : ""}>${escHtml(d.name)}</option>`).join("")}
+    ${mevcutDers && !dersler.some(d => d.name === mevcutDers) ? `<option value="${escHtml(mevcutDers)}" selected>${escHtml(mevcutDers)} (mevcut)</option>` : ""}
+  </select>`;
+}
+function apSinifDegisti() {
+  const sinif = document.getElementById("ap-sinif").value;
+  const dersAlani = document.getElementById("ap-ders-alani");
+  if (dersAlani) dersAlani.innerHTML = planDersAlaniHtml(sinif, "");
+}
 function addPlanEntry(kind) {
   const root = document.getElementById("modal-root");
+  const siniflar = ogrenciListesiSiniflari();
   root.innerHTML = `
     <div class="modal-bg" onclick="if(event.target===this) closeModal()">
       <div class="modal" style="width:400px;">
         <h3>Yeni ${kind === 'yillik' ? 'Yıllık' : 'Günlük'} Plan Ekle</h3>
-        <label class="small">Ders Adı</label><input type="text" id="ap-ders" style="width:100%">
-        <label class="small">Sınıf (örn. 9-A, AMP 10-A)</label><input type="text" id="ap-sinif" style="width:100%">
-        <label class="small">Alan/Dal</label><input type="text" id="ap-alandal" value="Makine ve Tasarım Teknolojisi Alanı" style="width:100%">
+        <label class="small">Sınıf</label>
+        <select id="ap-sinif" style="width:100%" onchange="apSinifDegisti()">
+          <option value="">— seçin —</option>
+          ${siniflar.map(s => `<option value="${escHtml(s)}">${escHtml(s)}</option>`).join("")}
+        </select>
+        <label class="small">Ders Adı</label>
+        <div id="ap-ders-alani">${planDersAlaniHtml("", "")}</div>
+        <label class="small">Alan/Dal</label><input type="text" id="ap-alandal" value="${escHtml(S.kurumBilgileri.alanAdi || '')}" style="width:100%">
         <label class="small">Ders Saati</label><input type="text" id="ap-dershaat" style="width:100%">
         ${kind === 'gunluk' ? `<label class="small">Öğretmen</label><input type="text" id="ap-ogretmen" style="width:100%">
         <label class="small">Ders Günü</label>${gunlukDersGunuSecici("ap-dersgunu", "")}` : ''}
@@ -1236,12 +1262,14 @@ function saveNewPlanEntry(kind) {
     const p = { id: uid("yp"), ders, sinif, alanDal, dersSaati, sistem, haftaIcerik: {} };
     S.yillikPlanlar.push(p);
     activePlanEntryId.yillik = p.id;
+    planKademeyiGirdiyeSenkronizeEt("yillik", p);
   } else {
     const ogretmen = document.getElementById("ap-ogretmen").value.trim();
     const dersGunu = document.getElementById("ap-dersgunu").value.trim();
     const p = { id: uid("gp"), ders, sinif, ogretmen, alanDal, dersSaati, dersGunu, sistem, haftaIcerik: {} };
     S.gunlukPlanlar.push(p);
     activePlanEntryId.gunluk = p.id;
+    planKademeyiGirdiyeSenkronizeEt("gunluk", p);
   }
   save(); closeModal(); renderMain();
 }
@@ -1249,12 +1277,18 @@ function editPlanEntryMeta(kind, id) {
   const p = (kind === "yillik" ? S.yillikPlanlar : S.gunlukPlanlar).find(x => x.id === id);
   if (!p) return;
   const root = document.getElementById("modal-root");
+  const siniflar = ogrenciListesiSiniflari();
+  const sinifListesiNihai = (p.sinif && !siniflar.includes(p.sinif)) ? [p.sinif, ...siniflar] : siniflar;
   root.innerHTML = `
     <div class="modal-bg" onclick="if(event.target===this) closeModal()">
       <div class="modal" style="width:400px;">
         <h3>Plan Bilgilerini Düzenle</h3>
-        <label class="small">Ders Adı</label><input type="text" id="ap-ders" value="${escHtml(p.ders)}" style="width:100%">
-        <label class="small">Sınıf</label><input type="text" id="ap-sinif" value="${escHtml(p.sinif)}" style="width:100%">
+        <label class="small">Sınıf</label>
+        <select id="ap-sinif" style="width:100%" onchange="apSinifDegisti()">
+          ${sinifListesiNihai.map(s => `<option value="${escHtml(s)}" ${p.sinif === s ? "selected" : ""}>${escHtml(s)}</option>`).join("")}
+        </select>
+        <label class="small">Ders Adı</label>
+        <div id="ap-ders-alani">${planDersAlaniHtml(p.sinif, p.ders)}</div>
         <label class="small">Alan/Dal</label><input type="text" id="ap-alandal" value="${escHtml(p.alanDal || '')}" style="width:100%">
         <label class="small">Ders Saati</label><input type="text" id="ap-dershaat" value="${escHtml(p.dersSaati || '')}" style="width:100%">
         ${kind === 'gunluk' ? `<label class="small">Öğretmen</label><input type="text" id="ap-ogretmen" value="${escHtml(p.ogretmen || '')}" style="width:100%">
@@ -1280,6 +1314,7 @@ function saveEditedPlanEntry(kind, id) {
     p.ogretmen = document.getElementById("ap-ogretmen").value.trim();
     p.dersGunu = document.getElementById("ap-dersgunu").value.trim();
   }
+  planKademeyiGirdiyeSenkronizeEt(kind, p);
   save(); closeModal(); renderMain();
 }
 function planiYeniYilaKopyala(kind, id) {
@@ -1296,6 +1331,7 @@ function planiYeniYilaKopyala(kind, id) {
     mesaj = "Plan kopyalandı. Tarihler her zaman Çalışma Yılı sekmesindeki güncel haftalardan ve Ders Günü seçiminden otomatik geliyor, ayrıca bir şey yapmanıza gerek yok — içerik aynen korundu, gerekirse gözden geçirin.";
   }
   activePlanEntryId[kind] = kopya.id;
+  planKademeyiGirdiyeSenkronizeEt(kind, kopya);
   save();
   renderMain();
   alert(mesaj);
@@ -1789,14 +1825,10 @@ function renderGunlukPlanTable(p) {
   </div>`;
 }
 /* Yıllık/Günlük Plan'ın "sinif" alanı serbest metin (ör. "AMP 10-A") — bu
-   yüzden Dal süzgecini burada agresif uygulamıyoruz: ayrıştırılamayan veya
-   tanımsız şubeli kayıtlar HER ZAMAN gösterilir, hiçbir geçmiş kayıt
-   sessizce kaybolmaz. Sadece net bir dal eşleşmesi varsa ve seçili dala ait
-   değilse gizlenir; belirsiz durumda "· Eşleşmeyen" etiketiyle gösterilir. */
-function planGirdisiKesinUyumlu(sinifAdi) {
-  const sube = sinifAdindanSubeAyikla(sinifAdi);
-  return !!sube && !!dalTanimiForSube(sube);
-}
+   yüzden sol menüdeki Aktif Dal süzgecini burada agresif uygulamıyoruz:
+   ayrıştırılamayan veya tanımsız şubeli kayıtlar HER ZAMAN gösterilir,
+   hiçbir geçmiş kayıt sessizce kaybolmaz. Sadece net bir dal eşleşmesi
+   varsa ve seçili dala ait değilse gizlenir. */
 function planGirdisiGorunurMu(sinifAdi) {
   if (dalFiltresi === "ALL") return true;
   const sube = sinifAdindanSubeAyikla(sinifAdi);
@@ -1808,8 +1840,75 @@ function planGirdisiGorunurMu(sinifAdi) {
 function planGirdileriniFiltrele(entries) {
   return dalFiltresi === "ALL" ? entries : entries.filter(e => planGirdisiGorunurMu(e.sinif));
 }
-function planGirdiEtiketi(e) {
-  return e.sinif + " — " + e.ders + (dalFiltresi !== "ALL" && !planGirdisiKesinUyumlu(e.sinif) ? " · Eşleşmeyen" : "");
+/* Dal→Sınıf→Ders kademeli seçici — Ders Bilgi Formları'ndaki
+   Program→Sınıf→Ders deseninin aynısı: önce Dal seçilir, sonra o dala ait
+   sınıflar, sonra o sınıfın dersleri açılır — hepsi tek bir uzun listede
+   karışık gösterilmez. "sinif" alanı serbest metin olduğu için ayrıştırıp
+   bir dala kesin bağlayamadığımız kayıtlar "Diğer / Eşleşmeyen Sınıflar"
+   adıyla ayrı bir dal gibi listelenir — hiçbir kayıt sessizce kaybolmaz. */
+let activePlanDal = { yillik: null, gunluk: null };
+let activePlanSinif = { yillik: null, gunluk: null };
+function planGirdiDalId(e) {
+  const sube = sinifAdindanSubeAyikla(e.sinif);
+  const dal = sube ? dalTanimiForSube(sube) : null;
+  return dal ? dal.id : "__DIGER__";
+}
+function planDalSecenekleri(entries) {
+  const varOlanlar = new Set(entries.map(planGirdiDalId));
+  const liste = S.dalTanimlari.filter(d => varOlanlar.has(d.id)).map(d => ({ value: d.id, label: d.ad }));
+  if (varOlanlar.has("__DIGER__")) liste.push({ value: "__DIGER__", label: "Diğer / Eşleşmeyen Sınıflar" });
+  return liste;
+}
+function planSinifSecenekleri(entries, dalValue) {
+  return [...new Set(entries.filter(e => planGirdiDalId(e) === dalValue).map(e => e.sinif))]
+    .sort((a, b) => a.localeCompare(b, "tr", { numeric: true }));
+}
+function planDersSecenekleri(entries, dalValue, sinif) {
+  return entries.filter(e => planGirdiDalId(e) === dalValue && e.sinif === sinif).sort((a, b) => a.ders.localeCompare(b.ders, "tr"));
+}
+function selectPlanDal(kind, v) { activePlanDal[kind] = v; activePlanSinif[kind] = null; activePlanEntryId[kind] = null; renderMain(); }
+function selectPlanSinif(kind, v) { activePlanSinif[kind] = v; activePlanEntryId[kind] = null; renderMain(); }
+function planKademeliSeciciVeAktifGirdi(kind, entries) {
+  const dalSecenekleri = planDalSecenekleri(entries);
+  if (activePlanDal[kind] && !dalSecenekleri.some(d => d.value === activePlanDal[kind])) activePlanDal[kind] = null;
+  const dalBar = entries.length === 0 ? "" : `
+    <div class="card no-print">
+      <div class="small" style="margin-bottom:6px;font-weight:600;">1) Dal</div>
+      <div class="row" style="flex-wrap:wrap;">
+        ${sekmeDropdown("plan-dal-" + kind, dalSecenekleri, activePlanDal[kind], `selectPlanDal('${jsq(kind)}','{v}')`)}
+      </div>
+    </div>`;
+  if (!activePlanDal[kind]) return { listHtml: dalBar, activeEntry: null };
+
+  const siniflar = planSinifSecenekleri(entries, activePlanDal[kind]);
+  if (activePlanSinif[kind] && !siniflar.includes(activePlanSinif[kind])) activePlanSinif[kind] = null;
+  const sinifBar = `
+    <div class="card no-print">
+      <div class="small" style="margin-bottom:6px;font-weight:600;">2) Sınıf</div>
+      <div class="row" style="flex-wrap:wrap;">
+        ${sekmeDropdown("plan-sinif-" + kind, siniflar.map(s => ({ value: s, label: s })), activePlanSinif[kind], `selectPlanSinif('${jsq(kind)}','{v}')`)}
+      </div>
+    </div>`;
+  if (!activePlanSinif[kind]) return { listHtml: dalBar + sinifBar, activeEntry: null };
+
+  const dersler = planDersSecenekleri(entries, activePlanDal[kind], activePlanSinif[kind]);
+  if (activePlanEntryId[kind] && !dersler.some(e => e.id === activePlanEntryId[kind])) activePlanEntryId[kind] = null;
+  const dersBar = `
+    <div class="card no-print">
+      <div class="small" style="margin-bottom:6px;font-weight:600;">3) Ders</div>
+      <div class="row" style="flex-wrap:wrap;">
+        ${sekmeDropdown("plan-ders-" + kind, dersler.map(e => ({ value: e.id, label: e.ders })), activePlanEntryId[kind], `selectPlanEntry('${jsq(kind)}','{v}')`)}
+      </div>
+    </div>`;
+  const activeEntry = dersler.find(e => e.id === activePlanEntryId[kind]) || null;
+  return { listHtml: dalBar + sinifBar + dersBar, activeEntry };
+}
+/* Yeni eklenen/kopyalanan bir plan, kademeli seçicide o anda açık dal/sınıf
+   tiers'ına denk gelmiyorsa görünmez kalmasın diye tierları da senkronize
+   eder. */
+function planKademeyiGirdiyeSenkronizeEt(kind, entry) {
+  activePlanDal[kind] = planGirdiDalId(entry);
+  activePlanSinif[kind] = entry.sinif;
 }
 function viewPlanModule() {
   const kind = "gunluk";
@@ -1817,19 +1916,10 @@ function viewPlanModule() {
   const aciklama = "Her dersin konu/kazanım/giriş-gelişme-sonuç/yöntem/ölçme-değerlendirme detayları. Kendi Excel dosyanızı yükleyerek veya elle düzenleyerek doldurabilirsiniz.";
 
   const entries = planGirdileriniFiltrele(S.gunlukPlanlar.slice().sort((a, b) => (a.sinif + a.ders).localeCompare(b.sinif + b.ders, "tr")));
-  if (entries.length && !entries.some(e => e.id === activePlanEntryId[kind])) activePlanEntryId[kind] = entries[0].id;
-  if (!entries.length) activePlanEntryId[kind] = null;
-  const activeEntry = entries.find(e => e.id === activePlanEntryId[kind]) || null;
-
-  const listHtml = entries.length === 0 ? "" : `
-    <div class="card no-print">
-      <div class="row" style="flex-wrap:wrap;">
-        ${sekmeDropdown("plan-ders-" + kind, entries.map(e => ({ value: e.id, label: planGirdiEtiketi(e) })), activePlanEntryId[kind], `selectPlanEntry('${jsq(kind)}','{v}')`)}
-      </div>
-    </div>`;
+  const { listHtml, activeEntry } = planKademeliSeciciVeAktifGirdi(kind, entries);
 
   const contentHtml = activeEntry ? renderGunlukPlanTable(activeEntry) : `<div class="card small no-print" style="text-align:center;padding:30px 20px;">
-      Henüz yüklenmiş bir günlük plan yok.
+      ${entries.length === 0 ? "Henüz yüklenmiş bir günlük plan yok." : "Devam etmek için yukarıdan Dal, Sınıf ve Ders seçin."}
     </div>`;
 
   const dosyaAdi = activeEntry ? (title + " - " + activeEntry.sinif + " - " + activeEntry.ders) : title;
@@ -1859,19 +1949,10 @@ function renderCalismaYiliTab() {
 }
 function renderYillikPlanSecTab() {
   const entries = planGirdileriniFiltrele(S.yillikPlanlar.slice().sort((a, b) => (a.sinif + a.ders).localeCompare(b.sinif + b.ders, "tr")));
-  if (entries.length && !entries.some(e => e.id === activePlanEntryId.yillik)) activePlanEntryId.yillik = entries[0].id;
-  if (!entries.length) activePlanEntryId.yillik = null;
-  const activeEntry = entries.find(e => e.id === activePlanEntryId.yillik) || null;
-
-  const listHtml = entries.length === 0 ? "" : `
-    <div class="card no-print">
-      <div class="row" style="flex-wrap:wrap;">
-        ${sekmeDropdown("plan-ders-yillik", entries.map(e => ({ value: e.id, label: planGirdiEtiketi(e) })), activePlanEntryId.yillik, `selectPlanEntry('yillik','{v}')`)}
-      </div>
-    </div>`;
+  const { listHtml, activeEntry } = planKademeliSeciciVeAktifGirdi("yillik", entries);
 
   const contentHtml = activeEntry ? renderYillikPlanIcerik(activeEntry) : `<div class="card small no-print" style="text-align:center;padding:30px 20px;">
-      Henüz yüklenmiş bir yıllık plan yok.
+      ${entries.length === 0 ? "Henüz yüklenmiş bir yıllık plan yok." : "Devam etmek için yukarıdan Dal, Sınıf ve Ders seçin."}
     </div>`;
 
   const dosyaAdi = activeEntry ? ("Yıllık Plan - " + activeEntry.sinif + " - " + activeEntry.ders) : "Yıllık Plan";
