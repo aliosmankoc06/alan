@@ -2587,7 +2587,16 @@ function editToplantiMeta(id) {
         <label class="small">Sınıf / Ders</label><input type="text" id="at-sinifders" value="${escHtml(top.sinifVeyaDers || '')}" style="width:100%">
         <label class="small">Öğretim Yılı</label><input type="text" id="at-yil" value="${escHtml(top.ogretimYili || '')}" style="width:100%">
         <label class="small">Dönem</label><input type="text" id="at-donem" value="${escHtml(top.donem || '')}" style="width:100%">
-        <label class="small">Kurul/Zümre Başkanı</label><input type="text" id="at-baskan" value="${escHtml(top.baskan || '')}" style="width:100%">
+        <label class="small">Kurul/Zümre Başkanı</label>
+        ${(() => {
+          const adlar = S.imzaSirkuleri.map(im => im.adSoyad).filter(Boolean);
+          if (!adlar.length) return `<input type="text" id="at-baskan" value="${escHtml(top.baskan || '')}" style="width:100%">`;
+          const liste = (top.baskan && !adlar.includes(top.baskan)) ? [top.baskan, ...adlar] : adlar;
+          return `<select id="at-baskan" style="width:100%">
+            <option value="">— seçin —</option>
+            ${liste.map(ad => `<option value="${escHtml(ad)}" ${top.baskan === ad ? "selected" : ""}>${escHtml(ad)}</option>`).join("")}
+          </select>`;
+        })()}
         <label class="small">Zümre No</label><input type="text" id="at-zumreno" value="${escHtml(top.zumreNo || '')}" style="width:100%">
         <label class="small">Toplantı Tarihi</label><input type="text" id="at-tarih" value="${escHtml(top.tarih || '')}" style="width:100%">
         <label class="small">Toplantı Yeri</label><input type="text" id="at-yer" value="${escHtml(top.yer || '')}" style="width:100%">
@@ -4896,18 +4905,29 @@ function ogretmenSiniflariDersler(ogretmenId) {
 }
 function donemRaporListesi(tur) { return tur === "yaziliTeslim" ? S.donemRaporlari.yaziliTeslim : S.donemRaporlari.dersKesim; }
 function donemRaporById(tur, id) { return donemRaporListesi(tur).find(x => x.id === id); }
+/* Öğretmen seçilince Unvan, Ders Programı > Öğretmenler'de o öğretmen için
+   girilmiş unvanla otomatik dolar (setTeacherUnvan) — ama alan serbestçe
+   elle de değiştirilebilir kalır, çünkü resmi rapordaki unvan ibaresi bazen
+   roster'daki kısa etiketten farklı yazılmak istenebilir. */
+function drOgretmenDegisti() {
+  const ogretmenId = document.getElementById("dr-ogretmen").value;
+  const ogretmen = teacherById(ogretmenId);
+  const unvanAlani = document.getElementById("dr-unvan");
+  if (ogretmen && ogretmen.unvan && unvanAlani) unvanAlani.value = ogretmen.unvan;
+}
 function addDonemRapor(tur) {
   const root = document.getElementById("modal-root");
+  const ilkOgretmen = S.teachers[0];
   root.innerHTML = `
     <div class="modal-bg" onclick="if(event.target===this) closeModal()">
       <div class="modal" style="width:420px;">
         <h3>${tur === 'yaziliTeslim' ? 'Yeni Yazılı Kağıtları Teslim Raporu' : 'Yeni Ders Kesim Raporu'}</h3>
         <input type="hidden" id="dr-tur" value="${tur}">
         <label class="small">Öğretmen</label>
-        <select id="dr-ogretmen" style="width:100%">
+        <select id="dr-ogretmen" style="width:100%" onchange="drOgretmenDegisti()">
           ${S.teachers.map(t => `<option value="${t.id}">${escHtml(t.name)}</option>`).join("")}
         </select>
-        <label class="small">Unvan</label><input type="text" id="dr-unvan" placeholder="örn. Mak. ve Tek. Tas. Öğrt." style="width:100%">
+        <label class="small">Unvan</label><input type="text" id="dr-unvan" value="${escHtml((ilkOgretmen && ilkOgretmen.unvan) || '')}" placeholder="örn. Mak. ve Tek. Tas. Öğrt." style="width:100%">
         <label class="small">Öğretim Yılı</label><input type="text" id="dr-yil" value="${S.akademikTakvim ? escHtml(S.akademikTakvim.ogretimYili) : ''}" style="width:100%">
         <label class="small">Dönem</label>
         <select id="dr-donem" style="width:100%">
@@ -4953,7 +4973,7 @@ function editDonemRaporMeta(tur, id) {
       <div class="modal" style="width:420px;">
         <h3>Rapor Bilgilerini Düzenle</h3>
         <label class="small">Öğretmen</label>
-        <select id="dr-ogretmen" style="width:100%">
+        <select id="dr-ogretmen" style="width:100%" onchange="drOgretmenDegisti()">
           ${S.teachers.map(t => `<option value="${t.id}" ${t.id === r.ogretmenId ? 'selected' : ''}>${escHtml(t.name)}</option>`).join("")}
         </select>
         <label class="small">Unvan</label><input type="text" id="dr-unvan" value="${escHtml(r.unvan || '')}" style="width:100%">
@@ -5033,11 +5053,26 @@ function removeDonemRaporSatir(tur, raporId, satirId) {
 }
 function renderDonemRaporDetay(tur, r) {
   const isYazili = tur === "yaziliTeslim";
-  const rows = r.satirlar.map(s => `
+  const drSinifSecenekleri = ogrenciListesiSiniflari();
+  const rows = r.satirlar.map(s => {
+    const sinifListesiNihai = (s.sinif && !drSinifSecenekleri.includes(s.sinif)) ? [s.sinif, ...drSinifSecenekleri] : drSinifSecenekleri;
+    const clsForRow = S.classes.find(c => c.name === s.sinif);
+    const dersSecenekleri = clsForRow ? assignedCoursesForClass(clsForRow) : [];
+    const dersAlanHtml = dersSecenekleri.length
+      ? `<select style="width:220px" onchange="updateDonemRaporSatir('${tur}','${r.id}','${s.id}','ders',this.value)">
+          <option value="">— seçin —</option>
+          ${dersSecenekleri.map(d => `<option value="${escHtml(d.name)}" ${s.ders === d.name ? "selected" : ""}>${escHtml(d.name)}</option>`).join("")}
+          ${s.ders && !dersSecenekleri.some(d => d.name === s.ders) ? `<option value="${escHtml(s.ders)}" selected>${escHtml(s.ders)} (mevcut)</option>` : ""}
+        </select>`
+      : `<input type="text" value="${escHtml(s.ders)}" placeholder="örn. Temel İmalat İşlemleri" style="width:220px" onchange="updateDonemRaporSatir('${tur}','${r.id}','${s.id}','ders',this.value)">`;
+    return `
     <tr>
-      <td class="no-print"><input type="text" value="${escHtml(s.sinif)}" style="width:70px" onchange="updateDonemRaporSatir('${tur}','${r.id}','${s.id}','sinif',this.value)"></td>
+      <td class="no-print"><select style="width:90px" onchange="updateDonemRaporSatir('${tur}','${r.id}','${s.id}','sinif',this.value); renderMain();">
+        <option value="">—</option>
+        ${sinifListesiNihai.map(sn => `<option value="${escHtml(sn)}" ${s.sinif === sn ? "selected" : ""}>${escHtml(sn)}</option>`).join("")}
+      </select></td>
       <td class="print-only-cell">${escHtml(s.sinif)}</td>
-      <td class="no-print"><input type="text" value="${escHtml(s.ders)}" style="width:220px" onchange="updateDonemRaporSatir('${tur}','${r.id}','${s.id}','ders',this.value)"></td>
+      <td class="no-print">${dersAlanHtml}</td>
       <td class="print-only-cell">${escHtml(s.ders)}</td>
       ${isYazili ? `
       <td class="no-print"><input type="text" value="${escHtml(s.yazili1)}" placeholder="örn. 1 ADET" style="width:90px" onchange="updateDonemRaporSatir('${tur}','${r.id}','${s.id}','yazili1',this.value)"></td>
@@ -5047,7 +5082,8 @@ function renderDonemRaporDetay(tur, r) {
       <td class="no-print"><input type="text" value="${escHtml(s.durum)}" placeholder="TAMAMLANDI" style="width:160px" onchange="updateDonemRaporSatir('${tur}','${r.id}','${s.id}','durum',this.value)"></td>
       <td class="print-only-cell">${escHtml(s.durum)}</td>`}
       <td class="no-print"><button class="btn danger" onclick="removeDonemRaporSatir('${tur}','${r.id}','${s.id}')">Sil</button></td>
-    </tr>`).join("");
+    </tr>`;
+  }).join("");
 
   const toplam = isYazili ? r.satirlar.reduce((a, s) => a + (parseInt(s.yazili1) || 0) + (parseInt(s.yazili2) || 0), 0) : null;
   const paragraf = isYazili
@@ -5361,14 +5397,28 @@ function seflikOtomatikOlustur(aySecim) {
   save(); closeModal(); renderMain();
   alert(eklenen ? `${eklenen} satır eklendi. "Yapılan İşler" sütunu otomatik önerilerle dolduruldu — gözden geçirip beğenmediklerinizi "Öneri Değiştir" ile başka bir öneriyle değiştirebilir ya da elle düzenleyebilirsiniz.` : "Eklenecek yeni satır bulunamadı (bu ay için satırlar zaten mevcut).");
 }
+function srAyDegisti() {
+  const sel = document.getElementById("sr-ay");
+  const elle = document.getElementById("sr-ay-elle");
+  if (sel && elle) elle.style.display = sel.value === "__diger__" ? "block" : "none";
+}
 function addSeflikRaporu() {
   const root = document.getElementById("modal-root");
+  const secenekler = seflikAySecenekleri();
+  const ayAlani = secenekler.length
+    ? `<select id="sr-ay" style="width:100%" onchange="srAyDegisti()">
+        ${secenekler.map(s => `<option value="${s.ay} ${s.yil}">${s.ay} ${s.yil}</option>`).join("")}
+        <option value="__diger__">Diğer (listede yok, elle yazacağım)</option>
+      </select>
+      <input type="text" id="sr-ay-elle" placeholder="örn. Mayıs 2026" style="width:100%;display:none;margin-top:6px;">`
+    : `<input type="text" id="sr-ay" placeholder="örn. Mayıs 2026" style="width:100%">`;
   root.innerHTML = `
     <div class="modal-bg" onclick="if(event.target===this) closeModal()">
       <div class="modal" style="width:360px;">
         <h3>Yeni Aylık Rapor</h3>
-        <label class="small">Ay (örn. Mayıs 2026)</label>
-        <input type="text" id="sr-ay" style="width:100%">
+        <label class="small">Ay</label>
+        ${secenekler.length ? '<p class="small">Liste, Ayarlar &gt; Akademik Takvim\'deki haftalardan geliyor; takvimde olmayan bir ay için "Diğer"i seçip elle yazabilirsiniz.</p>' : ''}
+        ${ayAlani}
         <div class="row">
           <button class="btn primary" onclick="saveNewSeflikRaporu()">Ekle</button>
           <button class="btn" onclick="closeModal()">İptal</button>
@@ -5377,8 +5427,10 @@ function addSeflikRaporu() {
     </div>`;
 }
 function saveNewSeflikRaporu() {
-  const ay = document.getElementById("sr-ay").value.trim();
-  if (!ay) { alert("Ay girin."); return; }
+  const secim = document.getElementById("sr-ay").value.trim();
+  const elleAlani = document.getElementById("sr-ay-elle");
+  const ay = (secim === "__diger__" && elleAlani) ? elleAlani.value.trim() : secim;
+  if (!ay || ay === "__diger__") { alert("Ay girin."); return; }
   const r = { id: uid("sr"), ay, kayitlar: [] };
   S.seflikRaporlari.push(r);
   activeSeflikRaporId = r.id;
