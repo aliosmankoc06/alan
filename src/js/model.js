@@ -246,6 +246,12 @@ function normalizeState(s) {
   s.isletmeler.forEach(isl => {
     if (!isl.kontenjanlar || typeof isl.kontenjanlar !== "object") isl.kontenjanlar = {};
     if (typeof isl.talep !== "string") isl.talep = "";
+    // "BMİ" (noktalı İ) altında girilmiş eski kontenjan sayıları varsa
+    // "BMI" (düz I) anahtarına taşı — bkz. öğrenci dal düzeltmesi yukarıda.
+    if (isl.kontenjanlar["BMİ"] !== undefined) {
+      if (isl.kontenjanlar["BMI"] === undefined) isl.kontenjanlar["BMI"] = isl.kontenjanlar["BMİ"];
+      delete isl.kontenjanlar["BMİ"];
+    }
   });
   if (!s.isletmeTeacherAssign) s.isletmeTeacherAssign = {};
   if (!Array.isArray(s.students)) s.students = [];
@@ -254,6 +260,10 @@ function normalizeState(s) {
     if (typeof st.tercihler !== "string") st.tercihler = "";
     if (typeof st.istemiyor !== "string") st.istemiyor = "";
     if (typeof st.yerlestirmeSirasi !== "string") st.yerlestirmeSirasi = "";
+    // Eskiden bazı öğrenci kayıtlarında "BMİ" (noktalı İ), S.classes'ta ise
+    // "BMI" (düz I) yazılmıştı — aynı dal iki farklı anahtar altında
+    // bölünüp işletme kontenjanı eşleşmesini bozuyordu.
+    if (st.dal === "BMİ") st.dal = "BMI";
   });
   if (typeof s.eskiSistemKaldirildi !== "boolean") s.eskiSistemKaldirildi = false;
   if (s.akademikTakvim === undefined) s.akademikTakvim = null;
@@ -711,21 +721,21 @@ function normalizeState(s) {
       ["12/A", "23102", "Hüseyin Yekta Şenlik", "MBO", ""],
       ["12/A", "23112", "Emirhan Ertürk", "MBO", "Ürün Taşlama (Aycan Ürün)"],
       ["12/A", "22", "Halil Yanık", "MBO", "Bulut Metal"],
-      ["12/B", "23010", "Emirhan Yaslan", "BMİ", "TKİ Ege Linyitleri İşletmesi Müdürlüğü"],
-      ["12/B", "23021", "Yiğit Afacan", "BMİ", "TKİ Ege Linyitleri İşletmesi Müdürlüğü"],
-      ["12/B", "23026", "Yağız Şenhan", "BMİ", "TKİ Ege Linyitleri İşletmesi Müdürlüğü"],
-      ["12/B", "23054", "Samet Yalın", "BMİ", "TKİ Ege Linyitleri İşletmesi Müdürlüğü"],
-      ["12/B", "23105", "Efe Eşref Özdılkural", "BMİ", "TKİ Ege Linyitleri İşletmesi Müdürlüğü"],
-      ["12/B", "23058", "Mehmet Can Çelebi", "BMİ", ""],
-      ["12/B", "23109", "Eren Olum", "BMİ", ""],
-      ["12/B", "23085", "Muhammet Toprak", "BMİ", "Arıksan Metal"],
-      ["12/B", "23249", "Ege Genç", "BMİ", "Arıksan Metal"],
-      ["12/B", "22117", "Hüseyin Anıl Koç", "BMİ", "Hidro-Gen Enerji"],
-      ["12/B", "23053", "Mert Berat Varlı", "BMİ", "İmbat Madencilik"],
-      ["12/B", "23093", "Fahri Can Ilgaz", "BMİ", "İmbat Madencilik"],
-      ["12/B", "22102", "Ramazan Doganer", "BMİ", "Bulut Metal"],
-      ["12/B", "23007", "Talha Ömer Yağmur", "BMİ", "Bulut Metal"],
-      ["12/B", "202501", "Bülent Alp Özkan", "BMİ", "Zirve Makina"],
+      ["12/B", "23010", "Emirhan Yaslan", "BMI", "TKİ Ege Linyitleri İşletmesi Müdürlüğü"],
+      ["12/B", "23021", "Yiğit Afacan", "BMI", "TKİ Ege Linyitleri İşletmesi Müdürlüğü"],
+      ["12/B", "23026", "Yağız Şenhan", "BMI", "TKİ Ege Linyitleri İşletmesi Müdürlüğü"],
+      ["12/B", "23054", "Samet Yalın", "BMI", "TKİ Ege Linyitleri İşletmesi Müdürlüğü"],
+      ["12/B", "23105", "Efe Eşref Özdılkural", "BMI", "TKİ Ege Linyitleri İşletmesi Müdürlüğü"],
+      ["12/B", "23058", "Mehmet Can Çelebi", "BMI", ""],
+      ["12/B", "23109", "Eren Olum", "BMI", ""],
+      ["12/B", "23085", "Muhammet Toprak", "BMI", "Arıksan Metal"],
+      ["12/B", "23249", "Ege Genç", "BMI", "Arıksan Metal"],
+      ["12/B", "22117", "Hüseyin Anıl Koç", "BMI", "Hidro-Gen Enerji"],
+      ["12/B", "23053", "Mert Berat Varlı", "BMI", "İmbat Madencilik"],
+      ["12/B", "23093", "Fahri Can Ilgaz", "BMI", "İmbat Madencilik"],
+      ["12/B", "22102", "Ramazan Doganer", "BMI", "Bulut Metal"],
+      ["12/B", "23007", "Talha Ömer Yağmur", "BMI", "Bulut Metal"],
+      ["12/B", "202501", "Bülent Alp Özkan", "BMI", "Zirve Makina"],
       ["11/C", "713", "Emirhan Türkmen", "MBO", "Özaltınbay Mermer"]
     ];
     studentSeed.forEach(([sinif, okulNo, ad, dal, isletme]) => {
@@ -924,8 +934,13 @@ function dalTanimiForSube(sube) { return S.dalTanimlari.find(d => (d.subeler || 
    göstermeye devam et" olarak ele almalı (asla sessizce gizleme nedeni
    olmamalı). */
 function sinifAdindanSubeAyikla(sinifAdi) {
-  const m = String(sinifAdi || "").toLocaleUpperCase("tr-TR").match(/\d+\s*[-/]\s*([A-ZÇĞİÖŞÜ])\b/);
-  return m ? m[1] : null;
+  // "10-A" / "12/B" gibi ayraçlı biçimlerin yanında, "AMP 9A" gibi ayraçsız
+  // (rakamın hemen ardından boşluksuz harf gelen) biçimleri de tanır —
+  // ayraç yoksa harf rakama bitişik olmalı, yoksa "2026 Yılı" gibi
+  // alakasız metinleri şube harfi sanmasın diye.
+  const m = String(sinifAdi || "").toLocaleUpperCase("tr-TR")
+    .match(/\d+(?:\s*[-/]\s*([A-ZÇĞİÖŞÜ])|([A-ZÇĞİÖŞÜ]))\b/);
+  return m ? (m[1] || m[2]) : null;
 }
 
 function assignedCoursesForClass(cls) {

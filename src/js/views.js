@@ -588,7 +588,11 @@ function viewStajSonuc() {
   </div>`;
 }
 function dalForSinif(sinif) {
-  const cls = S.classes.find(c => c.name === sinif);
+  // "12/B" (e-Okul'dan gelen format) ile "12-B" (S.classes'ın kendi format)
+  // aynı sınıf olsun diye ayraç farkı yok sayılır — bkz. sinifAdindanSubeAyikla.
+  const norm = s => String(s || "").replace(/\//g, "-");
+  const hedef = norm(sinif);
+  const cls = S.classes.find(c => norm(c.name) === hedef);
   return cls ? cls.dal : "";
 }
 function stajListedenTopluEkleModal() {
@@ -1964,9 +1968,14 @@ function mergeOgrenciListesiImport(result) {
   let eklenen = 0, guncellenen = 0;
   (result.siniflar || []).forEach(s => {
     s.ogrenciler.forEach(o => {
-      const existing = S.ogrenciListesi.find(x => x.sinif === s.sinif && x.okulNo === o.okulNo);
+      // Okul No, bir öğrencinin sınıf değişse de (üst sınıfa geçme, şube
+      // değişikliği) aynı kalan gerçek kimliği — bu yüzden sadece okulNo'ya
+      // bakılır. Eskiden (sinif,okulNo) ikilisine bakılıyordu; bu da sınıfı
+      // değişen bir öğrenciyi güncellemek yerine ikinci bir kopya olarak
+      // ekliyordu (eski sınıfındaki kaydı yetim bırakarak).
+      const existing = S.ogrenciListesi.find(x => x.okulNo === o.okulNo);
       if (existing) {
-        Object.assign(existing, { ad: o.ad, soyad: o.soyad, cinsiyet: o.cinsiyet, pansiyon: o.pansiyon });
+        Object.assign(existing, { sinif: s.sinif, ad: o.ad, soyad: o.soyad, cinsiyet: o.cinsiyet, pansiyon: o.pansiyon });
         guncellenen++;
       } else {
         S.ogrenciListesi.push(Object.assign({ id: uid("og"), sinif: s.sinif }, o));
@@ -2023,12 +2032,19 @@ function deleteOgrenci(id) {
   S.ogrenciListesi = S.ogrenciListesi.filter(x => x.id !== id);
   save(); renderMain();
 }
+function ogrenciSinifiDegistir(id, yeniSinif) {
+  const o = S.ogrenciListesi.find(x => x.id === id);
+  if (!o || !yeniSinif || o.sinif === yeniSinif) return;
+  o.sinif = yeniSinif;
+  save(); renderMain();
+}
 function setOgrenciListesiSinif(sinif) { activeOgrenciListesiSinif = sinif; renderMain(); }
 function viewOgrenciListesi() {
   const siniflar = ogrenciListesiSiniflariDalaGore();
   if (!activeOgrenciListesiSinif || !siniflar.includes(activeOgrenciListesiSinif)) activeOgrenciListesiSinif = siniflar[0] || null;
   const sinifBar = `<div class="row no-print" style="flex-wrap:wrap;">${sekmeDropdown("ogrenci-sinif", siniflar.map(s => ({ value: s, label: s + " (" + ogrencilerForSinif(s).length + ")" })), activeOgrenciListesiSinif, "setOgrenciListesiSinif('{v}')")}</div>`;
   const ogrenciler = activeOgrenciListesiSinif ? ogrencilerForSinif(activeOgrenciListesiSinif) : [];
+  const tumSiniflar = ogrenciListesiSiniflari();
   const rows = ogrenciler.map((o, i) => `
     <tr>
       <td>${i + 1}</td>
@@ -2041,6 +2057,9 @@ function viewOgrenciListesi() {
       </select></td>
       <td class="print-only-cell">${escHtml(o.cinsiyet)}</td>
       <td><input class="no-print" type="text" value="${escHtml(o.pansiyon)}" placeholder="-" style="width:80px" onchange="updateOgrenciListesi('${o.id}','pansiyon',this.value)"><span class="print-only-inline">${escHtml(o.pansiyon || "-")}</span></td>
+      <td class="no-print"><select onchange="ogrenciSinifiDegistir('${o.id}',this.value)" title="Öğrenciyi başka bir sınıfa taşı">
+        ${tumSiniflar.map(s => `<option value="${escHtml(s)}" ${s === o.sinif ? "selected" : ""}>${escHtml(s)}</option>`).join("")}
+      </select></td>
       <td class="no-print"><button class="btn danger" onclick="deleteOgrenci('${o.id}')">Sil</button></td>
     </tr>`).join("");
   const erkek = ogrenciler.filter(o => o.cinsiyet === "Erkek").length;
@@ -2060,8 +2079,8 @@ function viewOgrenciListesi() {
     ${belgeYazdirmaBasligi(dosyaAdi)}
     <div class="card" style="overflow-x:auto;">
       <table style="width:100%;">
-        <thead><tr><th>S.No</th><th>Öğrenci No</th><th>Adı</th><th>Soyadı</th><th>Cinsiyeti</th><th>Pansiyon</th><th class="no-print"></th></tr></thead>
-        <tbody>${rows || `<tr><td colspan="7" class="small">Bu sınıfta henüz öğrenci yok.</td></tr>`}</tbody>
+        <thead><tr><th>S.No</th><th>Öğrenci No</th><th>Adı</th><th>Soyadı</th><th>Cinsiyeti</th><th>Pansiyon</th><th class="no-print">Sınıf</th><th class="no-print"></th></tr></thead>
+        <tbody>${rows || `<tr><td colspan="8" class="small">Bu sınıfta henüz öğrenci yok.</td></tr>`}</tbody>
       </table>
       <div class="print-only" style="margin-top:14px;">
         <div>Sınıf Öğretmeni: ..................................</div>
