@@ -6564,7 +6564,7 @@ function viewSinif() {
       const locked = isAssignmentLocked(cls.id, a.id);
       const placement = assignmentPlacementSummary(cls.id, a.id);
       return `
-        <div class="card" style="padding:10px 14px;margin-bottom:8px;${locked ? 'border-color:var(--teal);background:var(--teal-bg);' : ''}">
+        <div class="card" style="padding:10px 14px;margin-bottom:8px;${locked ? 'border-color:var(--teal);background:var(--teal-card-bg);' : ''}">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
             <span><strong>${course.name}</strong> <span class="small">— ${course.hours} saat/hafta · bloklar: ${(course.blocks || []).join("+")}</span></span>
             <div style="display:flex;align-items:center;gap:8px;">
@@ -6614,7 +6614,7 @@ function viewSinif() {
         </label>
       </div>
       ${cls.grade === 12 ? `
-      <div class="card" style="background:var(--teal-bg);border-color:var(--teal);padding:12px 14px;margin-bottom:16px;">
+      <div class="card" style="background:var(--teal-card-bg);border-color:var(--teal);padding:12px 14px;margin-bottom:16px;">
         <strong style="color:var(--teal-ink);">Bu sınıf okula hangi gün(ler) geliyor?</strong>
         <p class="small">İşletmede mesleki eğitime giden (staj) sınıflar için sadece okula geldikleri günler işaretlenmeli — dağıtım motoru derslerini sadece bu günlere yerleştirir. Okula her gün gelen sınıflar için hepsini işaretli bırakın.</p>
         <div>${dayChecks}</div>
@@ -6797,7 +6797,7 @@ function viewKoordinatorluk() {
   }
 
   return `
-  <div class="card no-print" style="background:var(--teal-bg);border-color:var(--teal);">
+  <div class="card no-print" style="background:var(--teal-card-bg);border-color:var(--teal);">
     <div class="row" style="justify-content:space-between;align-items:center;">
       <h2 style="color:var(--teal-ink);margin:0;">Koordinatörlük / İşletme Listesi</h2>
       ${S.isletmeler.length ? `<button class="btn danger" onclick="tumIsletmeleriSil()">Tüm İşletmeleri Sil</button>` : ''}
