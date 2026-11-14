@@ -5742,7 +5742,7 @@ function renderSidebarBrand() {
 /* ---- Karanlık Mod ---- */
 const THEME_KEY = "aok-theme-v1";
 function currentTheme() {
-  try { return localStorage.getItem(THEME_KEY) || "dark"; } catch (e) { return "dark"; }
+  try { return localStorage.getItem(THEME_KEY) || "light"; } catch (e) { return "light"; }
 }
 function applyTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme);
