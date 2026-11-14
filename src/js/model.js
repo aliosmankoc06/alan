@@ -150,7 +150,11 @@ function defaultState() {
       alanSefiUnvani: "Makine Teknolojisi Alan Şefi",
       logo: YILLIK_PLAN_OKUL_LOGO_VARSAYILAN,
       mebLogo: YILLIK_PLAN_MEB_LOGO_VARSAYILAN
-    }
+    },
+    dalTanimlari: [
+      { id: "dal-mbo", ad: "Makine Bakım Onarım Dalı", subeler: ["A"], renkKey: "accent" },
+      { id: "dal-bmi", ad: "Bilgisayarlı Makine İmalatı Dalı", subeler: ["B"], renkKey: "teal" }
+    ]
   };
 }
 
@@ -200,7 +204,8 @@ function emptyState() {
       alanSefiUnvani: "Makine Teknolojisi Alan Şefi",
       logo: YILLIK_PLAN_OKUL_LOGO_VARSAYILAN,
       mebLogo: YILLIK_PLAN_MEB_LOGO_VARSAYILAN
-    }
+    },
+    dalTanimlari: []
   };
 }
 
@@ -762,6 +767,23 @@ function normalizeState(s) {
     if (typeof e.ad !== "string") e.ad = "";
     if (typeof e.unvan !== "string") e.unvan = "";
   });
+  if (!Array.isArray(s.dalTanimlari)) s.dalTanimlari = [];
+  s.dalTanimlari.forEach(d => {
+    if (!d.id) d.id = uid("dal");
+    if (typeof d.ad !== "string") d.ad = "";
+    if (!Array.isArray(d.subeler)) d.subeler = [];
+    d.subeler = d.subeler.map(x => String(x || "").toLocaleUpperCase("tr-TR").trim()).filter(Boolean);
+    if (!["accent", "teal", "warn"].includes(d.renkKey)) d.renkKey = "accent";
+  });
+  if (!s.seededDalTanimlari) {
+    s.seededDalTanimlari = true;
+    if (s.dalTanimlari.length === 0) {
+      s.dalTanimlari = [
+        { id: uid("dal"), ad: "Makine Bakım Onarım Dalı", subeler: ["A"], renkKey: "accent" },
+        { id: uid("dal"), ad: "Bilgisayarlı Makine İmalatı Dalı", subeler: ["B"], renkKey: "teal" }
+      ];
+    }
+  }
   s.classes.forEach(cl => {
     cl.assignments.forEach(a => {
       if (!Array.isArray(a.eligibleTeacherIds)) a.eligibleTeacherIds = [];
@@ -894,6 +916,17 @@ function teacherById(id) { return S.teachers.find(t => t.id === id); }
 function roomById(id) { return S.rooms.find(r => r.id === id); }
 function classById(id) { return S.classes.find(c => c.id === id); }
 function isletmeById(id) { return S.isletmeler.find(i => i.id === id); }
+
+function dalTanimiById(id) { return S.dalTanimlari.find(d => d.id === id); }
+function dalTanimiForSube(sube) { return S.dalTanimlari.find(d => (d.subeler || []).includes(sube)); }
+/* "10-A", "12/A", "AMP 10-A" gibi serbest metinlerden de şube harfini
+   çıkarır; ayrıştıramazsa null döner — çağıran taraf bunu "emin değilim,
+   göstermeye devam et" olarak ele almalı (asla sessizce gizleme nedeni
+   olmamalı). */
+function sinifAdindanSubeAyikla(sinifAdi) {
+  const m = String(sinifAdi || "").toLocaleUpperCase("tr-TR").match(/\d+\s*[-/]\s*([A-ZÇĞİÖŞÜ])\b/);
+  return m ? m[1] : null;
+}
 
 function assignedCoursesForClass(cls) {
   return (cls.assignments || []).map(a => courseById(a.courseId)).filter(Boolean);

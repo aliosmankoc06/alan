@@ -54,6 +54,28 @@ let activeOffTeacherId = null;
 let activePlanSistem = "eski";
 let activePlanEntryId = { yillik: null, gunluk: null };
 
+/* ---- Sol Menü: Aktif Dal süzgeci ----
+   Alan birden fazla dala ayrılmışsa (bkz. Ayarlar > Dallar, S.dalTanimlari),
+   bu küresel süzgeç Öğrenci Listesi/Performans/Norm Kadro ekranı/Yıllık ve
+   Günlük Plan'ı seçilen dala göre daraltır. "ALL" = Tüm Dallar (süzgeç yok).
+   Diğer nav state'leri (activeModule vb.) gibi kalıcı değil, sayfa
+   yenilenince sıfırlanır. Not: bu, zamanlayıcının kendi "dal" kategorisinden
+   (DAL_LABELS/course.dal/class.dal, bkz. model.js) tamamen bağımsızdır. */
+let dalFiltresi = "ALL";
+function setDalFiltresi(id) {
+  dalFiltresi = S.dalTanimlari.some(d => d.id === id) ? id : "ALL";
+  renderDalFiltresiWidget();
+  renderMain();
+}
+function renderDalFiltresiWidget() {
+  const el = document.getElementById("dal-switcher");
+  if (!el) return;
+  if (!S.dalTanimlari.length) { el.innerHTML = ""; return; }
+  const options = [`<option value="ALL">Tüm Dallar</option>`]
+    .concat(S.dalTanimlari.map(d => `<option value="${d.id}" ${d.id === dalFiltresi ? "selected" : ""}>${escHtml(d.ad || "Dal")}</option>`));
+  el.innerHTML = `<label>Aktif Dal</label><select onchange="setDalFiltresi(this.value)">${options.join("")}</select>`;
+}
+
 /* ---- Sol Menü: kategori akordeonu ----
    Modüller MODULES[].group alanına göre kategorilere ayrılır; her an
    yalnızca bir kategori açık gösterilir (expandedGroup), diğerleri
@@ -1647,12 +1669,35 @@ function renderGunlukPlanTable(p) {
     </div>
   </div>`;
 }
+/* Yıllık/Günlük Plan'ın "sinif" alanı serbest metin (ör. "AMP 10-A") — bu
+   yüzden Dal süzgecini burada agresif uygulamıyoruz: ayrıştırılamayan veya
+   tanımsız şubeli kayıtlar HER ZAMAN gösterilir, hiçbir geçmiş kayıt
+   sessizce kaybolmaz. Sadece net bir dal eşleşmesi varsa ve seçili dala ait
+   değilse gizlenir; belirsiz durumda "· Eşleşmeyen" etiketiyle gösterilir. */
+function planGirdisiKesinUyumlu(sinifAdi) {
+  const sube = sinifAdindanSubeAyikla(sinifAdi);
+  return !!sube && !!dalTanimiForSube(sube);
+}
+function planGirdisiGorunurMu(sinifAdi) {
+  if (dalFiltresi === "ALL") return true;
+  const sube = sinifAdindanSubeAyikla(sinifAdi);
+  if (!sube) return true;
+  const dal = dalTanimiForSube(sube);
+  if (!dal) return true;
+  return dal.id === dalFiltresi;
+}
+function planGirdileriniFiltrele(entries) {
+  return dalFiltresi === "ALL" ? entries : entries.filter(e => planGirdisiGorunurMu(e.sinif));
+}
+function planGirdiEtiketi(e) {
+  return e.sinif + " — " + e.ders + (dalFiltresi !== "ALL" && !planGirdisiKesinUyumlu(e.sinif) ? " · Eşleşmeyen" : "");
+}
 function viewPlanModule() {
   const kind = "gunluk";
   const title = "Günlük Plan";
   const aciklama = "Her dersin konu/kazanım/giriş-gelişme-sonuç/yöntem/ölçme-değerlendirme detayları. Kendi Excel dosyanızı yükleyerek veya elle düzenleyerek doldurabilirsiniz.";
 
-  const entries = S.gunlukPlanlar.slice().sort((a, b) => (a.sinif + a.ders).localeCompare(b.sinif + b.ders, "tr"));
+  const entries = planGirdileriniFiltrele(S.gunlukPlanlar.slice().sort((a, b) => (a.sinif + a.ders).localeCompare(b.sinif + b.ders, "tr")));
   if (entries.length && !entries.some(e => e.id === activePlanEntryId[kind])) activePlanEntryId[kind] = entries[0].id;
   if (!entries.length) activePlanEntryId[kind] = null;
   const activeEntry = entries.find(e => e.id === activePlanEntryId[kind]) || null;
@@ -1660,7 +1705,7 @@ function viewPlanModule() {
   const listHtml = entries.length === 0 ? "" : `
     <div class="card no-print">
       <div class="row" style="flex-wrap:wrap;">
-        ${sekmeDropdown("plan-ders-" + kind, entries.map(e => ({ value: e.id, label: e.sinif + " — " + e.ders })), activePlanEntryId[kind], `selectPlanEntry('${jsq(kind)}','{v}')`)}
+        ${sekmeDropdown("plan-ders-" + kind, entries.map(e => ({ value: e.id, label: planGirdiEtiketi(e) })), activePlanEntryId[kind], `selectPlanEntry('${jsq(kind)}','{v}')`)}
       </div>
     </div>`;
 
@@ -1694,7 +1739,7 @@ function renderCalismaYiliTab() {
   ${renderAkademikTakvimKarti()}`;
 }
 function renderYillikPlanSecTab() {
-  const entries = S.yillikPlanlar.slice().sort((a, b) => (a.sinif + a.ders).localeCompare(b.sinif + b.ders, "tr"));
+  const entries = planGirdileriniFiltrele(S.yillikPlanlar.slice().sort((a, b) => (a.sinif + a.ders).localeCompare(b.sinif + b.ders, "tr")));
   if (entries.length && !entries.some(e => e.id === activePlanEntryId.yillik)) activePlanEntryId.yillik = entries[0].id;
   if (!entries.length) activePlanEntryId.yillik = null;
   const activeEntry = entries.find(e => e.id === activePlanEntryId.yillik) || null;
@@ -1702,7 +1747,7 @@ function renderYillikPlanSecTab() {
   const listHtml = entries.length === 0 ? "" : `
     <div class="card no-print">
       <div class="row" style="flex-wrap:wrap;">
-        ${sekmeDropdown("plan-ders-yillik", entries.map(e => ({ value: e.id, label: e.sinif + " — " + e.ders })), activePlanEntryId.yillik, `selectPlanEntry('yillik','{v}')`)}
+        ${sekmeDropdown("plan-ders-yillik", entries.map(e => ({ value: e.id, label: planGirdiEtiketi(e) })), activePlanEntryId.yillik, `selectPlanEntry('yillik','{v}')`)}
       </div>
     </div>`;
 
@@ -1899,6 +1944,19 @@ function ogrenciListesiSiniflari() {
   S.classes.filter(c => c.grade > 0 && !c.excludeFromDistribution).forEach(c => set.add(c.name));
   return Array.from(set).sort((a, b) => a.localeCompare(b, "tr"));
 }
+/* ogrenciListesiSiniflari() Staj/Beceri Sınavı/Kalfalık-Ustalık'ın öğrenci
+   seçicilerinde de kullanıldığı için oraya dokunmadan, sadece Öğrenci
+   Listesi ekranı için Dal süzgeçli bir sarmalayıcı. */
+function ogrenciListesiSiniflariDalaGore() {
+  const liste = ogrenciListesiSiniflari();
+  if (dalFiltresi === "ALL") return liste;
+  return liste.filter(s => {
+    const sube = sinifAdindanSubeAyikla(s);
+    if (!sube) return true;
+    const dal = dalTanimiForSube(sube);
+    return !dal || dal.id === dalFiltresi;
+  });
+}
 function mergeOgrenciListesiImport(result) {
   let eklenen = 0, guncellenen = 0;
   (result.siniflar || []).forEach(s => {
@@ -1964,7 +2022,7 @@ function deleteOgrenci(id) {
 }
 function setOgrenciListesiSinif(sinif) { activeOgrenciListesiSinif = sinif; renderMain(); }
 function viewOgrenciListesi() {
-  const siniflar = ogrenciListesiSiniflari();
+  const siniflar = ogrenciListesiSiniflariDalaGore();
   if (!activeOgrenciListesiSinif || !siniflar.includes(activeOgrenciListesiSinif)) activeOgrenciListesiSinif = siniflar[0] || null;
   const sinifBar = `<div class="row no-print" style="flex-wrap:wrap;">${sekmeDropdown("ogrenci-sinif", siniflar.map(s => ({ value: s, label: s + " (" + ogrencilerForSinif(s).length + ")" })), activeOgrenciListesiSinif, "setOgrenciListesiSinif('{v}')")}</div>`;
   const ogrenciler = activeOgrenciListesiSinif ? ogrencilerForSinif(activeOgrenciListesiSinif) : [];
@@ -2076,8 +2134,23 @@ function normKadroBolumBasligi(baslik) {
 function normKadroToplamSatiri(etiket, saat) {
   return `<tr style="font-weight:700;"><td colspan="6">${escHtml(etiket)}</td><td>${saat}</td><td></td></tr>`;
 }
+/* Not: bu filtre SADECE ekran görünümü içindir — extractNormKadroForExcel()
+   kasıtlı olarak buna dokunmaz, çünkü resmî Norm Kadro belgesi her zaman
+   alan genelini (tüm dallar birden) göstermek zorunda. */
+function normKadroRelevantClasses() {
+  let list = S.classes.filter(c => c.id !== "cl-idari" && c.assignments.length > 0 && !c.id.startsWith("isletme-"));
+  if (dalFiltresi !== "ALL") {
+    list = list.filter(c => {
+      const sube = sinifAdindanSubeAyikla(c.name);
+      if (!sube) return true;
+      const dal = dalTanimiForSube(sube);
+      return !dal || dal.id === dalFiltresi;
+    });
+  }
+  return list;
+}
 function viewNormKadro() {
-  const relevantClasses = S.classes.filter(c => c.id !== "cl-idari" && c.assignments.length > 0 && !c.id.startsWith("isletme-"));
+  const relevantClasses = normKadroRelevantClasses();
   let siraNo = 0;
   let ampToplam = 0;
 
@@ -2146,6 +2219,7 @@ function viewNormKadro() {
   <div class="card no-print">
     <h2>Norm Kadro Hesabı</h2>
     <p class="small">Ders Programı'ndaki güncel ders atamalarınızdan otomatik hesaplanır — sınıflara ders/öğretmen ekledikçe/çıkardıkça burası da güncellenir. Öğrenci sayılarını ve koordinatörlük satırlarını elle girin.</p>
+    ${dalFiltresi !== "ALL" && dalTanimiById(dalFiltresi) ? `<p class="pill info">Gösterilen AMP dersleri "${escHtml(dalTanimiById(dalFiltresi).ad)}" ile sınırlı — Koordinatörlük ve Şeflik satırları her zaman alan geneli gösterilir. Resmî Norm Kadro sayısını kontrol ederken sol menüden "Tüm Dallar"ı seçin; Excel'e aktarma her zaman alan genelini içerir.</p>` : ""}
     <div class="row no-print">
       <button class="btn primary" onclick="printCurrentView(false)">Yazdır</button>
       <button class="btn" onclick="indirNormKadroExcel('Norm Kadro ${jsq(S.akademikTakvim ? S.akademikTakvim.ogretimYili : "")}')">İndir (Excel)</button>
@@ -3173,7 +3247,16 @@ function performansKriterleri(tur) {
 function performansSinifListesi(tur) {
   const gercekSiniflar = S.classes.filter(c => c.grade > 0).map(c => c.name);
   const kayitSiniflari = S.performansKayitlari.filter(x => x.tur === tur).map(x => x.sinif);
-  return Array.from(new Set(gercekSiniflar.concat(kayitSiniflari))).sort((a, b) => a.localeCompare(b, "tr", { numeric: true }));
+  let list = Array.from(new Set(gercekSiniflar.concat(kayitSiniflari))).sort((a, b) => a.localeCompare(b, "tr", { numeric: true }));
+  if (dalFiltresi !== "ALL") {
+    list = list.filter(s => {
+      const sube = sinifAdindanSubeAyikla(s);
+      if (!sube) return true; // ayrıştırılamadı: her zaman göster
+      const dal = dalTanimiForSube(sube);
+      return !dal || dal.id === dalFiltresi; // tanımsız şube: her zaman göster
+    });
+  }
+  return list;
 }
 function donemEtiketi(d) {
   const s = String(d || "");
@@ -5987,7 +6070,55 @@ function viewAyarlar() {
     </div>
   </div>
   ${renderAkademikTakvimKarti()}
+  ${renderDalTanimlariKarti()}
   ${renderImzaSirkuleriKarti()}`;
+}
+const DAL_SUBE_HARFLERI = ["A", "B", "C", "D", "E", "F"];
+function dalChipHtml(d) {
+  if (!d) return "";
+  return `<span class="dal-chip dal-chip-${d.renkKey}">${escHtml(d.ad || "Dal")}</span>`;
+}
+function renderDalTanimlariKarti() {
+  const rows = S.dalTanimlari.map(d => `
+    <tr>
+      <td><input type="text" placeholder="Dal adı" value="${escHtml(d.ad)}" style="width:100%;min-width:200px;" onchange="updateDalTanimi('${d.id}','ad',this.value)"></td>
+      <td>${DAL_SUBE_HARFLERI.map(h => `<label style="display:inline-flex;align-items:center;gap:3px;margin-right:10px;">
+          <input type="checkbox" ${d.subeler.includes(h) ? "checked" : ""} onchange="updateDalSubeleri('${d.id}','${h}',this.checked)"> ${h}
+        </label>`).join("")}</td>
+      <td>${dalChipHtml(d)}</td>
+      <td><button class="btn danger" onclick="deleteDalTanimi('${d.id}')">Sil</button></td>
+    </tr>`).join("");
+  return `
+  <div class="card">
+    <h2>Dallar</h2>
+    <p class="small">Alanınız birden fazla dala ayrılıyorsa (örn. Makine Bakım Onarım / Bilgisayarlı Makine İmalatı) burada tanımlayın ve hangi şube harflerinin hangi dala ait olduğunu işaretleyin. Bir dal kapandığında şubelerini kaldırmanız, yeni bir dal açıldığında ise buradan eklemeniz yeterli — Öğrenci Listesi, Performans, Norm Kadro, Yıllık/Günlük Plan ve sol menüdeki Dal süzgeci otomatik güncellenir. Bir dalı silmek, ona ait öğrenci/plan kayıtlarını silmez — sadece süzgeçten kaldırır.</p>
+    <table><thead><tr><th>Dal Adı</th><th>Şubeler</th><th>Rozet</th><th></th></tr></thead>
+    <tbody>${rows || `<tr><td colspan="4" class="small">Henüz dal tanımlanmadı.</td></tr>`}</tbody></table>
+    <div class="row"><button class="btn" onclick="addDalTanimi()">Dal Ekle</button></div>
+  </div>`;
+}
+function addDalTanimi() {
+  const renkler = ["accent", "teal", "warn"];
+  const renkKey = renkler[S.dalTanimlari.length % renkler.length];
+  S.dalTanimlari.push({ id: uid("dal"), ad: "", subeler: [], renkKey });
+  save(); renderMain(); renderDalFiltresiWidget();
+}
+function updateDalTanimi(id, field, value) {
+  const d = S.dalTanimlari.find(x => x.id === id);
+  if (d) d[field] = value;
+  save(); renderMain(); renderDalFiltresiWidget();
+}
+function updateDalSubeleri(id, harf, checked) {
+  S.dalTanimlari.forEach(d => { d.subeler = d.subeler.filter(s => s !== harf); });
+  const d = S.dalTanimlari.find(x => x.id === id);
+  if (d && checked) d.subeler.push(harf);
+  save(); renderMain(); renderDalFiltresiWidget();
+}
+function deleteDalTanimi(id) {
+  if (!confirm("Bu dal silinsin mi? Bu dala atanmış sınıflar/kayıtlar silinmez, sadece dal süzgecinde artık ayrı gösterilmez.")) return;
+  S.dalTanimlari = S.dalTanimlari.filter(x => x.id !== id);
+  if (dalFiltresi !== "ALL" && !S.dalTanimlari.some(d => d.id === dalFiltresi)) dalFiltresi = "ALL";
+  save(); renderMain(); renderDalFiltresiWidget();
 }
 function renderImzaSirkuleriKarti() {
   const rows = S.imzaSirkuleri.map(k => `
@@ -6386,10 +6517,18 @@ function idariOgretmenEkle(clsId, teacherId) {
   cls.assignments.push({ id: uid("a"), courseId: "pbo-6", eligibleTeacherIds: [teacherId], teacherCount: 1, roomIds: [] });
   save(); renderMain();
 }
+/* Sadece bilgi amaçlı: yeni (kullanıcı tanımlı) Dal ile zamanlayıcının kendi
+   dal kategorisini (DAL_LABELS/c.dal) karşılaştırma rozeti — hiçbir şeyi
+   filtrelemez/değiştirmez, sadece olası tutarsızlığı görünür kılar. */
+function dalIpucuChipHtml(sinifAdi) {
+  const sube = sinifAdindanSubeAyikla(sinifAdi);
+  const dal = sube ? dalTanimiForSube(sube) : null;
+  return dal ? `<span class="dal-chip dal-chip-${dal.renkKey}" title="Ayarlar &gt; Dallar ile eşleşme (bilgi amaçlı)">${escHtml(dal.ad)}</span>` : "";
+}
 function viewSinif() {
   const listHtml = S.classes.filter(c => !c.id.startsWith("isletme-")).map(c => `
     <div class="list-item ${c.id === activeClassId ? 'active' : ''}" onclick="setActiveClass('${c.id}')">
-      <span>${c.name} <span class="small">(${DAL_LABELS[c.dal] || c.dal})</span> ${c.excludeFromDistribution ? '<span class="pill warn">Dahil değil</span>' : ''}</span>
+      <span>${c.name} <span class="small">(${DAL_LABELS[c.dal] || c.dal})</span> ${dalIpucuChipHtml(c.name)} ${c.excludeFromDistribution ? '<span class="pill warn">Dahil değil</span>' : ''}</span>
       <span style="display:flex;gap:8px;flex-shrink:0;margin-left:6px;">
         <span onclick="event.stopPropagation(); editClass('${c.id}');" style="cursor:pointer;" title="Sınıfı düzenle">✎</span>
         <span onclick="event.stopPropagation(); deleteClass('${c.id}');" style="cursor:pointer;" title="Sınıfı sil">✕</span>

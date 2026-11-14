@@ -22,6 +22,7 @@ if (window.desktop && window.desktop.isElectron) {
 renderTabbar();
 renderMain();
 renderSidebarBrand();
+renderDalFiltresiWidget();
 applyTheme(currentTheme());
 sonKayitBaslangicDurumunuGoster();
 renderSurumWidget();
