@@ -6185,6 +6185,12 @@ function globalSearch(query) {
       results.push({ tip: "İşletme", ad: i.name, action: () => { setModule("ders-programi"); setTab("koordinatorluk"); } });
     }
   });
+  S.ogrenciListesi.forEach(o => {
+    const adSoyad = (o.ad || "") + " " + (o.soyad || "");
+    if (trLower(adSoyad).includes(q) || trLower(o.okulNo || "").includes(q)) {
+      results.push({ tip: "Öğrenci", ad: adSoyad.trim() + (o.sinif ? " · " + o.sinif : "") + (o.okulNo ? " · No: " + o.okulNo : ""), action: () => { setModule("ogrenci-listesi"); activeOgrenciListesiSinif = o.sinif; } });
+    }
+  });
   S.students.forEach(s => {
     if (trLower(s.ad).includes(q)) {
       results.push({ tip: "Öğrenci (Staj)", ad: s.ad + (s.sinif ? " · " + s.sinif : ""), action: () => setModule("staj-yerlestirme") });
@@ -6208,6 +6214,16 @@ function globalSearch(query) {
   dbfKayitlar().forEach(r => {
     if (trLower(r.dersAdi).includes(q)) {
       results.push({ tip: "Ders Bilgi Formu", ad: r.dersAdi + " · " + r.program + " " + r.sinif, action: () => { setModule("ders-bilgi-formu"); selectDbfProgram(r.program); selectDbfSinif(r.sinif); selectDbfDers(r.dersAdi); } });
+    }
+  });
+  S.rooms.forEach(r => {
+    if (trLower(r.name).includes(q)) {
+      results.push({ tip: "Laboratuvar/Atölye", ad: r.name, action: () => setModule("ayarlar") });
+    }
+  });
+  S.donemArsivi.forEach(a => {
+    if (trLower(a.etiket).includes(q)) {
+      results.push({ tip: "Dönem Arşivi", ad: a.etiket, action: () => setModule("ayarlar") });
     }
   });
   return results.slice(0, 20);
