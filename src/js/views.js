@@ -5721,6 +5721,12 @@ function alanSefiPlanlamaKursu() {
   return S.courses.find(c => /alan\s*şefi/i.test(c.name || "") && /planlama/i.test(c.name || "")) || null;
 }
 function alanSefiGunlukSaatler() {
+  // Önce elle girilmiş haftalık saat ayarına bak (bkz. renderSeflikHaftalikSaatKarti)
+  // — varsa, Ders Programı'ndaki dağıtıma hiç bakılmaz, kullanıcı zamanlayıcıyla
+  // hiç uğraşmadan doğrudan kendi haftalık düzenini girebilir.
+  if (S.seflikHaftalikSaatOverride && S.seflikHaftalikSaatOverride.some(x => x > 0)) {
+    return S.seflikHaftalikSaatOverride.slice();
+  }
   const kurs = alanSefiPlanlamaKursu();
   const gunSaat = [0, 0, 0, 0, 0];
   if (!kurs) return gunSaat;
@@ -5729,6 +5735,31 @@ function alanSefiGunlukSaatler() {
     if (cell.courseId === kurs.id && cell.day >= 0 && cell.day <= 4) gunSaat[cell.day]++;
   });
   return gunSaat;
+}
+const SEFLIK_HAFTA_GUNLERI = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"];
+function updateSeflikHaftalikSaat(gunIndex, value) {
+  const gunSaat = Array.isArray(S.seflikHaftalikSaatOverride) ? S.seflikHaftalikSaatOverride.slice() : [0, 0, 0, 0, 0];
+  gunSaat[gunIndex] = Math.max(0, parseInt(value, 10) || 0);
+  S.seflikHaftalikSaatOverride = gunSaat;
+  save(); renderMain();
+}
+function seflikHaftalikSaatTemizle() {
+  S.seflikHaftalikSaatOverride = null;
+  save(); renderMain();
+}
+function renderSeflikHaftalikSaatKarti() {
+  const aktif = S.seflikHaftalikSaatOverride && S.seflikHaftalikSaatOverride.some(x => x > 0);
+  const gunSaat = aktif ? S.seflikHaftalikSaatOverride : [0, 0, 0, 0, 0];
+  return `
+  <div class="card no-print">
+    <h2>Haftalık Saat Ayarı</h2>
+    <p class="small">Normalde haftalık şeflik saatleri Ders Programı'ndaki "Planlama Bakım Onarım (Alan Şefi)" dersinin dağıtımından otomatik okunur. Ders Programı'yla uğraşmak istemiyorsanız, hangi gün kaç saat şeflik yapacağınızı buradan doğrudan girin — "Ders Programından Otomatik Oluştur" bundan sonra bu saatleri kullanır.</p>
+    <div class="row" style="flex-wrap:wrap;gap:12px;">
+      ${SEFLIK_HAFTA_GUNLERI.map((gun, i) => `
+        <div><label class="small">${gun}</label><input type="number" min="0" style="width:70px" value="${gunSaat[i] || ''}" placeholder="0" onchange="updateSeflikHaftalikSaat(${i}, this.value)"></div>`).join("")}
+    </div>
+    ${aktif ? `<div class="row" style="margin-top:8px;"><button class="btn" onclick="seflikHaftalikSaatTemizle()">Elle Girişi Temizle (Ders Programı'na Dön)</button></div>` : ""}
+  </div>`;
 }
 function seflikGunGruplariOlustur(gunSaat) {
   const gruplar = [];
@@ -5795,7 +5826,7 @@ function seflikOtomatikOlustur(aySecim) {
   const gunGruplari = seflikGunGruplariOlustur(gunSaat);
   if (!gunGruplari.length) {
     closeModal();
-    alert('Ders Programı\'nda "Planlama Bakım Onarım (Alan Şefi)" dersi için henüz bir gün ataması bulunamadı. Önce Ders Programı > Ders Dağıtım\'dan programı oluşturun.');
+    alert('Haftalık şeflik saatiniz bulunamadı. Ya Ders Programı > Ders Dağıtım\'dan "Planlama Bakım Onarım (Alan Şefi)" dersine gün atayın, ya da bu ekrandaki "Haftalık Saat Ayarı" kartından hangi gün kaç saat olduğunu doğrudan elle girin.');
     return;
   }
   let r = S.seflikRaporlari.find(x => x.ay === aySecim);
@@ -5964,6 +5995,7 @@ function viewSeflikRaporlari() {
     </div>
     ${active ? belgeAracCubugu(dosyaAdi) : ""}
   </div>
+  ${renderSeflikHaftalikSaatKarti()}
   ${listHtml}
   <div class="print-area">
     <div class="card" style="overflow-x:auto;">${content}</div>

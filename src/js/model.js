@@ -156,7 +156,8 @@ function defaultState() {
     dalTanimlari: [
       { id: "dal-mbo", ad: "Makine Bakım Onarım Dalı", subeler: ["A"], renkKey: "accent" },
       { id: "dal-bmi", ad: "Bilgisayarlı Makine İmalatı Dalı", subeler: ["B"], renkKey: "teal" }
-    ]
+    ],
+    seflikHaftalikSaatOverride: null
   };
 }
 
@@ -209,7 +210,8 @@ function emptyState() {
       logo: YILLIK_PLAN_OKUL_LOGO_VARSAYILAN,
       mebLogo: YILLIK_PLAN_MEB_LOGO_VARSAYILAN
     },
-    dalTanimlari: []
+    dalTanimlari: [],
+    seflikHaftalikSaatOverride: null
   };
 }
 
@@ -274,6 +276,16 @@ function normalizeState(s) {
     if (typeof st.sorumluOgretmenId !== "string") st.sorumluOgretmenId = "";
     if (!st.devamsizlik || typeof st.devamsizlik !== "object") st.devamsizlik = {};
   });
+  // Şeflik haftalık saat girişi normalde Ders Programı'ndaki "Planlama Bakım
+  // Onarım (Alan Şefi)" dersinin zamanlayıcıda hangi güne/kaç saat
+  // bloklandığından okunur (bkz. alanSefiGunlukSaatler, views.js) — ama bu
+  // ders dağıtılmamışsa kullanıcı karmaşık zamanlayıcıya girmek zorunda
+  // kalıyordu. Bu, doğrudan 5 günlük (Pzt-Cuma) bir sayı dizisi girilerek o
+  // taramayı atlayan isteğe bağlı bir geçersiz kılmadır; boş/null ise eski
+  // davranış (zamanlayıcıdan okuma) değişmeden sürer.
+  if (s.seflikHaftalikSaatOverride !== null && !(Array.isArray(s.seflikHaftalikSaatOverride) && s.seflikHaftalikSaatOverride.length === 5)) {
+    s.seflikHaftalikSaatOverride = null;
+  }
   if (typeof s.eskiSistemKaldirildi !== "boolean") s.eskiSistemKaldirildi = false;
   if (s.akademikTakvim === undefined) s.akademikTakvim = null;
   if (s.akademikTakvim && (!s.akademikTakvim.sinavTarihleri || typeof s.akademikTakvim.sinavTarihleri !== "object")) {
