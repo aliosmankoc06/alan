@@ -3269,6 +3269,258 @@ function viewOkulZumresi() {
 let activeEnvanterTab = "makineler";
 let activeMakineId = "__ALL__";
 let activeDurumTespitId = null;
+let activeBakimKartId = null;
+
+/* ---- Atölye Bakım Formu ----
+   Gerçek, okulda kullanılan "Atölye Bakım Formu" dosyalarından (öğretmen
+   başına, makine başına Günlük/Haftalık/6 Aylık sekmeler) alınan AYNI,
+   sabit kontrol madde listeleri — her makinede ve her öğretmende birebir
+   aynı metinle tekrar ediyordu, bu yüzden tek bir kanonik sabit olarak
+   tutuluyor (makineye özel değil, tür'e özel). Kullanıcının isteği: makine
+   SEÇ -> tür SEÇ -> form (kart) açılsın -> madde/kolon hücrelerine tıklayıp
+   işaretle, açıklama yaz -> yazdır/indir -> imza atacak öğretmenin adı da
+   seçilsin (kayıtlı öğretmen listesinden). Öğretmen bazlı AYRI formlar
+   kasıtlı olarak YAPILMADI — kullanıcı bunu özellikle istemedi. */
+const BAKIM_FORMU_TURLERI = {
+  gunluk: {
+    label: "Günlük",
+    baslik: "Makine Günlük Kontrol Formu",
+    not: "Ders başlamadan önce yapılacak hızlı kontroller (5 Haftalık Standart Periyot)",
+    kolonBasligi: "KONTROL MADDESİ",
+    kolonlar: ["Hafta 1", "Hafta 2", "Hafta 3", "Hafta 4", "Hafta 5"],
+    maddeler: [
+      "Genel görsel kontrol (Kırık, hasar var mı?)",
+      "Acil durdurma butonu çalışıyor mu?",
+      "Koruyucu siperliklerin durumu",
+      "Tezgah etrafı temizliği",
+      "Elektrik kabloları sağlam mı?",
+      "Talaş toplama sistemi çalışıyor mu?",
+      "Işıklandırma yeterli mi?",
+      "Makine yağ seviyesi (Gözle kontrol)",
+      "Soğutma sıvısı seviyesi (Varsa)",
+      "Tezgah üzerinde yabancı cisim var mı?"
+    ],
+    durumSecenekleri: [
+      { kod: "ok", sembol: "✓", etiket: "Sorun Yok" },
+      { kod: "sorun", sembol: "X", etiket: "Sorun Var" },
+      { kod: "atlandi", sembol: "-", etiket: "Kontrol Edilmedi" }
+    ],
+    aciklamaBasligi: "ARIZALI DURUMLAR VE AÇIKLAMALAR",
+    aciklamaYerTutucu: "Örnek: Hafta 2'de acil durdurma butonunda takılma oldu, hafif zorlama ile çalışıyor. Elektrik kablosunda ezilme tespit edildi vs."
+  },
+  haftalik: {
+    label: "Haftalık",
+    baslik: "Makine Haftalık Bakım Formu",
+    not: "Haftalık şeflik görevleriyle birlikte yapılacak bakımlar (5 Haftalık Standart Periyot)",
+    kolonBasligi: "BAKIM MADDESİ",
+    kolonlar: ["Hafta 1", "Hafta 2", "Hafta 3", "Hafta 4", "Hafta 5"],
+    maddeler: [
+      "Kılavuz yüzeylerinin temizliği ve yağlanması",
+      "Rulmanların kontrolü ve greslemesi",
+      "Talaş çekmecesi boşaltma ve temizlik",
+      "Soğutma sıvısı tankı temizliği (Varsa)",
+      "Sızdırmazlık elemanlarının kontrolü",
+      "Vida bağlantılarının sıkılık kontrolü",
+      "Hidrolik/Pnömatik hortum kontrolü",
+      "Elektrik panosu temizliği",
+      "Filtre temizliği/değişimi",
+      "Alet tutucu ve mandren temizliği",
+      "Kumanda paneli temizliği",
+      "Tezgah altı ve etrafının detaylı temizliği"
+    ],
+    durumSecenekleri: [
+      { kod: "ok", sembol: "✓", etiket: "Yapıldı" },
+      { kod: "sorun", sembol: "X", etiket: "Sorun Tespit Edildi" },
+      { kod: "atlandi", sembol: "-", etiket: "Yapılmadı" }
+    ],
+    aciklamaBasligi: "TESPİT EDİLEN SORUNLAR VE YAPILAN İŞLEMLER",
+    aciklamaYerTutucu: "Örnek: Hafta 3'te rulman sesli çalışıyor tespit edildi, gresleme yapıldı ancak ses devam ediyor. Değişim gerekebilir. Talaş çekmecesinde kırık tespit edildi vs."
+  },
+  altiAylik: {
+    label: "6 Aylık",
+    baslik: "Makine 6 Aylık Bakım Formu",
+    not: "Yaz ve kış tatillerinde yapılacak kapsamlı bakımlar",
+    kolonBasligi: "BAKIM MADDESİ",
+    kolonlar: ["HAZİRAN (Yaz Tatili)", "ARALIK (Kış Tatili)"],
+    maddeler: [
+      "Motor rulmanlarının kontrolü ve değişimi (Gerekirse)",
+      "V-kayış gerginliği kontrolü ve değişimi",
+      "Hidrolik yağ seviyesi ve kalitesi kontrolü",
+      "Pnömatik sistem basınç kontrolü",
+      "Tüm elektrik bağlantılarının sıkılık kontrolü",
+      "Tesviye kontrolü (Seviye ayarı)",
+      "Mil ayarları ve kontrolleri",
+      "Hassasiyet testleri",
+      "CNC sistemlerinde yazılım güncellemesi (Varsa)",
+      "Tüm güvenlik sistemlerinin fonksiyon testi",
+      "Acil durdurma butonlarının test edilmesi",
+      "Genel boya ve estetik bakım",
+      "Teknik dokümantasyon güncellemesi",
+      "Yedek parça envanteri kontrolü",
+      "Kalibrasyon kontrolü"
+    ],
+    durumSecenekleri: [
+      { kod: "ok", sembol: "✓", etiket: "Yapıldı ve Normal" },
+      { kod: "sorun", sembol: "!", etiket: "Parça Değişimi Gerekli" },
+      { kod: "ariza", sembol: "X", etiket: "Arızalı" }
+    ],
+    aciklamaBasligi: "KAPSAMLI BAKIM SONUÇLARI VE TESPİTLER",
+    aciklamaYerTutucu: "Örnek: Motor rulmanları değiştirildi. V-kayış eskimesi tespit edildi, yeni kayış sipariş edildi. Hidrolik yağ seviyesi düşük bulundu, ilave edildi. Kalibrasyon testi yapıldı, hassasiyet normal sınırlarda vs."
+  }
+};
+function bakimKartiById(id) { return S.bakimKartlari.find(x => x.id === id); }
+function addBakimKartiModal() {
+  if (!S.envanter.makineler.length) { alert("Önce Makine Envanteri sekmesinden makine ekleyin."); return; }
+  const root = document.getElementById("modal-root");
+  root.innerHTML = `
+    <div class="modal-bg" onclick="if(event.target===this) closeModal()">
+      <div class="modal" style="width:380px;">
+        <h3>Yeni Bakım Kartı Oluştur</h3>
+        <label class="small">Makine</label>
+        <select id="bk-makine" style="width:100%">
+          ${S.envanter.makineler.map(m => `<option value="${m.id}">${escHtml(m.ad)}${m.lab ? " · " + escHtml(m.lab) : ""}</option>`).join("")}
+        </select>
+        <label class="small">Bakım Türü</label>
+        <select id="bk-tur" style="width:100%">
+          ${Object.keys(BAKIM_FORMU_TURLERI).map(t => `<option value="${t}">${escHtml(BAKIM_FORMU_TURLERI[t].label)}</option>`).join("")}
+        </select>
+        <label class="small">Ay (opsiyonel)</label>
+        <input type="text" id="bk-ay" style="width:100%" placeholder="örn. Kasım 2026">
+        <div class="row">
+          <button class="btn primary" onclick="saveNewBakimKarti()">Oluştur</button>
+          <button class="btn" onclick="closeModal()">İptal</button>
+        </div>
+      </div>
+    </div>`;
+}
+function saveNewBakimKarti() {
+  const makineId = document.getElementById("bk-makine").value;
+  const tur = document.getElementById("bk-tur").value;
+  const ay = document.getElementById("bk-ay").value.trim();
+  const kart = { id: uid("bk"), makineId, tur, ay, imzaOgretmeni: "", durumlar: {}, tarihler: {}, aciklama: "" };
+  S.bakimKartlari.push(kart);
+  activeBakimKartId = kart.id;
+  save(); closeModal(); renderMain();
+}
+function deleteBakimKarti(id) {
+  if (!confirm("Bu bakım kartı silinsin mi? Bu işlem geri alınamaz.")) return;
+  S.bakimKartlari = S.bakimKartlari.filter(x => x.id !== id);
+  if (activeBakimKartId === id) activeBakimKartId = null;
+  save(); renderMain();
+}
+function selectBakimKarti(id) { activeBakimKartId = id; renderMain(); }
+function bakimKartiDurumIlerlet(kartId, maddeIndex, kolonIndex) {
+  const kart = bakimKartiById(kartId);
+  if (!kart) return;
+  const tanim = BAKIM_FORMU_TURLERI[kart.tur];
+  if (!tanim) return;
+  const sira = ["", ...tanim.durumSecenekleri.map(d => d.kod)];
+  const key = maddeIndex + "_" + kolonIndex;
+  const mevcut = kart.durumlar[key] || "";
+  const yeni = sira[(sira.indexOf(mevcut) + 1) % sira.length];
+  if (yeni === "") delete kart.durumlar[key];
+  else kart.durumlar[key] = yeni;
+  save(); renderMain();
+}
+function updateBakimKartiTarih(kartId, kolonIndex, value) {
+  const kart = bakimKartiById(kartId);
+  if (!kart) return;
+  kart.tarihler[kolonIndex] = value;
+  save();
+}
+function updateBakimKartiAciklama(kartId, value) {
+  const kart = bakimKartiById(kartId);
+  if (kart) kart.aciklama = value;
+  save();
+}
+function updateBakimKartiImza(kartId, value) {
+  const kart = bakimKartiById(kartId);
+  if (kart) kart.imzaOgretmeni = value;
+  save(); renderMain();
+}
+function updateBakimKartiAy(kartId, value) {
+  const kart = bakimKartiById(kartId);
+  if (kart) kart.ay = value.trim();
+  save();
+}
+function renderBakimKartiDetay(kart) {
+  const tanim = BAKIM_FORMU_TURLERI[kart.tur];
+  if (!tanim) return `<p class="small">Geçersiz bakım türü.</p>`;
+  const makine = makineById(kart.makineId);
+  const basliklar = `<tr><th>${escHtml(tanim.kolonBasligi)}</th>${tanim.kolonlar.map(k => `<th>${escHtml(k)}</th>`).join("")}</tr>`;
+  const maddeSatirlari = tanim.maddeler.map((madde, mi) => {
+    const hucreler = tanim.kolonlar.map((_, ki) => {
+      const key = mi + "_" + ki;
+      const kod = kart.durumlar[key] || "";
+      const secenek = tanim.durumSecenekleri.find(d => d.kod === kod);
+      return `<td class="small" style="text-align:center;cursor:pointer;" title="${secenek ? escHtml(secenek.etiket) : "İşaretlenmedi"} — tıklayınca değişir" onclick="bakimKartiDurumIlerlet('${kart.id}',${mi},${ki})">${secenek ? secenek.sembol : "<span style='opacity:.3'>·</span>"}</td>`;
+    }).join("");
+    return `<tr><td>${escHtml(madde)}</td>${hucreler}</tr>`;
+  }).join("");
+  const tarihSatiri = `<tr class="no-print"><td class="small" style="font-weight:600;">Tarih</td>${tanim.kolonlar.map((_, ki) => `<td><input type="text" style="width:100%;text-align:center;" placeholder="gg.aa.yyyy" value="${escHtml(kart.tarihler[ki] || '')}" onchange="updateBakimKartiTarih('${kart.id}',${ki},this.value)"></td>`).join("")}</tr>`;
+  const tarihSatiriPrint = `<tr class="print-only-row"><td class="small" style="font-weight:600;">Tarih</td>${tanim.kolonlar.map((_, ki) => `<td class="small" style="text-align:center;">${escHtml(kart.tarihler[ki] || '')}</td>`).join("")}</tr>`;
+  const legend = tanim.durumSecenekleri.map(d => `<b>${d.sembol}</b>: ${escHtml(d.etiket)}`).join("  ·  ");
+  return `
+  <div style="margin-bottom:10px;">
+    <h2 style="margin:0 0 2px 0;">${escHtml(tanim.baslik)}</h2>
+    <p class="small" style="margin:0;">MAKİNE: <b>${escHtml(makine ? makine.ad : "?")}</b>${makine && makine.lab ? " · " + escHtml(makine.lab) : ""}</p>
+    <p class="small" style="margin:0;">${escHtml(tanim.not)}</p>
+    <div class="row no-print" style="margin-top:6px;max-width:260px;"><label class="small" style="white-space:nowrap;">Ay:</label><input type="text" style="width:100%" value="${escHtml(kart.ay)}" onchange="updateBakimKartiAy('${kart.id}',this.value)"></div>
+    <p class="small print-only-cell" style="margin:4px 0 0 0;">AY: ${escHtml(kart.ay || '—')}</p>
+  </div>
+  <table><thead>${basliklar}</thead><tbody>${maddeSatirlari}${tarihSatiri}${tarihSatiriPrint}</tbody></table>
+  <p class="small" style="margin-top:8px;">${legend}</p>
+  <div style="margin-top:14px;">
+    <label class="small" style="font-weight:600;">${escHtml(tanim.aciklamaBasligi)}</label>
+    <textarea rows="3" style="width:100%" class="no-print" placeholder="${escHtml(tanim.aciklamaYerTutucu)}" onchange="updateBakimKartiAciklama('${kart.id}',this.value)">${escHtml(kart.aciklama)}</textarea>
+    <p class="small print-only-cell" style="white-space:pre-wrap;border:1px solid var(--line);border-radius:6px;padding:8px;min-height:40px;">${escHtml(kart.aciklama || '—')}</p>
+  </div>
+  <div class="row no-print" style="margin-top:14px;max-width:320px;">
+    <label class="small" style="white-space:nowrap;">İmza Atacak Öğretmen:</label>
+    <select style="width:100%" onchange="updateBakimKartiImza('${kart.id}',this.value)">${ogretmenSecenekleriHtml(kart.imzaOgretmeni)}</select>
+  </div>
+  <div style="margin-top:18px;display:flex;justify-content:flex-end;">
+    <div style="text-align:center;">
+      <div>.../.../20....</div>
+      <div style="margin-top:28px;font-weight:600;">${escHtml(kart.imzaOgretmeni || "…………………")}</div>
+      <div class="small">İmza</div>
+    </div>
+  </div>`;
+}
+function viewBakimFormuBolumu() {
+  const entries = S.bakimKartlari.slice().sort((a, b) => (a.ay || "").localeCompare(b.ay || "", "tr"));
+  if (entries.length && !entries.some(e => e.id === activeBakimKartId)) activeBakimKartId = entries[0].id;
+  if (!entries.length) activeBakimKartId = null;
+  const active = bakimKartiById(activeBakimKartId);
+  const etiketFor = k => {
+    const m = makineById(k.makineId);
+    const tanim = BAKIM_FORMU_TURLERI[k.tur];
+    return (m ? m.ad : "?") + " · " + (tanim ? tanim.label : k.tur) + (k.ay ? " · " + k.ay : "");
+  };
+  const listHtml = entries.length === 0 ? "" : `
+    <div class="card no-print">
+      <div class="row" style="flex-wrap:wrap;">
+        ${sekmeDropdown("bakim-kart", entries.map(e => ({ value: e.id, label: etiketFor(e) })), activeBakimKartId, "selectBakimKarti('{v}')")}
+      </div>
+    </div>`;
+  const dosyaAdi = active ? "Bakım Formu - " + etiketFor(active) : "Atölye Bakım Formu";
+  const content = active ? renderBakimKartiDetay(active) : `<div class="card small" style="text-align:center;padding:30px 20px;">Henüz bir bakım kartı oluşturulmadı. "Yeni Bakım Kartı Oluştur" ile başlayın: önce makineyi, sonra bakım türünü (Günlük/Haftalık/6 Aylık) seçin.</div>`;
+  return `
+  <div class="card no-print">
+    <h2>Atölye Bakım Formu</h2>
+    <p class="small">Bir makine ve bakım türü seçip yeni bir kart oluşturun; açılan formdaki her maddeyi tıklayarak işaretleyin (sırayla: boş → ${Object.values(BAKIM_FORMU_TURLERI).map(t => t.durumSecenekleri.map(d => d.sembol).join("→")).join(" / ")} → boş), gerekirse açıklama yazın, imza atacak öğretmeni seçin, sonra yazdırın/indirin.</p>
+    <div class="row" style="margin-top:8px;">
+      <button class="btn primary" onclick="addBakimKartiModal()">Yeni Bakım Kartı Oluştur</button>
+      ${active ? `<button class="btn danger" onclick="deleteBakimKarti('${active.id}')">Bu Kartı Sil</button>` : ""}
+    </div>
+    ${active ? belgeAracCubugu(dosyaAdi) : ""}
+  </div>
+  ${listHtml}
+  <div class="print-area">
+    ${belgeYazdirmaBasligi(dosyaAdi)}
+    ${content}
+  </div>`;
+}
 
 function makineById(id) { return S.envanter.makineler.find(x => x.id === id); }
 function durumTespitById(id) { return S.durumTespitFormlari.find(x => x.id === id); }
@@ -3791,10 +4043,13 @@ function viewDurumTespitBolumu() {
 function viewAtolyeEnvanter() {
   const tabs = [
     { id: "makineler", label: "Makine Envanteri" },
+    { id: "bakim-formu", label: "Bakım Formu" },
     { id: "durum-tespit", label: "Durum Tespit Formları" }
   ];
   const tabBar = `<div class="row no-print" style="flex-wrap:wrap;">${tabs.map(t => `<button class="btn ${t.id === activeEnvanterTab ? 'primary' : ''}" onclick="setEnvanterTab('${t.id}')">${escHtml(t.label)}</button>`).join("")}</div>`;
-  const body = activeEnvanterTab === "durum-tespit" ? viewDurumTespitBolumu() : viewMakinelerBolumu();
+  const body = activeEnvanterTab === "durum-tespit" ? viewDurumTespitBolumu()
+    : activeEnvanterTab === "bakim-formu" ? viewBakimFormuBolumu()
+    : viewMakinelerBolumu();
   return tabBar + body;
 }
 

@@ -310,6 +310,7 @@ label.small{font-size:11px;color:var(--ink-soft);display:block;margin:8px 0 3px;
 .print-only{display:none;}
 .print-only-cell{display:none;}
 .print-only-inline{display:none;}
+.print-only-row{display:none;}
 
 @media print{
   .sidebar,.no-print{display:none !important;}
@@ -321,6 +322,7 @@ label.small{font-size:11px;color:var(--ink-soft);display:block;margin:8px 0 3px;
   .print-only{display:block;}
   .print-only-cell{display:table-cell;}
   .print-only-inline{display:inline;}
+  .print-only-row{display:table-row;}
   .card{box-shadow:none;border:1px solid #999;border-radius:0;page-break-inside:avoid;margin-bottom:10px;}
   /* Sınıf seviyesi renkleri (Ders Programı ızgarası) koyu temadayken bile
      kağıtta her zaman okunaklı açık tonlarla basılsın — ekrandaki koyu

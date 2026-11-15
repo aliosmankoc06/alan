@@ -157,7 +157,8 @@ function defaultState() {
       { id: "dal-mbo", ad: "Makine Bakım Onarım Dalı", subeler: ["A"], renkKey: "accent" },
       { id: "dal-bmi", ad: "Bilgisayarlı Makine İmalatı Dalı", subeler: ["B"], renkKey: "teal" }
     ],
-    seflikHaftalikSaatOverride: null
+    seflikHaftalikSaatOverride: null,
+    bakimKartlari: []
   };
 }
 
@@ -211,7 +212,8 @@ function emptyState() {
       mebLogo: YILLIK_PLAN_MEB_LOGO_VARSAYILAN
     },
     dalTanimlari: [],
-    seflikHaftalikSaatOverride: null
+    seflikHaftalikSaatOverride: null,
+    bakimKartlari: []
   };
 }
 
@@ -286,6 +288,14 @@ function normalizeState(s) {
   if (s.seflikHaftalikSaatOverride !== null && !(Array.isArray(s.seflikHaftalikSaatOverride) && s.seflikHaftalikSaatOverride.length === 5)) {
     s.seflikHaftalikSaatOverride = null;
   }
+  if (!Array.isArray(s.bakimKartlari)) s.bakimKartlari = [];
+  s.bakimKartlari.forEach(k => {
+    if (!k.durumlar || typeof k.durumlar !== "object") k.durumlar = {};
+    if (!k.tarihler || typeof k.tarihler !== "object") k.tarihler = {};
+    if (typeof k.aciklama !== "string") k.aciklama = "";
+    if (typeof k.imzaOgretmeni !== "string") k.imzaOgretmeni = "";
+    if (typeof k.ay !== "string") k.ay = "";
+  });
   if (typeof s.eskiSistemKaldirildi !== "boolean") s.eskiSistemKaldirildi = false;
   if (s.akademikTakvim === undefined) s.akademikTakvim = null;
   if (s.akademikTakvim && (!s.akademikTakvim.sinavTarihleri || typeof s.akademikTakvim.sinavTarihleri !== "object")) {
