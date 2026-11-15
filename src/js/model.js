@@ -118,6 +118,7 @@ function defaultState() {
     isletmeler: [],
     isletmeTeacherAssign: {},
     students: [],
+    stajdakiOgrenciler: [],
     akademikTakvim: null,
     yillikPlanlar: [],
     gunlukPlanlar: [],
@@ -173,6 +174,7 @@ function emptyState() {
     isletmeler: [],
     isletmeTeacherAssign: {},
     students: [],
+    stajdakiOgrenciler: [],
     akademikTakvim: null,
     yillikPlanlar: [],
     gunlukPlanlar: [],
@@ -266,6 +268,11 @@ function normalizeState(s) {
     // "BMI" (düz I) yazılmıştı — aynı dal iki farklı anahtar altında
     // bölünüp işletme kontenjanı eşleşmesini bozuyordu.
     if (st.dal === "BMİ") st.dal = "BMI";
+  });
+  if (!Array.isArray(s.stajdakiOgrenciler)) s.stajdakiOgrenciler = [];
+  s.stajdakiOgrenciler.forEach(st => {
+    if (typeof st.sorumluOgretmenId !== "string") st.sorumluOgretmenId = "";
+    if (!st.devamsizlik || typeof st.devamsizlik !== "object") st.devamsizlik = {};
   });
   if (typeof s.eskiSistemKaldirildi !== "boolean") s.eskiSistemKaldirildi = false;
   if (s.akademikTakvim === undefined) s.akademikTakvim = null;
@@ -748,6 +755,30 @@ function normalizeState(s) {
     ];
     studentSeed.forEach(([sinif, okulNo, ad, dal, isletme]) => {
       s.students.push({ id: uid("st"), sinif, okulNo, ad, dal, isletme });
+    });
+  }
+  // Bir kerelik geçiş: "Staj Yerleştirme" (S.students, gelecek yıl planlaması)
+  // ile şu an gerçekten işletmede staj yapan öğrencilerin takibi (devamsızlık,
+  // sorumlu öğretmen) artık iki ayrı modül. S.students'taki kayıtlardan
+  // işletmesi ZATEN atanmış olanlar (yani gerçekten bu yıl staja gitmiş
+  // öğrenciler), S.students'tan SİLİNMEDEN, yeni modüle bir kerelik
+  // kopyalanır — eski "Sonuç/Yerleştirme" imzalı belgesi olduğu gibi kalır.
+  // NOT: bu blok, yukarıdaki seededIsletmeler2026 bloğundan (S.students'ı
+  // gerçek 32+ öğrenciyle dolduran bir kerelik seed) SONRA çalışmalı; aksi
+  // hâlde ilk açılışta S.students henüz boşken bayrak true'ya kilitlenir ve
+  // bir daha hiç kopyalama yapılamaz (bkz. Soru Havuzu dönem geçişindeki
+  // aynı sınıf hata — model.js'teki soruHavuzuDonemBackfillUygulandi notu).
+  if (!s.stajdakiOgrencilerSeedKopyalandi) {
+    s.stajdakiOgrencilerSeedKopyalandi = true;
+    const mevcutOkulNolar = new Set(s.stajdakiOgrenciler.map(st => st.okulNo).filter(Boolean));
+    s.students.forEach(st => {
+      if (!st.isletme) return;
+      if (st.okulNo && mevcutOkulNolar.has(st.okulNo)) return;
+      s.stajdakiOgrenciler.push({
+        id: uid("sdo"), sinif: st.sinif || "", okulNo: st.okulNo || "", ad: st.ad || "",
+        dal: st.dal || "", isletme: st.isletme || "", sorumluOgretmenId: "", devamsizlik: {}
+      });
+      if (st.okulNo) mevcutOkulNolar.add(st.okulNo);
     });
   }
   if (s.coordAssignments.length > 0 || s.classes.some(c => c.id && c.id.startsWith("koord-"))) {

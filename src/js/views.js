@@ -12,6 +12,7 @@ const MODULES = [
   { id: "norm-kadro", label: "Norm Kadro", icon: "chart", group: "Öğrenci & Kadro" },
   { id: "toplantilar", label: "Toplantılar", icon: "users", group: "Toplantılar" },
   { id: "staj-yerlestirme", label: "Staj Yerleştirme", icon: "briefcase", group: "Staj" },
+  { id: "staj-takip", label: "Stajda Olan Öğrenciler", icon: "calendarCheck", group: "Staj" },
   { id: "atolye-envanter", label: "Atölye / Envanter", icon: "tool", group: "Atölye" },
   { id: "performans", label: "Performans Kriterleri", icon: "star", group: "Sınav & Değerlendirme" },
   { id: "sinav-havuzu", label: "Sınav Havuzu", icon: "question", group: "Sınav & Değerlendirme" },
@@ -38,6 +39,17 @@ const STAJ_TABS = [
   { id: "kontenjanlar", label: "İşletme Kontenjanları", icon: "building" },
   { id: "sonuc", label: "Sonuç / Yerleştirme", icon: "badge" }
 ];
+/* "Staj Yerleştirme" gelecek yıl staja gidecek (bugün 11. sınıf) öğrencilerin
+   PLANLAMASI içindir (not ortalaması/tercih/otomatik yerleştirme). "Stajda
+   Olan Öğrenciler" ise bambaşka bir modül: bu yıl GERÇEKTEN işletmede staj
+   yapan öğrencilerin takibi — sorumlu öğretmen ataması ve gün/ay bazlı
+   devamsızlık çizelgesi. İkisi kasıtlı olarak ayrı veri kaynağı kullanır
+   (S.students / S.stajdakiOgrenciler) — bkz. model.js'teki geçiş notu. */
+const STAJ_TAKIP_TABS = [
+  { id: "ogrenciler", label: "Öğrenciler", icon: "school" },
+  { id: "isletmeler", label: "İşletmelere Göre", icon: "building" },
+  { id: "devamsizlik", label: "Devamsızlık", icon: "calendarCheck" }
+];
 const TOPLANTI_TABS = [
   { id: "okul", label: "Okul Zümresi", icon: "users" },
   { id: "il", label: "İl Zümresi", icon: "building" }
@@ -45,6 +57,7 @@ const TOPLANTI_TABS = [
 let activeModule = "ana";
 let activeTab = "havuz";
 let activeStajTab = "ogrenciler";
+let activeStajTakipTab = "ogrenciler";
 let activeToplantiTab = "okul";
 let activeClassId = S.classes[0] ? S.classes[0].id : null;
 let activeTeacherId = S.teachers[0] ? S.teachers[0].id : null;
@@ -105,6 +118,11 @@ function subTabButtonsFor(moduleId) {
       `<button class="nav-btn sub ${t.id === activeStajTab ? 'active' : ''}" onclick="setStajTab('${t.id}')">${icon(t.icon)}<span>${t.label}</span></button>`
     ).join("");
   }
+  if (moduleId === "staj-takip") {
+    return STAJ_TAKIP_TABS.map(t =>
+      `<button class="nav-btn sub ${t.id === activeStajTakipTab ? 'active' : ''}" onclick="setStajTakipTab('${t.id}')">${icon(t.icon)}<span>${t.label}</span></button>`
+    ).join("");
+  }
   if (moduleId === "toplantilar") {
     return TOPLANTI_TABS.map(t =>
       `<button class="nav-btn sub ${t.id === activeToplantiTab ? 'active' : ''}" onclick="setToplantiTab('${t.id}')">${icon(t.icon)}<span>${t.label}</span></button>`
@@ -128,7 +146,7 @@ function renderTabbar() {
     }
     if (m.group !== expandedGroup) return;
     const isActive = m.id === activeModule || (m.id === 'ders-programi' && activeModule === 'ders-programi-secim');
-    const hasSubTabs = ['ders-programi', 'staj-yerlestirme', 'toplantilar'].includes(m.id);
+    const hasSubTabs = ['ders-programi', 'staj-yerlestirme', 'staj-takip', 'toplantilar'].includes(m.id);
     if (isActive && hasSubTabs) {
       parts.push(`<div class="nav-btn active" style="cursor:default;">${icon(m.icon)}<span>${m.label}</span></div>`);
     } else {
@@ -146,6 +164,7 @@ function setModule(id) {
   activeModule = id;
   if (id === "ders-programi" && !DERS_PROGRAMI_TABS.some(t => t.id === activeTab)) activeTab = "havuz";
   if (id === "staj-yerlestirme" && !STAJ_TABS.some(t => t.id === activeStajTab)) activeStajTab = "ogrenciler";
+  if (id === "staj-takip" && !STAJ_TAKIP_TABS.some(t => t.id === activeStajTakipTab)) activeStajTakipTab = "ogrenciler";
   if (id === "toplantilar" && !TOPLANTI_TABS.some(t => t.id === activeToplantiTab)) activeToplantiTab = "okul";
   const grup = moduleGroupOf(id);
   if (grup) expandedGroup = grup;
@@ -156,6 +175,7 @@ function setModule(id) {
 }
 function setTab(id) { activeTab = id; selectedTeacherCells.clear(); multiSelectMode = false; renderTabbar(); renderMain(); }
 function setStajTab(id) { activeStajTab = id; renderTabbar(); renderMain(); }
+function setStajTakipTab(id) { activeStajTakipTab = id; renderTabbar(); renderMain(); }
 function setToplantiTab(id) { activeToplantiTab = id; renderTabbar(); renderMain(); }
 
 function renderMain() {
@@ -177,6 +197,12 @@ function renderMain() {
       : activeStajTab === "kontenjanlar" ? viewStajKontenjanlar()
       : activeStajTab === "sonuc" ? viewStajSonuc()
       : viewStajOgrenciler();
+    return;
+  }
+  if (activeModule === "staj-takip") {
+    el.innerHTML = activeStajTakipTab === "isletmeler" ? viewStajTakipIsletmeler()
+      : activeStajTakipTab === "devamsizlik" ? viewStajTakipDevamsizlik()
+      : viewStajTakipOgrenciler();
     return;
   }
   if (activeModule === "atolye-envanter") { el.innerHTML = viewAtolyeEnvanter(); return; }
@@ -683,6 +709,295 @@ function nsSinifDegisti() {
   const dalSel = document.getElementById("ns-dal");
   const kod = dalForSinif(sinif);
   if (kod && Array.from(dalSel.options).some(o => o.value === kod)) dalSel.value = kod;
+}
+
+/* ============================================================
+   STAJDA OLAN ÖĞRENCİLER (ayrı modül — bkz. STAJ_TAKIP_TABS)
+   "Staj Yerleştirme" gelecek yılın planlamasıdır; burası ise bu yıl
+   GERÇEKTEN işletmede staj yapan öğrencilerin takibi: sorumlu öğretmen
+   ataması, işletme başına öğrenci sayısı, gün/ay bazlı devamsızlık.
+   ============================================================ */
+function stajTakipBySinif() {
+  const bySinif = {};
+  S.stajdakiOgrenciler.forEach(st => {
+    const key = st.sinif || "—";
+    if (!bySinif[key]) bySinif[key] = [];
+    bySinif[key].push(st);
+  });
+  Object.keys(bySinif).forEach(k => bySinif[k].sort((a, b) => (Number(a.okulNo) || 0) - (Number(b.okulNo) || 0)));
+  return bySinif;
+}
+function stajTakipOgretmenOptions(selected) {
+  return `<option value="">— atanmadı —</option>` + S.teachers.map(t => `<option value="${t.id}" ${t.id === selected ? "selected" : ""}>${escHtml(t.name)}</option>`).join("");
+}
+function setStajTakipSorumluOgretmen(id, ogretmenId) {
+  const st = S.stajdakiOgrenciler.find(x => x.id === id);
+  if (st) st.sorumluOgretmenId = ogretmenId;
+  save(); renderMain();
+}
+function setStajTakipIsletme(id, isletme) {
+  const st = S.stajdakiOgrenciler.find(x => x.id === id);
+  if (st) st.isletme = isletme;
+  save(); renderMain();
+}
+function deleteStajTakipOgrenci(id) {
+  if (!confirm("Bu öğrenci \"Stajda Olan Öğrenciler\" listesinden silinsin mi? (Devamsızlık kayıtları da silinir. Staj Yerleştirme'deki kaydı etkilenmez.)")) return;
+  S.stajdakiOgrenciler = S.stajdakiOgrenciler.filter(x => x.id !== id);
+  save(); renderMain();
+}
+function editStajTakipOgrenci(id) {
+  const st = S.stajdakiOgrenciler.find(x => x.id === id);
+  if (!st) return;
+  const root = document.getElementById("modal-root");
+  root.innerHTML = `
+    <div class="modal-bg" onclick="if(event.target===this) closeModal()">
+      <div class="modal" style="width:380px;">
+        <h3>Öğrenciyi Düzenle</h3>
+        <label class="small">Sınıf</label><input type="text" id="sdo-sinif" style="width:100%" value="${escHtml(st.sinif)}">
+        <label class="small">Okul No</label><input type="text" id="sdo-okulno" style="width:100%" value="${escHtml(st.okulNo)}">
+        <label class="small">Ad Soyad</label><input type="text" id="sdo-ad" style="width:100%" value="${escHtml(st.ad)}">
+        <label class="small">Dal</label><input type="text" id="sdo-dal" style="width:100%" value="${escHtml(st.dal)}">
+        <div class="row">
+          <button class="btn primary" onclick="saveStajTakipOgrenciDuzenle('${id}')">Kaydet</button>
+          <button class="btn" onclick="closeModal()">Vazgeç</button>
+        </div>
+      </div>
+    </div>`;
+}
+function saveStajTakipOgrenciDuzenle(id) {
+  const st = S.stajdakiOgrenciler.find(x => x.id === id);
+  if (!st) return;
+  st.sinif = document.getElementById("sdo-sinif").value.trim();
+  st.okulNo = document.getElementById("sdo-okulno").value.trim();
+  st.ad = document.getElementById("sdo-ad").value.trim();
+  st.dal = document.getElementById("sdo-dal").value.trim();
+  save(); closeModal(); renderMain();
+}
+function addStajTakipOgrenci() {
+  const sinif = document.getElementById("sdo-new-sinif").value.trim();
+  const okulNo = document.getElementById("sdo-new-okulno").value.trim();
+  const ad = document.getElementById("sdo-new-ad").value.trim();
+  const dal = document.getElementById("sdo-new-dal").value.trim();
+  const isletme = document.getElementById("sdo-new-isletme").value;
+  if (!ad) { alert("Öğrenci adı girin."); return; }
+  S.stajdakiOgrenciler.push({ id: uid("sdo"), sinif, okulNo, ad, dal, isletme, sorumluOgretmenId: "", devamsizlik: {} });
+  save(); renderMain();
+}
+function stajTakipListedenTopluEkleModal() {
+  const siniflar = ogrenciListesiSiniflariDalaGore();
+  const root = document.getElementById("modal-root");
+  root.innerHTML = `
+    <div class="modal-bg" onclick="if(event.target===this) closeModal()">
+      <div class="modal" style="width:380px;">
+        <h3>Öğrenci Listesinden Toplu Ekle</h3>
+        <p class="small">Öğrenci Listesi modülünde kayıtlı bir sınıf seçin — o sınıftaki, burada henüz olmayan tüm öğrenciler tek seferde eklensin (işletme ve sorumlu öğretmen boş gelir, siz atarsınız).</p>
+        <label class="small">Sınıf</label>
+        <select id="sdo-liste-sinif" style="width:100%">
+          ${siniflar.map(s => `<option value="${jsq(s)}">${escHtml(s)} (${ogrencilerForSinif(s).length} öğrenci)</option>`).join("")}
+        </select>
+        <div class="row">
+          <button class="btn primary" onclick="stajTakipListedenTopluEkleUygula()">Ekle</button>
+          <button class="btn" onclick="closeModal()">İptal</button>
+        </div>
+      </div>
+    </div>`;
+}
+function stajTakipListedenTopluEkleUygula() {
+  const secim = document.getElementById("sdo-liste-sinif");
+  if (!secim) return;
+  const sinif = secim.value;
+  const mevcut = new Set(S.stajdakiOgrenciler.filter(s => s.sinif === sinif && s.okulNo).map(s => s.okulNo));
+  const dal = dalForSinif(sinif);
+  let eklenen = 0;
+  ogrencilerForSinif(sinif).forEach(o => {
+    if (mevcut.has(o.okulNo)) return;
+    S.stajdakiOgrenciler.push({ id: uid("sdo"), sinif, okulNo: o.okulNo, ad: (o.ad + " " + o.soyad).trim(), dal, isletme: "", sorumluOgretmenId: "", devamsizlik: {} });
+    eklenen++;
+  });
+  save(); closeModal(); renderMain();
+  alert(eklenen ? `${eklenen} öğrenci eklendi.` : "Eklenecek yeni öğrenci bulunamadı (hepsi zaten listede ya da seçilen sınıfta kayıt yok).");
+}
+function viewStajTakipOgrenciler() {
+  const bySinif = stajTakipBySinif();
+  const sinifKeys = Object.keys(bySinif).sort();
+  const listHtml = sinifKeys.length ? sinifKeys.map(sinif => {
+    const rows = bySinif[sinif].map(st => `
+      <tr>
+        <td>${st.okulNo || ''}</td>
+        <td>${escHtml(st.ad)}</td>
+        <td>${st.dal || ''}</td>
+        <td class="no-print"><select onchange="setStajTakipIsletme('${st.id}', this.value)">${studentIsletmeOptions(st.isletme)}</select></td>
+        <td class="print-only-cell">${escHtml(st.isletme || '—')}</td>
+        <td class="no-print"><select onchange="setStajTakipSorumluOgretmen('${st.id}', this.value)">${stajTakipOgretmenOptions(st.sorumluOgretmenId)}</select></td>
+        <td class="print-only-cell">${escHtml(st.sorumluOgretmenId ? ((teacherById(st.sorumluOgretmenId) || {}).name || '—') : '—')}</td>
+        <td class="no-print"><div class="row" style="margin:0;"><button class="btn" onclick="editStajTakipOgrenci('${st.id}')">Düzenle</button><button class="btn danger" onclick="deleteStajTakipOgrenci('${st.id}')">Sil</button></div></td>
+      </tr>`).join("");
+    return `<div class="card" style="overflow-x:auto;"><h2 style="margin-top:0;">${escHtml(sinif)}</h2><table><tr><th>Okul No</th><th>Ad Soyad</th><th>Dal</th><th>İşletme</th><th>Sorumlu Öğretmen</th><th class="no-print"></th></tr>${rows}</table></div>`;
+  }).join("") : `<div class="card"><p class="small">Henüz öğrenci eklenmedi.</p></div>`;
+
+  return `
+  <div class="card no-print">
+    <h2>Stajda Olan Öğrenciler</h2>
+    <p class="small">Bu yıl işletmede gerçekten staj yapan öğrencilerin listesi. Her öğrenciye bir işletme ve bir sorumlu öğretmen atayın — "Devamsızlık" sekmesinde sorumlu öğretmene göre süzebilirsiniz. ("Staj Yerleştirme" modülü ayrı bir listedir; gelecek yılın planlaması için kullanılır.)</p>
+    ${belgeAracCubugu("Stajda Olan Öğrenciler")}
+  </div>
+  <div class="print-area">
+    ${belgeYazdirmaBasligi("Stajda Olan Öğrenciler")}
+    ${listHtml}
+  </div>
+  <div class="card no-print">
+    <h2>Öğrenci Listesinden Ekle</h2>
+    <p class="small">Öğrenci Listesi modülüne aktardığınız e-Okul listesinden bu sınıfın tüm öğrencilerini tek seferde ekleyin.</p>
+    <div class="row" style="max-width:260px"><button class="btn primary" onclick="stajTakipListedenTopluEkleModal()">Öğrenci Listesinden Toplu Ekle</button></div>
+  </div>
+  <div class="card no-print">
+    <h2>Öğrenci Ekle</h2>
+    <div class="grid3">
+      <div><label class="small">Sınıf</label>
+        <select id="sdo-new-sinif" style="width:100%">
+          <option value="">— seçin —</option>
+          ${ogrenciListesiSiniflari().map(s => `<option value="${escHtml(s)}">${escHtml(s)}</option>`).join("")}
+        </select>
+      </div>
+      <div><label class="small">Okul No</label><input type="text" id="sdo-new-okulno" style="width:100%"></div>
+      <div><label class="small">Ad Soyad</label><input type="text" id="sdo-new-ad" style="width:100%"></div>
+      <div><label class="small">Dal</label>
+        <select id="sdo-new-dal" style="width:100%">
+          <option value="">— —</option>
+          ${havuzDalSecenekleri().map(d => `<option value="${d.value}">${escHtml(d.label)}</option>`).join("")}
+        </select>
+      </div>
+      <div><label class="small">İşletme</label><select id="sdo-new-isletme" style="width:100%">${studentIsletmeOptions()}</select></div>
+    </div>
+    <div class="row" style="max-width:200px"><button class="btn primary" onclick="addStajTakipOgrenci()">Ekle</button></div>
+  </div>`;
+}
+function viewStajTakipIsletmeler() {
+  const gruplar = {};
+  S.stajdakiOgrenciler.forEach(st => {
+    const key = st.isletme || "— İşletmesi Atanmamış —";
+    if (!gruplar[key]) gruplar[key] = [];
+    gruplar[key].push(st);
+  });
+  // Henüz hiç öğrencisi olmayan işletmeler de görünsün — "kaç öğrencim var"
+  // sorusuna 0 cevabı da bir cevaptır, sessizce gizlenmemeli.
+  S.isletmeler.forEach(isl => { if (!gruplar[isl.name]) gruplar[isl.name] = []; });
+  const anahtarlar = Object.keys(gruplar).sort((a, b) => a.localeCompare(b, "tr"));
+  const kartlar = anahtarlar.map(isletmeAdi => {
+    const ogrenciler = gruplar[isletmeAdi];
+    const rows = ogrenciler.length ? ogrenciler.map(st => `
+      <tr><td>${escHtml(st.sinif || '')}</td><td>${escHtml(st.ad)}</td><td>${escHtml(st.sorumluOgretmenId ? ((teacherById(st.sorumluOgretmenId) || {}).name || '—') : '—')}</td></tr>`).join("")
+      : `<tr><td colspan="3" class="small">Bu işletmede henüz öğrenci yok.</td></tr>`;
+    return `<div class="card"><h2 style="margin-top:0;">${escHtml(isletmeAdi)} <span class="small" style="font-weight:400;">(${ogrenciler.length} öğrenci)</span></h2><table><tr><th>Sınıf</th><th>Ad Soyad</th><th>Sorumlu Öğretmen</th></tr>${rows}</table></div>`;
+  }).join("") || `<div class="card"><p class="small">Önce Koordinatörlük'ten işletme ekleyin ya da Öğrenciler sekmesinden işletme atayın.</p></div>`;
+  return `
+  <div class="card no-print">
+    <h2>İşletmelere Göre</h2>
+    <p class="small">Her işletmede kaç öğrenciniz olduğunu ve kimler olduğunu burada görürsünüz. "İşletmesi Atanmamış" grubu, henüz işletme ataması yapılmamış öğrencileri gösterir.</p>
+    ${belgeAracCubugu("Stajda Olan Öğrenciler - İşletmelere Göre")}
+  </div>
+  <div class="print-area">
+    ${belgeYazdirmaBasligi("Stajda Olan Öğrenciler — İşletmelere Göre")}
+    ${kartlar}
+  </div>`;
+}
+let stajTakipDevamYil = new Date().getFullYear();
+let stajTakipDevamAy = new Date().getMonth() + 1;
+let stajTakipDevamOgretmenFiltre = "ALL";
+function setStajTakipDevamDonem(yil, ay) {
+  stajTakipDevamYil = parseInt(yil, 10) || stajTakipDevamYil;
+  stajTakipDevamAy = parseInt(ay, 10) || stajTakipDevamAy;
+  renderMain();
+}
+function setStajTakipDevamOgretmenFiltre(id) {
+  stajTakipDevamOgretmenFiltre = id || "ALL";
+  renderMain();
+}
+function ayGunSayisi(yil, ay) { return new Date(yil, ay, 0).getDate(); }
+function stajTakipTarihAnahtari(yil, ay, gun) { return yil + "-" + String(ay).padStart(2, "0") + "-" + String(gun).padStart(2, "0"); }
+function haftaSonuMu(yil, ay, gun) { const d = new Date(yil, ay - 1, gun).getDay(); return d === 0 || d === 6; }
+/* Hücreye her tıklamada sırayla ilerler: boş (Tam Gün Var) → Tam Gün Yok →
+   Sabah Yok → Öğleden Sonra Yok → Okulda (işletme günü değil) → Resmi Tatil
+   → tekrar boş. Hafta sonu günleri ayrıca otomatik gösterilir, tıklanamaz. */
+const DEVAMSIZLIK_SIRASI = ["", "tamYok", "sabahYok", "ogledenSonraYok", "okulda", "resmiTatil"];
+const DEVAMSIZLIK_ETIKET = {
+  "": { kisa: "·", ad: "Tam Gün Var (işletmede)" },
+  tamYok: { kisa: "YOK", ad: "Tam Gün Yok" },
+  sabahYok: { kisa: "S.Yok", ad: "Sabah Yok" },
+  ogledenSonraYok: { kisa: "ÖS.Yok", ad: "Öğleden Sonra Yok" },
+  okulda: { kisa: "Okul", ad: "Okulda (işletme günü değil)" },
+  resmiTatil: { kisa: "Tatil", ad: "Resmi Tatil" }
+};
+function stajTakipDevamsizlikDurumIlerlet(ogrenciId, tarih) {
+  const st = S.stajdakiOgrenciler.find(x => x.id === ogrenciId);
+  if (!st) return;
+  if (!st.devamsizlik || typeof st.devamsizlik !== "object") st.devamsizlik = {};
+  const mevcut = st.devamsizlik[tarih] || "";
+  const idx = DEVAMSIZLIK_SIRASI.indexOf(mevcut);
+  const yeni = DEVAMSIZLIK_SIRASI[(idx + 1) % DEVAMSIZLIK_SIRASI.length];
+  if (yeni === "") delete st.devamsizlik[tarih];
+  else st.devamsizlik[tarih] = yeni;
+  save(); renderMain();
+}
+function stajTakipDevamsizlikOzet(st, yil, ay) {
+  const prefix = yil + "-" + String(ay).padStart(2, "0");
+  let tamYok = 0, yarimYok = 0;
+  Object.keys(st.devamsizlik || {}).forEach(tarih => {
+    if (!tarih.startsWith(prefix)) return;
+    const durum = st.devamsizlik[tarih];
+    if (durum === "tamYok") tamYok++;
+    else if (durum === "sabahYok" || durum === "ogledenSonraYok") yarimYok++;
+  });
+  return { tamYok, yarimYok };
+}
+function viewStajTakipDevamsizlik() {
+  const yil = stajTakipDevamYil, ay = stajTakipDevamAy;
+  const gunSayisi = ayGunSayisi(yil, ay);
+  const ayAdlari = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+  const aySecenekleri = ayAdlari.map((ad, i) => `<option value="${i + 1}" ${i + 1 === ay ? "selected" : ""}>${ad}</option>`).join("");
+  const ogretmenSecenekleri = S.teachers.map(t => `<option value="${t.id}" ${t.id === stajTakipDevamOgretmenFiltre ? "selected" : ""}>${escHtml(t.name)}</option>`).join("");
+  let liste = S.stajdakiOgrenciler.slice().sort((a, b) => (a.sinif || "").localeCompare(b.sinif || "", "tr") || (a.ad || "").localeCompare(b.ad || "", "tr"));
+  if (stajTakipDevamOgretmenFiltre !== "ALL") liste = liste.filter(st => st.sorumluOgretmenId === stajTakipDevamOgretmenFiltre);
+  const baslikAciklama = stajTakipDevamOgretmenFiltre !== "ALL" ? ` — ${escHtml((teacherById(stajTakipDevamOgretmenFiltre) || {}).name || "")} öğretmenin öğrencileri` : "";
+  const headerGunler = Array.from({ length: gunSayisi }, (_, i) => i + 1)
+    .map(g => `<th style="${haftaSonuMu(yil, ay, g) ? "background:var(--panel-2);color:var(--ink-soft);" : ""}min-width:36px;">${g}</th>`).join("");
+  const colCount = 5 + gunSayisi;
+  const rows = liste.length ? liste.map(st => {
+    const ogretmenAdi = st.sorumluOgretmenId ? ((teacherById(st.sorumluOgretmenId) || {}).name || "—") : "—";
+    const { tamYok, yarimYok } = stajTakipDevamsizlikOzet(st, yil, ay);
+    const gunler = Array.from({ length: gunSayisi }, (_, i) => i + 1).map(g => {
+      if (haftaSonuMu(yil, ay, g)) {
+        return `<td class="small" style="text-align:center;background:var(--panel-2);color:var(--ink-soft);" title="Hafta Sonu">—</td>`;
+      }
+      const tarih = stajTakipTarihAnahtari(yil, ay, g);
+      const durum = (st.devamsizlik || {})[tarih] || "";
+      const etiket = DEVAMSIZLIK_ETIKET[durum] || DEVAMSIZLIK_ETIKET[""];
+      const renk = durum === "tamYok" || durum === "sabahYok" || durum === "ogledenSonraYok" ? "color:var(--warn);font-weight:600;"
+        : durum === "okulda" ? "color:var(--accent-ink);"
+        : durum === "resmiTatil" ? "color:var(--teal-ink);" : "";
+      return `<td class="small" style="text-align:center;cursor:pointer;${renk}" title="${escHtml(etiket.ad)} — tıklayınca değişir" onclick="stajTakipDevamsizlikDurumIlerlet('${st.id}','${tarih}')">${etiket.kisa}</td>`;
+    }).join("");
+    return `<tr><td>${escHtml(st.sinif || "")}</td><td>${escHtml(st.ad)}</td><td>${escHtml(st.isletme || "—")}</td><td>${escHtml(ogretmenAdi)}</td>${gunler}<td class="small" style="text-align:center;">${tamYok} tam<br>${yarimYok} yarım</td></tr>`;
+  }).join("") : `<tr><td colspan="${colCount}" class="small">Önce Öğrenciler sekmesinden öğrenci ekleyin.</td></tr>`;
+  return `
+  <div class="card no-print">
+    <h2>Devamsızlık</h2>
+    <p class="small">İşletme gününe tıklayınca sırayla <b>Tam Gün Var → Tam Gün Yok → Sabah Yok → Öğleden Sonra Yok → Okulda → Resmi Tatil</b> arasında geçiş yapar (nokta = tam gün geldi). Hafta sonları otomatik gri gösterilir, işaretlenmez.</p>
+    <div class="row" style="flex-wrap:wrap;gap:10px;align-items:flex-end;">
+      <div><label class="small">Ay</label><select onchange="setStajTakipDevamDonem(${yil}, this.value)">${aySecenekleri}</select></div>
+      <div><label class="small">Yıl</label><input type="number" value="${yil}" style="width:90px" onchange="setStajTakipDevamDonem(this.value, ${ay})"></div>
+      <div><label class="small">Sorumlu Öğretmen</label><select onchange="setStajTakipDevamOgretmenFiltre(this.value)"><option value="ALL" ${stajTakipDevamOgretmenFiltre === "ALL" ? "selected" : ""}>Tüm Öğretmenler</option>${ogretmenSecenekleri}</select></div>
+    </div>
+    ${belgeAracCubugu("Devamsızlık - " + ayAdlari[ay - 1] + " " + yil)}
+  </div>
+  <div class="print-area">
+    ${belgeYazdirmaBasligi("Staj Devamsızlık Çizelgesi — " + ayAdlari[ay - 1] + " " + yil + baslikAciklama)}
+    <div class="card" style="overflow-x:auto;">
+      <table><thead><tr><th>Sınıf</th><th>Ad Soyad</th><th>İşletme</th><th>Sorumlu Öğretmen</th>${headerGunler}<th>Toplam</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+      <p class="small" style="margin-top:8px;">YOK: Tam Gün Yok · S.Yok: Sabah Yok · ÖS.Yok: Öğleden Sonra Yok · Okul: Okulda (işletme günü değil) · Tatil: Resmi Tatil · — : Hafta Sonu · · : Tam Gün Var</p>
+    </div>
+  </div>`;
 }
 function esSinifDegisti() {
   const sinif = document.getElementById("es-sinif").value;
@@ -6285,7 +6600,12 @@ function globalSearch(query) {
   });
   S.students.forEach(s => {
     if (trLower(s.ad).includes(q)) {
-      results.push({ tip: "Öğrenci (Staj)", ad: s.ad + (s.sinif ? " · " + s.sinif : ""), action: () => setModule("staj-yerlestirme") });
+      results.push({ tip: "Öğrenci (Staj Yerleştirme)", ad: s.ad + (s.sinif ? " · " + s.sinif : ""), action: () => setModule("staj-yerlestirme") });
+    }
+  });
+  S.stajdakiOgrenciler.forEach(s => {
+    if (trLower(s.ad).includes(q)) {
+      results.push({ tip: "Öğrenci (Stajda)", ad: s.ad + (s.sinif ? " · " + s.sinif : "") + (s.isletme ? " · " + s.isletme : ""), action: () => setModule("staj-takip") });
     }
   });
   S.envanter.makineler.forEach(m => {
