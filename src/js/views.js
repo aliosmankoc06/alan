@@ -771,7 +771,7 @@ function renderIsletmeBelirlemeKarti() {
     ${active ? belgeAracCubugu(dosyaAdi) : ""}
     ${listHtml}
   </div>
-  ${active ? `<div class="print-area"><div class="card">${renderIsletmeBelirlemeDetay(active)}</div></div>` : ""}`;
+  ${active ? `<div class="print-area">${belgeYazdirmaBasligi("")}<div class="card">${renderIsletmeBelirlemeDetay(active)}</div></div>` : ""}`;
 }
 /* ---- İşletme Öğrenci Talep Formu ----
    Gönderilen gerçek "Öğrenci Talep Formu" örneklerinden (Ek-1): işletmenin
@@ -1812,17 +1812,14 @@ function sekmeDropdown(groupId, secenekler, aktifDeger, onSelectExprSablonu) {
   </div>`;
 }
 function belgeYazdirmaBasligi(altBaslik) {
-  const tarih = new Date().toLocaleDateString("tr-TR");
+  // Kullanıcı isteği: yazdırmada ne tarih/saat ne de gereksiz tekrar olsun —
+  // sadece okul/alan adı ve belgenin kendi başlığı, ortalanmış ve tutarlı.
   const k = S.kurumBilgileri;
   return `<div class="print-doc-header print-only">
-    <div style="display:flex;align-items:center;gap:10px;">
-      ${k.logo ? `<img src="${k.logo}" style="height:34px;width:auto;max-width:90px;object-fit:contain;">` : ""}
-      <div>
-        <div class="okul">${escHtml(k.okulAdi)}</div>
-        <div class="alan">${escHtml(k.alanAdi)}${altBaslik ? " · " + escHtml(altBaslik) : ""}</div>
-      </div>
-    </div>
-    <div class="tarih">Yazdırma Tarihi<br>${tarih}</div>
+    ${k.logo ? `<img src="${k.logo}" class="logo">` : ""}
+    <div class="okul">${escHtml(k.okulAdi)}</div>
+    ${k.alanAdi ? `<div class="alan">${escHtml(k.alanAdi)}</div>` : ""}
+    ${altBaslik ? `<div class="baslik">${escHtml(altBaslik)}</div>` : ""}
   </div>`;
 }
 
@@ -2785,7 +2782,7 @@ function viewDersBilgiFormu() {
   ${dersBar}
   <div class="card no-print">${belgeAracCubugu(dosyaAdi)}</div>
   <div class="print-area">
-    ${belgeYazdirmaBasligi("Ders Bilgi Formu")}
+    ${belgeYazdirmaBasligi(dosyaAdi)}
     <div class="card" style="overflow-x:auto;">${kayit ? renderDbfDetay(kayit) : '<p class="small">Kayıt bulunamadı.</p>'}</div>
   </div>`;
 }
@@ -4123,10 +4120,10 @@ function renderBakimKartiDetay(kart) {
   const legend = tanim.durumSecenekleri.map(d => `<b>${d.sembol}</b>: ${escHtml(d.etiket)}`).join("  ·  ");
   return `
   <div style="margin-bottom:10px;">
-    <h2 style="margin:0 0 2px 0;">${escHtml(tanim.baslik)}</h2>
-    <p class="small" style="margin:0;">MAKİNE: <b>${escHtml(makine ? makine.ad : "?")}</b>${makine && makine.lab ? " · " + escHtml(makine.lab) : ""}</p>
-    <p class="small" style="margin:0;">${escHtml(tanim.not)}</p>
-    <p class="small" style="margin:2px 0 0 0;">Kartın Oluşturulma Tarihi: <b>${escHtml(kart.olusturmaTarihi || "—")}</b></p>
+    <h2 style="margin:0 0 2px 0;text-align:center;">${escHtml(tanim.baslik)}</h2>
+    <p class="small" style="margin:0;text-align:center;">MAKİNE: <b>${escHtml(makine ? makine.ad : "?")}</b>${makine && makine.lab ? " · " + escHtml(makine.lab) : ""}</p>
+    <p class="small" style="margin:0;text-align:center;">${escHtml(tanim.not)}</p>
+    <p class="small" style="margin:2px 0 0 0;text-align:center;">Kartın Oluşturulma Tarihi: <b>${escHtml(kart.olusturmaTarihi || "—")}</b></p>
     <div class="row no-print" style="margin-top:6px;max-width:420px;align-items:center;">
       <label class="small" style="white-space:nowrap;">Ay:</label>
       <input type="text" style="width:140px;flex:none;" placeholder="Kasım 2026" value="${escHtml(kart.ay)}" onchange="updateBakimKartiAy('${kart.id}',this.value)">
@@ -6789,8 +6786,8 @@ function renderDonemRaporDetay(tur, r) {
       <button class="btn" onclick="donemRaporSatirlariYenile('${tur}','${r.id}')">Ders Programından Yenile</button>
     </div>
   </div>
-  <div style="margin-bottom:14px;">
-    <div>${escHtml((S.kurumBilgileri.okulAdi || "").toLocaleUpperCase("tr-TR"))} MÜDÜRLÜĞÜ'NE</div>
+  <div style="margin-bottom:14px;text-align:center;">
+    <div style="font-weight:700;">${escHtml((S.kurumBilgileri.okulAdi || "").toLocaleUpperCase("tr-TR"))} MÜDÜRLÜĞÜ'NE</div>
     <div>${escHtml(S.kurumBilgileri.sehir || "")}</div>
   </div>
   <p class="small" style="margin-bottom:14px;">${paragraf}</p>
@@ -6838,6 +6835,7 @@ function viewDonemRaporBolum(tur) {
   </div>
   ${listHtml}
   <div class="print-area">
+    ${belgeYazdirmaBasligi(dosyaAdi)}
     ${content}
   </div>`;
 }
@@ -7298,8 +7296,8 @@ function renderSeflikRaporDetay(r) {
       <button class="btn" onclick="addSeflikKayit('${r.id}')">Satır Ekle</button>
     </div>
   </div>
-  <div style="margin-bottom:14px;">
-    <div>${escHtml((k.okulAdi || "").toLocaleUpperCase("tr-TR"))} MÜDÜRLÜĞÜNE</div>
+  <div style="margin-bottom:14px;text-align:center;">
+    <div style="font-weight:700;">${escHtml((k.okulAdi || "").toLocaleUpperCase("tr-TR"))} MÜDÜRLÜĞÜNE</div>
   </div>
   <p class="small" style="margin-bottom:14px;">Okulunuzda ${escHtml(k.alanAdi)} Alan Şefliği görevini yürütmekteyim. Görevimle ilgili olarak ${escHtml((r.ay || "").toLocaleUpperCase("tr-TR"))} ayına ait Planlama ve Bakım Onarım raporu aşağıdaki gibidir.</p>
   <p class="small" style="margin-bottom:14px;">Bilgilerinize arz ederim.</p>
@@ -7346,6 +7344,7 @@ function viewSeflikRaporlari() {
   ${renderSeflikHaftalikSaatKarti()}
   ${listHtml}
   <div class="print-area">
+    ${belgeYazdirmaBasligi(dosyaAdi)}
     <div class="card" style="overflow-x:auto;">${content}</div>
   </div>`;
 }
@@ -7720,14 +7719,14 @@ function renderKagitDetay(kagit, kind) {
   </div>`;
 
   const printBelgeIcerik = activeKagitBelge === "cevap"
-    ? `${belgeYazdirmaBasligi(kagit.baslik + " — Cevap Anahtarı")}
+    ? `${belgeYazdirmaBasligi("")}
        <div style="text-align:center;margin-bottom:14px;">
          <div style="font-weight:700;">${classObj ? escHtml(classObj.name) : ''} · ${course ? escHtml(course.name) : ''}</div>
          <div style="font-weight:700;">${escHtml(kagit.baslik)} — CEVAP ANAHTARI</div>
        </div>
        ${cevapBlok || '<div class="small">Henüz soru seçilmedi.</div>'}
        <div style="margin-top:20px;font-weight:600;">TOPLAM: ${toplamPuan} PUAN</div>`
-    : `${belgeYazdirmaBasligi(kagit.baslik)}
+    : `${belgeYazdirmaBasligi("")}
        <div style="text-align:center;margin-bottom:14px;">
          <div style="font-weight:700;">${classObj ? escHtml(classObj.name) : ''} · ${course ? escHtml(course.name) : ''}</div>
          <div style="font-weight:700;">${escHtml(kagit.baslik)}</div>
