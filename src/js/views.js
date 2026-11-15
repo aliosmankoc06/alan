@@ -3566,6 +3566,10 @@ function toplantiYeniDonemeKopyala(id) {
     kopya.katilimcilar = kopya.katilimcilar.map(k => Object.assign({}, k, { id: uid("kt") }));
     kopya.gorevDagilimi = kopya.gorevDagilimi.map(g => Object.assign({}, g, { id: uid("gd") }));
     kopya.gundemMaddeleri = kopya.gundemMaddeleri.map(g => Object.assign({}, g, { id: uid("gm") }));
+    // Devamsızlık/başarı tablosundaki öğrenci adları (roster) kopyalanır ama
+    // gün sayısı/başarısız dersler ÖNCEKİ döneme ait veridir — yeni döneme
+    // sessizce taşınırsa yanıltıcı olur, bu yüzden sıfırlanır.
+    kopya.devamsizlikBasariTablosu = (kopya.devamsizlikBasariTablosu || []).map(r => ({ id: uid("dbt"), ad: r.ad, gun: "", basarisizDersler: "" }));
     S.toplantilar.push(kopya);
     activeToplantiId = kopya.id;
     save();
