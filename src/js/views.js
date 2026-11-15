@@ -6416,7 +6416,8 @@ function viewAyarlar() {
   ${renderAkademikTakvimKarti()}
   ${renderDalTanimlariKarti()}
   ${renderOdaTanimlariKarti()}
-  ${renderImzaSirkuleriKarti()}`;
+  ${renderImzaSirkuleriKarti()}
+  ${renderDonemArsiviKarti()}`;
 }
 const DAL_SUBE_HARFLERI = ["A", "B", "C", "D", "E", "F"];
 function dalChipHtml(d) {
@@ -6548,6 +6549,98 @@ function deleteImzaSirku(id) {
   if (!confirm("Bu imza sahibi silinsin mi?")) return;
   S.imzaSirkuleri = S.imzaSirkuleri.filter(x => x.id !== id);
   save(); renderMain();
+}
+
+/* ---- Dönem Arşivi ----
+   S.donemArsivi veri modelde ({id, etiket, tarih, veri}) hazır duruyordu
+   ama hiçbir ekran onu doldurmuyor/okumuyordu. Yeni dönem/yıla geçerken
+   üzerine yazılan dört ana kayıt kümesini (Öğrenci Listesi, Sınav
+   Notları, Performans Notları, Performans Kayıtları) olduğu haliyle
+   (deep copy) dondurup etiketli bir arşive kaydeder — arşiv salt
+   okunurdur, sadece görüntülenir/silinir, düzenlenemez. */
+function donemArsiviOzet(veri) {
+  const ogrenciSiniflar = {};
+  (veri.ogrenciListesi || []).forEach(o => { ogrenciSiniflar[o.sinif] = (ogrenciSiniflar[o.sinif] || 0) + 1; });
+  return {
+    toplamOgrenci: (veri.ogrenciListesi || []).length,
+    ogrenciSiniflar,
+    sinavNotuSayisi: (veri.sinavNotlari || []).length,
+    performansNotuSayisi: (veri.performansNotlari || []).length,
+    performansKaydiSayisi: (veri.performansKayitlari || []).length
+  };
+}
+function donemArsiviOlustur() {
+  const varsayilan = (S.akademikTakvim && S.akademikTakvim.ogretimYili ? S.akademikTakvim.ogretimYili + " " : "") + "Dönem Sonu";
+  promptModal("Bu arşive hangi etiketi vermek istersiniz? (örn. \"2025-2026 2. Dönem Sonu\")\n\nÖğrenci Listesi, Sınav Notları, Performans Notları ve Performans Kayıtları'nın şu anki hali, bu etiketle dondurulup arşivlenecek — yeni dönemde bu kayıtları değiştirseniz/sıfırlasanız da buradaki arşiv kopyası aynen kalır.", varsayilan, (etiket) => {
+    if (!etiket || !etiket.trim()) return;
+    const arsiv = {
+      id: uid("da"),
+      etiket: etiket.trim(),
+      tarih: new Date().toLocaleDateString("tr-TR"),
+      veri: {
+        ogrenciListesi: JSON.parse(JSON.stringify(S.ogrenciListesi)),
+        sinavNotlari: JSON.parse(JSON.stringify(S.sinavNotlari)),
+        performansNotlari: JSON.parse(JSON.stringify(S.performansNotlari)),
+        performansKayitlari: JSON.parse(JSON.stringify(S.performansKayitlari))
+      }
+    };
+    S.donemArsivi.push(arsiv);
+    save(); renderMain();
+    alert(`"${arsiv.etiket}" arşivlendi.`);
+  });
+}
+function donemArsiviSil(id) {
+  if (!confirm("Bu arşiv silinsin mi? Bu işlem geri alınamaz — arşivlenen kayıtlar bir daha geri gelmez.")) return;
+  S.donemArsivi = S.donemArsivi.filter(x => x.id !== id);
+  save(); renderMain();
+}
+function donemArsiviGoster(id) {
+  const arsiv = S.donemArsivi.find(x => x.id === id);
+  if (!arsiv) return;
+  const ozet = donemArsiviOzet(arsiv.veri);
+  const sinifSatirlari = Object.keys(ozet.ogrenciSiniflar).sort((a, b) => a.localeCompare(b, "tr", { numeric: true }))
+    .map(s => `<tr><td>${escHtml(s)}</td><td>${ozet.ogrenciSiniflar[s]}</td></tr>`).join("");
+  const root = document.getElementById("modal-root");
+  root.innerHTML = `
+    <div class="modal-bg" onclick="if(event.target===this) closeModal()">
+      <div class="modal" style="width:440px;">
+        <h3>${escHtml(arsiv.etiket)}</h3>
+        <p class="small">Arşivlendiği tarih: ${escHtml(arsiv.tarih)}</p>
+        <p class="small" style="margin-top:10px;">Bu, o anki kayıtların salt okunur bir dondurulmuş kopyasıdır — buradan düzenlenemez. Güncel kayıtlara dokunmaz.</p>
+        <table style="margin-top:10px;"><thead><tr><th>Sınıf</th><th>Öğrenci Sayısı</th></tr></thead>
+        <tbody>${sinifSatirlari || `<tr><td colspan="2" class="small">Öğrenci kaydı yok.</td></tr>`}</tbody></table>
+        <p class="small" style="margin-top:10px;">
+          <b>Toplam Öğrenci:</b> ${ozet.toplamOgrenci} ·
+          <b>Sınav Notu Kaydı:</b> ${ozet.sinavNotuSayisi} ·
+          <b>Performans Notu Kaydı:</b> ${ozet.performansNotuSayisi} ·
+          <b>Performans Kaydı:</b> ${ozet.performansKaydiSayisi}
+        </p>
+        <div class="row" style="margin-top:14px;"><button class="btn" onclick="closeModal()">Kapat</button></div>
+      </div>
+    </div>`;
+}
+function renderDonemArsiviKarti() {
+  const rows = S.donemArsivi.slice().sort((a, b) => b.tarih.localeCompare(a.tarih)).map(a => {
+    const ozet = donemArsiviOzet(a.veri);
+    return `
+    <tr>
+      <td>${escHtml(a.etiket)}</td>
+      <td class="small">${escHtml(a.tarih)}</td>
+      <td class="small">${ozet.toplamOgrenci} öğrenci</td>
+      <td>
+        <button class="btn" onclick="donemArsiviGoster('${a.id}')">Görüntüle</button>
+        <button class="btn danger" onclick="donemArsiviSil('${a.id}')">Sil</button>
+      </td>
+    </tr>`;
+  }).join("");
+  return `
+  <div class="card">
+    <h2>Dönem Arşivi</h2>
+    <p class="small">Dönem veya yıl sonunda, o anki Öğrenci Listesi/Sınav Notları/Performans Notları/Performans Kayıtları'nı etiketli bir arşive dondurun — yeni döneme geçip bu kayıtları değiştirseniz veya sıfırlasanız bile, buradaki kopya aynen kalır ve sonradan görüntüleyebilirsiniz. Arşivlenen kayıtlar düzenlenemez, sadece görüntülenir veya silinir.</p>
+    <table><thead><tr><th>Etiket</th><th>Tarih</th><th>Özet</th><th></th></tr></thead>
+    <tbody>${rows || `<tr><td colspan="4" class="small">Henüz arşiv oluşturulmadı.</td></tr>`}</tbody></table>
+    <div class="row"><button class="btn primary" onclick="donemArsiviOlustur()">Şu Anki Durumu Arşivle</button></div>
+  </div>`;
 }
 
 /* ---- Ana Sayfa ---- */
