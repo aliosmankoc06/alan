@@ -6782,7 +6782,7 @@ function viewAna() {
     : `<div class="card no-print"><p class="small">Şu an dikkat gerektiren bir şey görünmüyor.</p></div>`;
   return `
   <div class="hero-card">
-    <h2>Alan Yönetim Sistemi</h2>
+    <h2>Makine ve Tasarım Teknolojisi Alanı Yönetim Sistemi</h2>
     <p class="small">${escHtml(k.okulAdi)} · ${escHtml(k.alanAdi)}</p>
   </div>
   ${uyariHtml}`;
