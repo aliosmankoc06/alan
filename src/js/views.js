@@ -4013,9 +4013,7 @@ function saveNewBakimKarti() {
   const makineId = document.getElementById("bk-makine").value;
   const tur = document.getElementById("bk-tur").value;
   const ay = document.getElementById("bk-ay").value.trim();
-  const bugun = new Date();
-  const olusturmaTarihi = String(bugun.getDate()).padStart(2, "0") + "." + String(bugun.getMonth() + 1).padStart(2, "0") + "." + bugun.getFullYear();
-  const kart = { id: uid("bk"), makineId, tur, ay, olusturmaTarihi, imzaOgretmeni: "", durumlar: {}, tarihler: {}, aciklama: "" };
+  const kart = { id: uid("bk"), makineId, tur, ay, olusturmaTarihi: formatTrTarih(new Date()), imzaOgretmeni: "", durumlar: {}, tarihler: {}, aciklama: "" };
   S.bakimKartlari.push(kart);
   activeBakimKartId = kart.id;
   save(); closeModal(); renderMain();
@@ -4027,6 +4025,50 @@ function deleteBakimKarti(id) {
   save(); renderMain();
 }
 function selectBakimKarti(id) { activeBakimKartId = id; renderMain(); }
+function bakimKartiYeniDonemBaslat(id) {
+  const kart = bakimKartiById(id);
+  if (!kart) return;
+  if (!confirm("Bu kart olduğu gibi arşivde kalacak (Bakım Yapılan Tezgahlar sekmesinden her zaman erişebilirsiniz) ve aynı makine/tür için boş, temiz yeni bir kart açılacak. Devam edilsin mi?")) return;
+  const yeni = { id: uid("bk"), makineId: kart.makineId, tur: kart.tur, ay: "", olusturmaTarihi: formatTrTarih(new Date()), imzaOgretmeni: kart.imzaOgretmeni, durumlar: {}, tarihler: {}, aciklama: "" };
+  S.bakimKartlari.push(yeni);
+  activeBakimKartId = yeni.id;
+  save(); renderMain();
+}
+function bakimKartiTarihleriOtomaticDoldur(id) {
+  const kart = bakimKartiById(id);
+  if (!kart) return;
+  const tanim = BAKIM_FORMU_TURLERI[kart.tur];
+  if (!tanim || tanim.kolonlar.length !== 5) { alert("Tarihlerin otomatik doldurulması sadece 5 haftalık dönüşümlü (Günlük/Haftalık) formlar için uygundur."); return; }
+  const t = S.akademikTakvim;
+  if (!t || !Array.isArray(t.haftalar) || !t.haftalar.length) { alert("Önce Ayarlar > Akademik Takvim'de haftalık takvimi oluşturun."); return; }
+  if (!kart.ay.trim()) { alert('Önce "Ay" alanını "Kasım 2026" gibi doldurun — tarihler o aya denk gelen haftalardan alınır.'); return; }
+  const parcalar = kart.ay.trim().split(" ");
+  const yil = Number(parcalar.pop());
+  const ay = parcalar.join(" ");
+  if (!ay || !yil || !TR_AYLAR.includes(ay)) { alert('"Ay" alanını "Kasım 2026" formatında girin.'); return; }
+  const gunSaat = alanSefiGunlukSaatler();
+  const gunGruplari = seflikGunGruplariOlustur(gunSaat);
+  if (!gunGruplari.length) { alert('Haftalık şeflik gününüz bulunamadı. Ders Programı\'ndan "Planlama Bakım Onarım (Alan Şefi)" dersine gün atayın ya da Şeflik Aylık Raporu\'ndaki "Haftalık Saat Ayarı" kartından elle girin.'); return; }
+  const sonGunIndex = gunGruplari[gunGruplari.length - 1].gunIndexleri.slice(-1)[0];
+  const ilgiliHaftalar = t.haftalar.filter(h => {
+    if (!h.pazartesi || h.tatilMi) return false;
+    const d = parseTrTarih(h.pazartesi);
+    return d && TR_AYLAR[d.getMonth()] === ay && d.getFullYear() === yil;
+  });
+  if (!ilgiliHaftalar.length) { alert(`Akademik Takvim'de "${ay} ${yil}" ayına denk gelen (tatil olmayan) bir hafta bulunamadı.`); return; }
+  let dolan = 0;
+  tanim.kolonlar.forEach((_, ki) => {
+    const h = ilgiliHaftalar[ki];
+    if (!h) return;
+    const pzt = parseTrTarih(h.pazartesi);
+    const d = new Date(pzt);
+    d.setDate(d.getDate() + sonGunIndex);
+    kart.tarihler[ki] = formatTrTarih(d);
+    dolan++;
+  });
+  save(); renderMain();
+  alert(`${dolan} hafta için tarih, Ders Programı'ndaki şeflik gününüze göre dolduruldu.${ilgiliHaftalar.length < tanim.kolonlar.length ? " Not: bu ay için takvimde sadece " + ilgiliHaftalar.length + " hafta bulundu, kalan kolonları elle doldurabilirsiniz." : ""}`);
+}
 function bakimKartiDurumIlerlet(kartId, maddeIndex, kolonIndex) {
   const kart = bakimKartiById(kartId);
   if (!kart) return;
@@ -4084,7 +4126,11 @@ function renderBakimKartiDetay(kart) {
     <p class="small" style="margin:0;">MAKİNE: <b>${escHtml(makine ? makine.ad : "?")}</b>${makine && makine.lab ? " · " + escHtml(makine.lab) : ""}</p>
     <p class="small" style="margin:0;">${escHtml(tanim.not)}</p>
     <p class="small" style="margin:2px 0 0 0;">Kartın Oluşturulma Tarihi: <b>${escHtml(kart.olusturmaTarihi || "—")}</b></p>
-    <div class="row no-print" style="margin-top:6px;max-width:260px;"><label class="small" style="white-space:nowrap;">Ay:</label><input type="text" style="width:100%" value="${escHtml(kart.ay)}" onchange="updateBakimKartiAy('${kart.id}',this.value)"></div>
+    <div class="row no-print" style="margin-top:6px;max-width:420px;align-items:center;">
+      <label class="small" style="white-space:nowrap;">Ay:</label>
+      <input type="text" style="width:140px;flex:none;" placeholder="Kasım 2026" value="${escHtml(kart.ay)}" onchange="updateBakimKartiAy('${kart.id}',this.value)">
+      ${tanim.kolonlar.length === 5 ? `<button class="btn" style="padding:4px 8px;font-size:10.5px;" onclick="bakimKartiTarihleriOtomaticDoldur('${kart.id}')" title="Akademik Takvim + Ders Programı'ndaki şeflik gününüze göre Hafta 1-5 tarihlerini otomatik doldurur">Tarihleri Ders Programından Doldur</button>` : ""}
+    </div>
     <p class="small print-only-cell" style="margin:4px 0 0 0;">AY: ${escHtml(kart.ay || '—')}</p>
   </div>
   <table><thead>${basliklar}</thead><tbody>${maddeSatirlari}${tarihSatiri}${tarihSatiriPrint}</tbody></table>
@@ -4106,8 +4152,18 @@ function renderBakimKartiDetay(kart) {
     </div>
   </div>`;
 }
+function bakimKartiTarihMs(kart) {
+  const d = parseTrTarih(kart.olusturmaTarihi);
+  return d ? d.getTime() : null;
+}
 function viewBakimFormuBolumu() {
-  const entries = S.bakimKartlari.slice().sort((a, b) => (a.ay || "").localeCompare(b.ay || "", "tr"));
+  const entries = S.bakimKartlari.slice().sort((a, b) => {
+    const ta = bakimKartiTarihMs(a), tb = bakimKartiTarihMs(b);
+    if (ta !== null && tb !== null) return tb - ta; // en yeni oluşturulan önce
+    if (ta !== null) return -1;
+    if (tb !== null) return 1;
+    return (a.ay || "").localeCompare(b.ay || "", "tr");
+  });
   if (entries.length && !entries.some(e => e.id === activeBakimKartId)) activeBakimKartId = entries[0].id;
   if (!entries.length) activeBakimKartId = null;
   const active = bakimKartiById(activeBakimKartId);
@@ -4130,6 +4186,7 @@ function viewBakimFormuBolumu() {
     <p class="small">Bir makine ve bakım türü seçip yeni bir kart oluşturun; açılan formdaki her maddeyi tıklayarak işaretleyin (sırayla: boş → ${Object.values(BAKIM_FORMU_TURLERI).map(t => t.durumSecenekleri.map(d => d.sembol).join("→")).join(" / ")} → boş), gerekirse açıklama yazın, imza atacak öğretmeni seçin, sonra yazdırın/indirin.</p>
     <div class="row" style="margin-top:8px;">
       <button class="btn primary" onclick="addBakimKartiModal()">Yeni Bakım Kartı Oluştur</button>
+      ${active ? `<button class="btn" onclick="bakimKartiYeniDonemBaslat('${active.id}')" title="Bu kart arşivde kalır (Bakım Yapılan Tezgahlar'dan erişilebilir), aynı makine/tür için temiz yeni bir kart açılır">Dönemi Tamamla, Yeni Sayfa Aç</button>` : ""}
       ${active ? `<button class="btn danger" onclick="deleteBakimKarti('${active.id}')">Bu Kartı Sil</button>` : ""}
     </div>
     ${active ? belgeAracCubugu(dosyaAdi) : ""}
@@ -4160,7 +4217,8 @@ function viewBakimGecmisiBolumu() {
   if (activeBakimGecmisiMakineId === "__ALL__") {
     const rows = makineler.map(m => {
       const kartlar = kartlarByMakine(m.id);
-      const sonTarih = kartlar.map(k => k.olusturmaTarihi).filter(Boolean).sort().slice(-1)[0];
+      const sonKart = kartlar.filter(k => bakimKartiTarihMs(k) !== null).sort((a, b) => bakimKartiTarihMs(b) - bakimKartiTarihMs(a))[0];
+      const sonTarih = sonKart ? sonKart.olusturmaTarihi : null;
       const sorunluKartSayisi = kartlar.filter(k => bakimKartiSorunSayisi(k) > 0).length;
       return `<tr>
         <td>${escHtml(m.ad)}</td>
@@ -4183,7 +4241,7 @@ function viewBakimGecmisiBolumu() {
   }
 
   const m = makineById(activeBakimGecmisiMakineId);
-  const kartlar = kartlarByMakine(m.id).slice().sort((a, b) => (a.olusturmaTarihi || "").localeCompare(b.olusturmaTarihi || ""));
+  const kartlar = kartlarByMakine(m.id).slice().sort((a, b) => (bakimKartiTarihMs(a) || 0) - (bakimKartiTarihMs(b) || 0));
   const rows = kartlar.map(k => {
     const tanim = BAKIM_FORMU_TURLERI[k.tur];
     const sorun = bakimKartiSorunSayisi(k);
@@ -6762,54 +6820,131 @@ const ALAN_SEFI_AYLIK_GOREV_HAVUZU = {
   "Eylül": [
     "Yeni eğitim-öğretim yılına ait staj/işletmede mesleki eğitim programının planlanması çalışmalarına başlandı; staj yapılacak işletmelerin tespiti ve staj takviminin hazırlanmasına yönelik ön çalışmalar yürütüldü.",
     "Atölye ve laboratuvarların yeni döneme hazırlığı kapsamında genel temizlik, düzen ve güvenlik kontrolü yapıldı; eksik/arızalı makine-teçhizat tespit edilerek bakım-onarım planlaması yapıldı.",
-    "Alan/bölüm, atölye ve laboratuvar kayıtlarının (demirbaş, makine kartları, kullanma talimatları) güncellenmesi çalışmaları yürütüldü."
+    "Alan/bölüm, atölye ve laboratuvar kayıtlarının (demirbaş, makine kartları, kullanma talimatları) güncellenmesi çalışmaları yürütüldü.",
+    "Atölye ve laboratuvarlarda bulunan makine, takım ve teçhizatın demirbaş kayıtları yeni öğretim yılına göre gözden geçirildi.",
+    "Yeni kayıt olan öğrencilerin dal/sınıf dağılımına göre atölye kullanım planlaması yapıldı.",
+    "İş sağlığı ve güvenliği kapsamında kişisel koruyucu donanım (KKD) stok kontrolü yapıldı, eksikler tespit edilerek talep oluşturuldu.",
+    "Branş/alan zümre toplantısına katılım sağlandı; yeni dönem çalışma takvimi ve atölye kullanım esasları görüşüldü.",
+    "Atölye ve laboratuvarların acil durum tahliye planı ve yangın söndürme ekipmanlarının kontrolü yapıldı."
   ],
   "Ekim": [
     "Öğrenci-işletme eşleştirme çalışmaları sürdürüldü; staj sözleşmeleri ve ilgili evrakların hazırlanmasına devam edildi.",
     "Atölye tezgahlarının periyodik bakımı yapıldı; tespit edilen eksiklikler giderildi, atölye şeflerine teknik destek verildi.",
-    "İş sağlığı ve güvenliği denetimi kapsamında koruyucu muhafazalar, acil stop butonları ve kişisel koruyucu donanım (KKD) durumu kontrol edildi."
+    "İş sağlığı ve güvenliği denetimi kapsamında koruyucu muhafazalar, acil stop butonları ve kişisel koruyucu donanım (KKD) durumu kontrol edildi.",
+    "İşletmede mesleki eğitim gören öğrencilerin işletme ziyaretleri planlandı, ilk ziyaretler gerçekleştirildi.",
+    "Atölyede kullanılan kesici takım ve yardımcı ekipmanların stok durumu kontrol edildi, eksik takımlar için tedarik talebi oluşturuldu.",
+    "Rehberlik servisi ile işbirliği içinde sınıf rehberlik faaliyetleri kapsamında atölye/meslek tanıtım çalışmalarına destek verildi.",
+    "Staj yapan öğrencilerin işletme ile okul arasındaki devam-devamsızlık bilgi akışı düzenli olarak takip edildi.",
+    "Atölye elektrik tesisatı ve topraklama hatlarının periyodik kontrolü için ilgili birimle görüşüldü."
   ],
   "Kasım": [
     "1. dönem sınavlarına yönelik atölye ve laboratuvar hazırlıkları tamamlandı.",
     "Atölye makinelerinin periyodik bakımı ve küçük onarımları yapıldı; makine kartları güncellendi.",
-    "Staj/işletmede mesleki eğitim gören öğrencilerin işletme ziyaretleri koordine edildi, devam-devamsızlık durumları takip edildi."
+    "Staj/işletmede mesleki eğitim gören öğrencilerin işletme ziyaretleri koordine edildi, devam-devamsızlık durumları takip edildi.",
+    "1. dönem beceri sınavı/kalfalık-ustalık sınavı hazırlıkları kapsamında atölye düzeni ve sınav istasyonları planlandı.",
+    "Tezgah bazlı arıza kayıtları gözden geçirildi, tekrar eden arızalar için kalıcı çözüm/parça değişimi planlandı.",
+    "Staj yapan öğrencilerin dönem notu/performans değerlendirme ön çalışmaları işletme yetkilileriyle koordine edildi.",
+    "Okul yönetimiyle atölye bütçe ve yedek parça ihtiyaç planlaması toplantısı yapıldı.",
+    "Atölye ortam aydınlatma ve havalandırma sisteminin periyodik kontrolü yapıldı."
   ],
   "Aralık": [
     "1. dönem sonuna doğru atölye/laboratuvar genel bakım ve düzenleme çalışmaları yapıldı.",
     "Öğrencilerin dönem sonu beceri/performans değerlendirmeleri için gerekli atölye düzenlemeleri yapıldı.",
-    "Yılbaşı tatiline hazırlık kapsamında makine-teçhizatın güvenli şekilde kapatılması ve envanter kontrolü yapıldı."
+    "Yılbaşı tatiline hazırlık kapsamında makine-teçhizatın güvenli şekilde kapatılması ve envanter kontrolü yapıldı.",
+    "Dönem sonu beceri/performans değerlendirmeleri için gerekli ölçme-değerlendirme formları (performans kriterleri, dönem not fişi) hazırlandı.",
+    "Veli toplantısı kapsamında öğrenci devamsızlık ve başarı durumları ile ilgili bilgilendirme çalışması yapıldı.",
+    "Yıl sonu tatiline girmeden önce atölyedeki tüm makinelerin enerjisinin kesilmesi ve güvenlik kontrolü sağlandı.",
+    "Stajyer öğrencilerin dönem sonu işletme değerlendirme (dönem not fişi) süreci tamamlandı.",
+    "Atölye temizlik malzemesi ve sarf malzeme stok kontrolü yapılarak 2. dönem için tedarik planlaması yapıldı."
   ],
   "Ocak": [
     "1. dönem değerlendirmesi yapıldı; atölye/laboratuvar kullanım ve bakım kayıtları gözden geçirildi.",
     "2. döneme hazırlık kapsamında atölye tezgahlarının genel bakımı ve güvenlik kontrolü yapıldı.",
-    "Yarıyıl tatili döneminde ihtiyaç duyulan büyük bakım-onarım çalışmaları planlandı ve yürütüldü."
+    "Yarıyıl tatili döneminde ihtiyaç duyulan büyük bakım-onarım çalışmaları planlandı ve yürütüldü.",
+    "Yarıyıl tatilinde ihtiyaç duyulan büyük bakım-onarım çalışmaları (motor, elektrik aksamı, hidrolik/pnömatik sistemler) için teknik servisle görüşüldü.",
+    "1. dönem sonu itibarıyla makine arıza/onarım kayıtları değerlendirilerek yıllık bakım planı güncellendi.",
+    "2. dönem staj/işletme programı için işletme kontenjanları ve öğrenci talepleri yeniden gözden geçirildi.",
+    "Atölye zemin, aydınlatma ve ısıtma sistemlerinin 2. döneme hazır olup olmadığı kontrol edildi.",
+    "Sorumluluk sınavına girecek öğrenciler için atölye/laboratuvar uygulama sınavı planlaması yapıldı."
   ],
   "Şubat": [
     "2. dönem başlangıcında atölye ve laboratuvarların eğitime hazır hâle getirilmesi sağlandı.",
     "Staj/işletmede mesleki eğitim programının 2. dönem takvimi ve öğrenci-işletme durumları gözden geçirildi.",
-    "Atölye makinelerinin periyodik bakımı yapıldı; eksik yedek parça ihtiyaçları tespit edildi."
+    "Atölye makinelerinin periyodik bakımı yapıldı; eksik yedek parça ihtiyaçları tespit edildi.",
+    "2. dönem staj/işletme eşleştirmeleri tamamlanarak işletme belirleme komisyon tutanakları düzenlendi.",
+    "Atölyede kullanılan ölçü aletlerinin (kumpas, mikrometre vb.) kalibrasyon durumu kontrol edildi.",
+    "Makine koruyucu bakım planına göre tezgahların yağlama, temizlik ve ayar işlemleri gerçekleştirildi.",
+    "Zümre öğretmenleriyle 2. dönem ortak sınav soruları ve soru havuzu çalışmaları koordine edildi.",
+    "Veli görüşmeleri kapsamında staj/atölye performansı düşük öğrenciler için bireysel değerlendirme yapıldı."
   ],
   "Mart": [
     "Atölye ve laboratuvarların periyodik bakım ve iş sağlığı-güvenliği denetimleri sürdürüldü.",
     "Staj yapan öğrencilerin işletme ziyaretleri ve değerlendirmeleri koordine edildi.",
-    "2. dönem sınavlarına yönelik atölye/laboratuvar hazırlıkları yapıldı."
+    "2. dönem sınavlarına yönelik atölye/laboratuvar hazırlıkları yapıldı.",
+    "Atölyede kullanılan elektrikli el aletlerinin periyodik güvenlik kontrolü yapıldı.",
+    "İşletmede staj yapan öğrencilerin ara dönem devamsızlık/performans takibi yapılarak gerekli uyarılar iletildi.",
+    "2. dönem beceri sınavı/kalfalık-ustalık sınavı için atölye düzeni ve komisyon planlaması yapıldı.",
+    "Atölye/laboratuvar durum tespit ve eksiklik belirleme formu güncellendi, tespit edilen eksiklikler okul yönetimine raporlandı.",
+    "Makine yedek parça stok sayımı yapılarak eksik parçalar için satın alma talebi oluşturuldu."
   ],
   "Nisan": [
     "Bir sonraki eğitim-öğretim yılına ait staj/işletmede mesleki eğitim programının planlanması çalışmalarına başlandı.",
     "Atölye tezgahlarının periyodik bakımı ve iş sağlığı-güvenliği denetimi yapıldı; tespit edilen eksiklikler giderildi.",
-    "Alan şefleri toplantısına katılım sağlandı; staj programı ve İSG eksiklikleri gibi gündem maddeleri değerlendirildi."
+    "Alan şefleri toplantısına katılım sağlandı; staj programı ve İSG eksiklikleri gibi gündem maddeleri değerlendirildi.",
+    "Önümüzdeki öğretim yılı için işletmede mesleki eğitim yapılacak işletmelerin ön tespiti ve görüşmeleri başlatıldı.",
+    "Atölyedeki tüm tezgahların genel teknik kontrolü yapılarak yaz döneminde yapılacak kapsamlı bakım listesi oluşturuldu.",
+    "Mezuniyet aşamasına gelen 12. sınıf öğrencilerinin staj/işletme dönem sonu değerlendirmeleri başlatıldı.",
+    "Norm kadro ve ders dağıtım çalışmalarına yönelik alan şefliği görüşü okul yönetimine iletildi.",
+    "İş sağlığı ve güvenliği kurulu toplantısına katılım sağlandı, atölyeye ilişkin İSG eksiklikleri raporlandı."
   ],
   "Mayıs": [
     "12. sınıf öğrencilerinin işletmelerde beceri eğitimi / kalfalık-ustalık beceri sınavlarına yönelik hazırlık ve koordinasyon çalışmaları yürütüldü.",
     "Yeni öğretim yılı staj/işletmede mesleki eğitim programı kapsamında öğrenci-işletme eşleştirme çalışmaları sürdürüldü.",
-    "Atölye ve laboratuvarların yıl sonu genel bakımı ve envanter sayımı planlanmaya başlandı."
+    "Atölye ve laboratuvarların yıl sonu genel bakımı ve envanter sayımı planlanmaya başlandı.",
+    "12. sınıf öğrencilerinin kalfalık-ustalık/beceri sınavı komisyon çalışmalarına katılım sağlandı.",
+    "Mezun olacak öğrencilerin diploma/sertifika süreçleri ile ilgili evrak hazırlığı yapıldı.",
+    "Gelecek öğretim yılı için makine-teçhizat ihtiyaç listesi hazırlanarak okul yönetimine sunuldu.",
+    "Atölyede yıl sonu temizlik ve düzenleme çalışmalarına başlandı, kullanılmayan/hurda malzemelerin tasnifi yapıldı.",
+    "Staj yapan öğrencilerin işletme değerlendirme formları toplanarak dönem sonu not fişleri tamamlandı."
   ],
   "Haziran": [
     "Yıl sonu değerlendirmesi yapıldı; atölye/laboratuvar demirbaş ve makine envanteri sayımı tamamlandı.",
     "Mezun olacak öğrencilerin işe yerleştirme ve mezunları izleme çalışmaları ilgili alan öğretmenleriyle birlikte yürütüldü.",
-    "Yaz döneminde yapılacak büyük bakım-onarım çalışmaları planlandı; gelecek öğretim yılı hazırlıkları başlatıldı."
+    "Yaz döneminde yapılacak büyük bakım-onarım çalışmaları planlandı; gelecek öğretim yılı hazırlıkları başlatıldı.",
+    "Mezun öğrencilerin işe yerleştirme ve izleme çalışmaları kapsamında işletmelerle iletişime geçildi.",
+    "Atölye/laboratuvar demirbaş sayımı tamamlanarak kayıtlar güncellendi, eksik/hasarlı malzemeler tutanağa bağlandı.",
+    "Yaz tatili döneminde yapılacak kapsamlı (6 aylık) bakım çalışmaları için takvim oluşturuldu.",
+    "Gelecek öğretim yılına ait atölye/laboratuvar kullanım talimatlarının güncellenmesi çalışmalarına başlandı.",
+    "Yıl sonu alan şefleri değerlendirme toplantısına katılım sağlandı."
   ]
 };
+/* Gerçek makine envanterinden türetilen, tezgaha özel öneri şablonları —
+   statik 12x8'lik havuzu, elinizdeki tezgah sayısı kadar genişletir. Elle
+   50 cümle yazmak yerine envanterdeki her makineyle otomatik eşleşiyor;
+   siz makine eklediğinizde/çıkardığınızda ayrıca güncellemenize gerek yok. */
+const SEFLIK_MAKINE_SABLONLARI = [
+  "{makine} tezgahının periyodik bakımı yapıldı; hareketli aksamın temizliği ve yağlanması sağlandı.",
+  "{makine} tezgahında tespit edilen küçük arıza giderildi, tezgah tekrar kullanıma hazır hâle getirildi.",
+  "{makine} tezgahının güvenlik elemanları (acil stop, koruyucu siperlik, topraklama) kontrol edildi.",
+  "{makine} tezgahı için yedek parça ihtiyacı tespit edilerek tedarik süreci başlatıldı.",
+  "{makine} tezgahının hassasiyet/kalibrasyon kontrolü yapıldı.",
+  "{makine} tezgahının kullanma talimatı gözden geçirilerek güncellendi.",
+  "{makine} tezgahında öğrenci kullanımı öncesi genel kontrol ve temizlik yapıldı.",
+  "{lab} atölyesinde genel düzen, temizlik ve iş güvenliği kontrolü yapıldı."
+];
+function seflikMakineTabanliOneriUret(ay) {
+  const makineler = S.envanter.makineler;
+  if (!makineler || !makineler.length) return [];
+  const ayOffset = TR_AYLAR.indexOf(ay) >= 0 ? TR_AYLAR.indexOf(ay) : 0;
+  const ornekSayisi = Math.min(makineler.length, 8);
+  const sonuc = [];
+  for (let i = 0; i < ornekSayisi; i++) {
+    const m = makineler[(i * 5 + ayOffset * 3) % makineler.length];
+    const sablon = SEFLIK_MAKINE_SABLONLARI[(i + ayOffset) % SEFLIK_MAKINE_SABLONLARI.length];
+    sonuc.push(sablon.replace("{makine}", m.ad).replace("{lab}", m.lab || "atölye"));
+  }
+  return sonuc;
+}
 function seflikTarihinAyi(tarihStr) {
   const ilkTarih = (tarihStr || "").split("\n")[0];
   const d = parseTrTarih(ilkTarih);
@@ -6830,13 +6965,32 @@ function seflikGercekBakimMetni(pzt, gunSonIndex) {
       }
     });
   });
+  // Atölye Bakım Formu kartları: o hafta içinde oluşturulmuş bir kart varsa,
+  // doldurduğunuz gerçek checklist'ten (sorunlu madde sayısı + açıklama) türetilmiş
+  // bir cümle üretilir — genel şablonlardan önce her zaman bu gerçek kayıt kullanılır.
+  S.bakimKartlari.forEach(k => {
+    const bd = parseTrTarih(k.olusturmaTarihi);
+    if (!bd || bd < pzt || bd > sonTarih) return;
+    const m = makineById(k.makineId);
+    const tanim = BAKIM_FORMU_TURLERI[k.tur];
+    if (!m || !tanim) return;
+    const sorun = bakimKartiSorunSayisi(k);
+    if (sorun > 0) {
+      cumleler.push(`${m.ad} makinesi için ${tanim.label.toLowerCase()} bakım formu dolduruldu; ${sorun} maddede sorun tespit edildi${k.aciklama ? " (" + k.aciklama + ")" : ""}.`);
+    } else {
+      cumleler.push(`${m.ad} makinesi için ${tanim.label.toLowerCase()} bakım formu dolduruldu, kontrol edilen maddelerde sorun tespit edilmedi.`);
+    }
+  });
   return cumleler.join(" ");
+}
+function seflikAyHavuzu(ay) {
+  return (ALAN_SEFI_AYLIK_GOREV_HAVUZU[ay] || []).concat(seflikMakineTabanliOneriUret(ay));
 }
 function seflikOneriMetni(ay, pzt, gunSonIndex) {
   const gercek = seflikGercekBakimMetni(pzt, gunSonIndex);
   if (gercek) return gercek;
-  const havuz = ALAN_SEFI_AYLIK_GOREV_HAVUZU[ay];
-  if (!havuz || !havuz.length) return "";
+  const havuz = seflikAyHavuzu(ay);
+  if (!havuz.length) return "";
   return havuz[Math.floor(Math.random() * havuz.length)];
 }
 function seflikIslerOneriDegistir(raporId, kayitId) {
@@ -6845,8 +6999,8 @@ function seflikIslerOneriDegistir(raporId, kayitId) {
   const k = r.kayitlar.find(x => x.id === kayitId);
   if (!k) return;
   const ay = seflikTarihinAyi(k.tarih);
-  const havuz = ay ? ALAN_SEFI_AYLIK_GOREV_HAVUZU[ay] : null;
-  if (!havuz || !havuz.length) { alert("Bu satır için otomatik öneri havuzu bulunamadı — elle yazabilirsiniz."); return; }
+  const havuz = ay ? seflikAyHavuzu(ay) : [];
+  if (!havuz.length) { alert("Bu satır için otomatik öneri havuzu bulunamadı — elle yazabilirsiniz."); return; }
   const mevcutIdx = havuz.indexOf(k.isler);
   k.isler = havuz[(mevcutIdx + 1) % havuz.length];
   save(); renderMain();
