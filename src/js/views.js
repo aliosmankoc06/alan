@@ -2968,6 +2968,11 @@ function odaSecenekleriHtml(seciliAd) {
   const liste = (seciliAd && !adlar.includes(seciliAd)) ? [seciliAd, ...adlar] : adlar;
   return `<option value="">— seçin —</option>${liste.map(ad => `<option value="${escHtml(ad)}" ${seciliAd === ad ? "selected" : ""}>${escHtml(ad)}</option>`).join("")}`;
 }
+function ogretmenSecenekleriHtml(seciliAd) {
+  const adlar = S.teachers.map(t => t.name).filter(Boolean);
+  const liste = (seciliAd && !adlar.includes(seciliAd)) ? [seciliAd, ...adlar] : adlar;
+  return `<option value="">— seçin —</option>${liste.map(ad => `<option value="${escHtml(ad)}" ${seciliAd === ad ? "selected" : ""}>${escHtml(ad)}</option>`).join("")}`;
+}
 function makineFormAlanlari(m) {
   const v = f => escHtml(m ? m[f] || "" : "");
   return `
@@ -2983,7 +2988,7 @@ function makineFormAlanlari(m) {
     <label class="small">Motor Gücü</label><input type="text" id="mk-motorgucu" value="${v('motorGucu')}" style="width:100%">
     <label class="small">Çalışma Gerilimi</label><input type="text" id="mk-gerilim" value="${v('calismaGerilimi')}" style="width:100%">
     <label class="small">Ağırlık</label><input type="text" id="mk-agirlik" value="${v('agirlik')}" style="width:100%">
-    <label class="small">Sorumlu Personel</label><input type="text" id="mk-sorumlu" value="${v('sorumluPersonel')}" style="width:100%">
+    <label class="small">Sorumlu Personel</label><select id="mk-sorumlu" style="width:100%">${ogretmenSecenekleriHtml(m ? m.sorumluPersonel : "")}</select>
     <label class="small">Özel Notlar</label><textarea id="mk-notlar" rows="3" style="width:100%">${v('notlar')}</textarea>`;
 }
 function addMakine() {
