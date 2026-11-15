@@ -489,6 +489,24 @@ function normalizeState(s) {
       if (typeof m.talimat[f] !== "string") m.talimat[f] = "";
     });
   });
+  // Gerçek 30 makinelik atölye envanterinin bir kerelik aktarımı — SADECE
+  // makine envanteri tamamen boşsa yapılır (kullanıcı kendi elleriyle hiç
+  // makine girmemişse). Zaten en az bir makine varsa hiç dokunulmaz; aynı
+  // ad+lab'a sahip birden fazla GERÇEK fiziksel makine olabildiği için
+  // (örn. 4 adet "ÜNİVERSAL TORNA TEZGAHI") ad/lab eşleştirmesiyle "zaten
+  // var mı" kontrolü güvenilir değil — bu yüzden tek güvenli kural budur.
+  // NOT: bu blok yukarıdaki s.envanter.makineler şekil garantisinden SONRA
+  // çalışmalı (aksi hâlde ilk açılışta s.envanter henüz tanımsızken bayrak
+  // kilitlenir — bkz. Stajda Olan Öğrenciler/İşletme Kontenjanları'ndaki
+  // aynı sınıf hatalar).
+  if (!s.makineEnvanteriHazirYuklendi) {
+    s.makineEnvanteriHazirYuklendi = true;
+    if (typeof MAKINE_ENVANTERI_HAZIR_VERI !== "undefined" && s.envanter.makineler.length === 0) {
+      MAKINE_ENVANTERI_HAZIR_VERI.forEach(hm => {
+        s.envanter.makineler.push(Object.assign({ id: uid("mk"), arizaKayitlari: [], onarimKayitlari: [], bakimKayitlari: [], yedekParcalar: [] }, hm));
+      });
+    }
+  }
   if (!Array.isArray(s.durumTespitFormlari)) s.durumTespitFormlari = [];
   s.durumTespitFormlari.forEach(f => {
     if (!f.id) f.id = uid("dtf");
