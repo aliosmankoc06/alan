@@ -483,19 +483,23 @@ function addIsletme(groupKey, name) {
   }
   save(); renderMain();
 }
-function removeIsletmeGroup(id, groupKey) {
+function toggleIsletmeGrubu(id, groupKey, checked) {
   const isl = isletmeById(id);
   if (!isl) return;
-  const willDeleteWhole = isl.groups.length <= 1;
-  const msg = willDeleteWhole
-    ? `"${isl.name}" işletmesi tamamen silinsin mi? (Son grubu kaldırıyorsunuz)`
-    : `"${isl.name}" işletmesi ${GROUP_LABELS[groupKey]} grubundan kaldırılsın mı?`;
-  if (!confirm(msg)) return;
-  isl.groups = isl.groups.filter(g => g !== groupKey);
-  if (isl.groups.length === 0) {
-    S.isletmeler = S.isletmeler.filter(i => i.id !== id);
-    delete S.isletmeTeacherAssign[id];
+  if (checked) {
+    if (!isl.groups.includes(groupKey)) isl.groups.push(groupKey);
+  } else {
+    if (isl.groups.length <= 1) { alert(`"${isl.name}" en az bir gün grubuna ait olmalı. Tamamen kaldırmak için "Sil" butonunu kullanın.`); renderMain(); return; }
+    isl.groups = isl.groups.filter(g => g !== groupKey);
   }
+  save(); renderMain();
+}
+function silIsletmeTamamen(id) {
+  const isl = isletmeById(id);
+  if (!isl) return;
+  if (!confirm(`"${isl.name}" işletmesi tamamen silinsin mi? Bu işlem geri alınamaz.`)) return;
+  S.isletmeler = S.isletmeler.filter(i => i.id !== id);
+  delete S.isletmeTeacherAssign[id];
   save(); renderMain();
 }
 function editIsletme(id) {

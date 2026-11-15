@@ -9350,21 +9350,32 @@ function toggleAssignmentRoom(classId, assignmentId, roomId) {
 
 /* ---- Ders Dağıtım ---- */
 
+let koordGrupFiltresi = "ALL";
+function setKoordGrupFiltresi(g) { koordGrupFiltresi = g; renderMain(); }
+const KOORD_GRUP_KISA_ETIKET = { psc: "P-S-Ç", cpc: "Ç-P-C", mesem: "MESEM" };
 function viewKoordinatorluk() {
-  function isletmeListHtml(groupKey) {
-    const items = S.isletmeler.filter(i => i.groups.includes(groupKey));
-    if (items.length === 0) return `<p class="small">Henüz işletme eklenmedi.</p>`;
-    return items.map(isl => {
-      return `<div class="row" style="max-width:720px;align-items:center;">
-        <span style="flex:2;">${isl.name}</span>
-        <label class="small" style="display:flex;align-items:center;gap:4px;">Koordinatörlük Saati:
-          <input type="number" min="1" placeholder="${KOORD_BLOCK_LEN}" value="${isl.koordSaat !== undefined ? isl.koordSaat : ''}" style="width:50px" onchange="updateIsletmeSaat('${isl.id}',this.value)" title="Bu işletmeye ders programında kaç saat koordinatörlük yazılacağı (boş bırakılırsa varsayılan ${KOORD_BLOCK_LEN} saat kullanılır)">
-        </label>
-        <button class="btn" onclick="editIsletme('${isl.id}')">Düzenle</button>
-        <button class="btn danger" onclick="removeIsletmeGroup('${isl.id}','${groupKey}')">Kaldır</button>
-      </div>`;
-    }).join("");
-  }
+  const filtreSekmeler = [
+    { id: "ALL", label: "Tümü (" + S.isletmeler.length + ")" },
+    { id: "psc", label: "Pazartesi-Salı-Çarşamba" },
+    { id: "cpc", label: "Çarşamba-Perşembe-Cuma" },
+    { id: "mesem", label: "MESEM" }
+  ];
+  const filtreBar = `<div class="row no-print" style="flex-wrap:wrap;">${filtreSekmeler.map(f => `<button class="btn ${f.id === koordGrupFiltresi ? 'primary' : ''}" onclick="setKoordGrupFiltresi('${f.id}')">${escHtml(f.label)}</button>`).join("")}</div>`;
+
+  const gosterilecek = (koordGrupFiltresi === "ALL" ? S.isletmeler : S.isletmeler.filter(i => i.groups.includes(koordGrupFiltresi)))
+    .slice().sort((a, b) => a.name.localeCompare(b.name, "tr"));
+
+  const grupCheckbox = (isl, key) => `<label class="small" style="display:inline-flex;align-items:center;gap:3px;margin-right:12px;white-space:nowrap;">
+    <input type="checkbox" ${isl.groups.includes(key) ? "checked" : ""} onchange="toggleIsletmeGrubu('${isl.id}','${key}',this.checked)"> ${KOORD_GRUP_KISA_ETIKET[key]}
+  </label>`;
+
+  const rows = gosterilecek.map(isl => `
+    <tr>
+      <td>${escHtml(isl.name)}</td>
+      <td>${grupCheckbox(isl, "psc")}${grupCheckbox(isl, "cpc")}${grupCheckbox(isl, "mesem")}</td>
+      <td style="text-align:center;"><input type="number" min="1" placeholder="${KOORD_BLOCK_LEN}" value="${isl.koordSaat !== undefined ? isl.koordSaat : ''}" style="width:56px;text-align:center;" onchange="updateIsletmeSaat('${isl.id}',this.value)" title="Bu işletmeye ders programında kaç saat koordinatörlük yazılacağı (boş bırakılırsa varsayılan ${KOORD_BLOCK_LEN} saat kullanılır)"></td>
+      <td><button class="btn" onclick="editIsletme('${isl.id}')">Düzenle</button> <button class="btn danger" onclick="silIsletmeTamamen('${isl.id}')">Sil</button></td>
+    </tr>`).join("");
 
   return `
   <div class="card no-print" style="background:var(--teal-card-bg);border-color:var(--teal);">
@@ -9372,32 +9383,24 @@ function viewKoordinatorluk() {
       <h2 style="color:var(--teal-ink);margin:0;">Koordinatörlük / İşletme Listesi</h2>
       ${S.isletmeler.length ? `<button class="btn danger" onclick="tumIsletmeleriSil()">Tüm İşletmeleri Sil</button>` : ''}
     </div>
-    <div class="grid3">
-      <div>
-        <h2>Pazartesi-Salı-Çarşamba grubu işletmeleri</h2>
-        <div class="row" style="max-width:420px;">
-          <input type="text" id="isl-psc-name" placeholder="İşletme adı" style="width:100%">
-          <button class="btn primary" onclick="addIsletme('psc', document.getElementById('isl-psc-name').value); document.getElementById('isl-psc-name').value='';">Ekle</button>
-        </div>
-        ${isletmeListHtml('psc')}
+    <p class="small">MESEM öğrencileri Pazartesi, Salı, Perşembe ve Cuma günleri işletmededir; okula sadece Çarşamba günü gelirler. Koordinatör öğretmen bu 4 günden birinde ziyaret eder. Bir işletme birden fazla gün grubuna ait olabilir — ilgili kutucukları işaretleyin.</p>
+    <div class="row" style="max-width:520px;align-items:flex-end;">
+      <div style="flex:1;"><label class="small">Yeni İşletme Adı</label><input type="text" id="isl-yeni-name" style="width:100%"></div>
+      <div><label class="small">Gün Grubu</label>
+        <select id="isl-yeni-grup" style="width:100%">
+          <option value="psc" ${koordGrupFiltresi === "psc" ? "selected" : ""}>Pazartesi-Salı-Çarşamba</option>
+          <option value="cpc" ${koordGrupFiltresi === "cpc" ? "selected" : ""}>Çarşamba-Perşembe-Cuma</option>
+          <option value="mesem" ${koordGrupFiltresi === "mesem" ? "selected" : ""}>MESEM</option>
+        </select>
       </div>
-      <div>
-        <h2>Çarşamba-Perşembe-Cuma grubu işletmeleri</h2>
-        <div class="row" style="max-width:420px;">
-          <input type="text" id="isl-cpc-name" placeholder="İşletme adı" style="width:100%">
-          <button class="btn primary" onclick="addIsletme('cpc', document.getElementById('isl-cpc-name').value); document.getElementById('isl-cpc-name').value='';">Ekle</button>
-        </div>
-        ${isletmeListHtml('cpc')}
-      </div>
-      <div>
-        <h2>MESEM işletmeleri</h2>
-        <p class="small">MESEM öğrencileri Pazartesi, Salı, Perşembe ve Cuma günleri işletmededir; okula sadece Çarşamba günü gelirler. Koordinatör öğretmen bu 4 günden birinde ziyaret eder.</p>
-        <div class="row" style="max-width:420px;">
-          <input type="text" id="isl-mesem-name" placeholder="İşletme adı" style="width:100%">
-          <button class="btn primary" onclick="addIsletme('mesem', document.getElementById('isl-mesem-name').value); document.getElementById('isl-mesem-name').value='';">Ekle</button>
-        </div>
-        ${isletmeListHtml('mesem')}
-      </div>
+      <button class="btn primary" onclick="addIsletme(document.getElementById('isl-yeni-grup').value, document.getElementById('isl-yeni-name').value); document.getElementById('isl-yeni-name').value='';">Ekle</button>
+    </div>
+  </div>
+  <div class="card no-print">
+    ${filtreBar}
+    <div style="overflow-x:auto;margin-top:10px;">
+    <table><thead><tr><th>İşletme Adı</th><th>Gün Grupları</th><th>Koord. Saati</th><th></th></tr></thead>
+    <tbody>${rows || `<tr><td colspan="4" class="small">${koordGrupFiltresi === "ALL" ? "Henüz işletme eklenmedi." : "Bu grupta işletme yok."}</td></tr>`}</tbody></table>
     </div>
   </div>
   <div class="card no-print" style="background:var(--panel-2);">
