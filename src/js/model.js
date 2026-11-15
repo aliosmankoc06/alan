@@ -130,6 +130,7 @@ function defaultState() {
     donemRaporlari: { dersKesim: [], yaziliTeslim: [] },
     sinavHavuzu: { sorular: [] },
     sinavKagitlari: [],
+    calismaKagitlari: [],
     imzaSirkuleri: [],
     kalfalikUstalik: { kayitlar: [] },
     beceriSinavi: { kayitlar: [] },
@@ -184,6 +185,7 @@ function emptyState() {
     donemRaporlari: { dersKesim: [], yaziliTeslim: [] },
     sinavHavuzu: { sorular: [] },
     sinavKagitlari: [],
+    calismaKagitlari: [],
     imzaSirkuleri: [],
     kalfalikUstalik: { kayitlar: [] },
     beceriSinavi: { kayitlar: [] },
@@ -509,6 +511,11 @@ function normalizeState(s) {
   if (!Array.isArray(s.sinavKagitlari)) s.sinavKagitlari = [];
   s.sinavKagitlari.forEach(k => {
     if (!k.id) k.id = uid("sk");
+    if (!Array.isArray(k.soruIdleri)) k.soruIdleri = [];
+  });
+  if (!Array.isArray(s.calismaKagitlari)) s.calismaKagitlari = [];
+  s.calismaKagitlari.forEach(k => {
+    if (!k.id) k.id = uid("ck");
     if (!Array.isArray(k.soruIdleri)) k.soruIdleri = [];
   });
   if (!Array.isArray(s.imzaSirkuleri)) s.imzaSirkuleri = [];

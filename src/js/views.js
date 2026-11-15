@@ -5661,10 +5661,21 @@ const FORMAT_ETIKETLERI = { klasik: "Klasik", test: "Test", uygulamali: "Uygulam
 let activeSinavSinifId = null;
 let activeSinavCourseId = null;
 let activeSinavTab = "havuz";
-let activeSinavKagitId = null;
+/* Sınav Kağıtları ve Çalışma Soruları aynı altyapıyı (Soru Havuzu'ndan
+   seçim + Cevap Anahtarı + Yazdır/İndir) paylaşır, ama ayrı listelerde
+   tutulur (S.sinavKagitlari / S.calismaKagitlari) ki sınav hazırlarken
+   çalışma kağıtları araya girmesin. "kind" parametresi ("sinav" |
+   "calisma") hangi listeyle çalışıldığını belirler. */
+let activeKagitId = { sinav: null, calisma: null };
 
 function soruById(id) { return S.sinavHavuzu.sorular.find(x => x.id === id); }
-function kagitById(id) { return S.sinavKagitlari.find(x => x.id === id); }
+function kagitListesi(kind) { return kind === "calisma" ? S.calismaKagitlari : S.sinavKagitlari; }
+function kagitById(id, kind) { return kagitListesi(kind).find(x => x.id === id); }
+function kagitEtiketleri(kind) {
+  return kind === "calisma"
+    ? { baslikVarsayilan: "Çalışma Kağıdı", hazirlaBtn: "Çalışma Kağıdı Hazırla", meta: "Çalışma Kağıdı Bilgilerini Düzenle", bosDurum: "Henüz çalışma kağıdı oluşturulmadı.", sil: "Bu Çalışma Kağıdını Sil", onaySil: "Bu çalışma kağıdı silinsin mi? Bu işlem geri alınamaz." }
+    : { baslikVarsayilan: "Sınav Kağıdı", hazirlaBtn: "Sınav Kağıdı Hazırla", meta: "Sınav Kağıdı Bilgilerini Düzenle", bosDurum: "Henüz sınav kağıdı oluşturulmadı.", sil: "Bu Kağıdı Sil", onaySil: "Bu sınav kağıdı silinsin mi? Bu işlem geri alınamaz." };
+}
 function sinavSiniflari() {
   let list = S.classes.filter(c => c.grade > 0).slice().sort((a, b) => a.name.localeCompare(b.name, "tr", { numeric: true }));
   if (dalFiltresi !== "ALL") {
@@ -5682,7 +5693,7 @@ function selectSinavCourse(courseId) { activeSinavCourseId = courseId; activeSin
 function setSinavTab(id) { activeSinavTab = id; renderMain(); }
 let activeKagitBelge = "soru";
 let activeKagitDonemFiltre = null;
-function selectKagit(id) { activeSinavKagitId = id; activeKagitBelge = "soru"; activeKagitDonemFiltre = null; renderMain(); }
+function selectKagit(kind, id) { activeKagitId[kind] = id; activeKagitBelge = "soru"; activeKagitDonemFiltre = null; renderMain(); }
 function setKagitBelge(id) { activeKagitBelge = id; renderMain(); }
 function setKagitDonemFiltre(v) { activeKagitDonemFiltre = v; renderMain(); }
 
@@ -5803,6 +5814,7 @@ function deleteSoru(id) {
   if (!confirm("Bu soru silinsin mi? Bu soruyu içeren sınav kağıtlarından da kaldırılacak.")) return;
   S.sinavHavuzu.sorular = S.sinavHavuzu.sorular.filter(x => x.id !== id);
   S.sinavKagitlari.forEach(k => { k.soruIdleri = k.soruIdleri.filter(sid => sid !== id); });
+  S.calismaKagitlari.forEach(k => { k.soruIdleri = k.soruIdleri.filter(sid => sid !== id); });
   save(); renderMain();
 }
 function viewSoruHavuzuBolum(classId, courseId) {
@@ -5836,17 +5848,19 @@ function viewSoruHavuzuBolum(classId, courseId) {
     ${cards || `<div class="card small" style="text-align:center;padding:30px 20px;">Bu ders için henüz soru eklenmedi.</div>`}
   </div>`;
 }
-function addKagit(classId, courseId) {
+function addKagit(classId, courseId, kind) {
   const course = courseById(courseId);
   const cls = classById(classId);
+  const et = kagitEtiketleri(kind);
   const root = document.getElementById("modal-root");
   root.innerHTML = `
     <div class="modal-bg" onclick="if(event.target===this) closeModal()">
       <div class="modal" style="width:420px;">
-        <h3>Sınav Kağıdı Hazırla</h3>
+        <h3>${et.hazirlaBtn}</h3>
+        <input type="hidden" id="sk-kind" value="${kind}">
         <input type="hidden" id="sk-classid" value="${classId}">
         <input type="hidden" id="sk-courseid" value="${courseId}">
-        <label class="small">Başlık</label><input type="text" id="sk-baslik" value="${cls && course ? escHtml(cls.name + ' ' + course.name + ' Yazılı Sınavı') : ''}" style="width:100%">
+        <label class="small">Başlık</label><input type="text" id="sk-baslik" value="${cls && course ? escHtml(cls.name + ' ' + course.name + ' ' + (kind === 'calisma' ? 'Çalışma Kağıdı' : 'Yazılı Sınavı')) : ''}" style="width:100%">
         <label class="small">Format</label>
         <select id="sk-format" style="width:100%">
           <option value="klasik">Klasik</option>
@@ -5861,7 +5875,7 @@ function addKagit(classId, courseId) {
         </select>
         <label class="small">Öğretim Yılı</label><input type="text" id="sk-yil" value="${S.akademikTakvim ? escHtml(S.akademikTakvim.ogretimYili) : ''}" style="width:100%">
         <label class="small">Tarih</label><input type="text" id="sk-tarih" placeholder="gg.aa.yyyy" style="width:100%">
-        <label class="small">Süre (dakika)</label><input type="number" id="sk-sure" value="40" min="0" style="width:100%">
+        <label class="small">Süre (dakika)</label><input type="number" id="sk-sure" value="${kind === 'calisma' ? 0 : 40}" min="0" style="width:100%">
         <div class="row">
           <button class="btn primary" onclick="saveNewKagit()">Oluştur</button>
           <button class="btn" onclick="closeModal()">İptal</button>
@@ -5870,10 +5884,11 @@ function addKagit(classId, courseId) {
     </div>`;
 }
 function saveNewKagit() {
+  const kind = document.getElementById("sk-kind").value;
   const baslik = document.getElementById("sk-baslik").value.trim();
   if (!baslik) { alert("Başlık girin."); return; }
   const kagit = {
-    id: uid("sk"),
+    id: uid(kind === "calisma" ? "ck" : "sk"),
     classId: document.getElementById("sk-classid").value,
     courseId: document.getElementById("sk-courseid").value,
     baslik,
@@ -5884,18 +5899,21 @@ function saveNewKagit() {
     sure: Number(document.getElementById("sk-sure").value) || 0,
     soruIdleri: []
   };
-  S.sinavKagitlari.push(kagit);
-  activeSinavKagitId = kagit.id;
+  kagitListesi(kind).push(kagit);
+  activeKagitId[kind] = kagit.id;
   save(); closeModal(); renderMain();
 }
-function editKagitMeta(id) {
-  const k = kagitById(id);
+function editKagitMeta(id, kind) {
+  const k = kagitById(id, kind);
   if (!k) return;
+  const et = kagitEtiketleri(kind);
   const root = document.getElementById("modal-root");
   root.innerHTML = `
     <div class="modal-bg" onclick="if(event.target===this) closeModal()">
       <div class="modal" style="width:420px;">
-        <h3>Sınav Kağıdı Bilgilerini Düzenle</h3>
+        <h3>${et.meta}</h3>
+        <input type="hidden" id="sk-kind" value="${kind}">
+        <input type="hidden" id="sk-id" value="${id}">
         <label class="small">Başlık</label><input type="text" id="sk-baslik" value="${escHtml(k.baslik)}" style="width:100%">
         <label class="small">Format</label>
         <select id="sk-format" style="width:100%">
@@ -5913,14 +5931,16 @@ function editKagitMeta(id) {
         <label class="small">Tarih</label><input type="text" id="sk-tarih" value="${escHtml(k.tarih || '')}" style="width:100%">
         <label class="small">Süre (dakika)</label><input type="number" id="sk-sure" value="${k.sure || 0}" min="0" style="width:100%">
         <div class="row">
-          <button class="btn primary" onclick="saveKagitMeta('${id}')">Kaydet</button>
+          <button class="btn primary" onclick="saveKagitMeta()">Kaydet</button>
           <button class="btn" onclick="closeModal()">İptal</button>
         </div>
       </div>
     </div>`;
 }
-function saveKagitMeta(id) {
-  const k = kagitById(id);
+function saveKagitMeta() {
+  const kind = document.getElementById("sk-kind").value;
+  const id = document.getElementById("sk-id").value;
+  const k = kagitById(id, kind);
   if (!k) return;
   const baslik = document.getElementById("sk-baslik").value.trim();
   if (!baslik) { alert("Başlık girin."); return; }
@@ -5932,21 +5952,24 @@ function saveKagitMeta(id) {
   k.sure = Number(document.getElementById("sk-sure").value) || 0;
   save(); closeModal(); renderMain();
 }
-function deleteKagit(id) {
-  if (!confirm("Bu sınav kağıdı silinsin mi? Bu işlem geri alınamaz.")) return;
-  S.sinavKagitlari = S.sinavKagitlari.filter(x => x.id !== id);
-  if (activeSinavKagitId === id) activeSinavKagitId = null;
+function deleteKagit(id, kind) {
+  const et = kagitEtiketleri(kind);
+  if (!confirm(et.onaySil)) return;
+  const liste = kagitListesi(kind);
+  if (kind === "calisma") S.calismaKagitlari = liste.filter(x => x.id !== id);
+  else S.sinavKagitlari = liste.filter(x => x.id !== id);
+  if (activeKagitId[kind] === id) activeKagitId[kind] = null;
   save(); renderMain();
 }
-function toggleKagitSoru(kagitId, soruId) {
-  const k = kagitById(kagitId);
+function toggleKagitSoru(kagitId, soruId, kind) {
+  const k = kagitById(kagitId, kind);
   if (!k) return;
   const idx = k.soruIdleri.indexOf(soruId);
   if (idx >= 0) k.soruIdleri.splice(idx, 1);
   else k.soruIdleri.push(soruId);
   save(); renderMain();
 }
-function renderKagitDetay(kagit) {
+function renderKagitDetay(kagit, kind) {
   const classObj = classById(kagit.classId);
   const course = courseById(kagit.courseId);
   // Dönem filtresi: hiçbir şey seçilmemişse (activeKagitDonemFiltre === null)
@@ -5965,7 +5988,7 @@ function renderKagitDetay(kagit) {
     </div>`;
   const secimHtml = havuzTumu.length === 0 ? `<div class="small">Bu format için soru havuzunda uygun soru yok. Önce "Soru Havuzu" sekmesinden soru ekleyin.</div>` : donemFiltreBar + (havuz.length === 0 ? `<div class="small">Bu dönem için uygun soru yok.</div>` : havuz.map(q => `
     <label class="row small" style="align-items:flex-start;gap:8px;">
-      <input type="checkbox" ${kagit.soruIdleri.includes(q.id) ? 'checked' : ''} onchange="toggleKagitSoru('${kagit.id}','${q.id}')">
+      <input type="checkbox" ${kagit.soruIdleri.includes(q.id) ? 'checked' : ''} onchange="toggleKagitSoru('${kagit.id}','${q.id}','${kind}')">
       <span>${escHtml(q.soruMetni)} <i>(${q.puan} puan${q.donem ? ' · ' + escHtml(q.donem) : ''})</i></span>
     </label>`).join("<br>"));
 
@@ -5997,7 +6020,7 @@ function renderKagitDetay(kagit) {
 
   const belgeSeciciBar = `
   <div class="row no-print" style="margin-top:10px;">
-    <button class="btn ${activeKagitBelge === 'soru' ? 'primary' : ''}" onclick="setKagitBelge('soru')">Sınav Kağıdı</button>
+    <button class="btn ${activeKagitBelge === 'soru' ? 'primary' : ''}" onclick="setKagitBelge('soru')">${kind === 'calisma' ? 'Çalışma Kağıdı' : 'Sınav Kağıdı'}</button>
     <button class="btn ${activeKagitBelge === 'cevap' ? 'primary' : ''}" onclick="setKagitBelge('cevap')">Cevap Anahtarı</button>
   </div>`;
 
@@ -6031,40 +6054,41 @@ function renderKagitDetay(kagit) {
       <span><b>Format:</b> ${escHtml(FORMAT_ETIKETLERI[kagit.format] || kagit.format)}</span>
       <span><b>Dönem:</b> ${escHtml(kagit.donem || '-')}</span>
       <span><b>Süre:</b> ${kagit.sure || '-'} dk</span>
-      <button class="btn" onclick="editKagitMeta('${kagit.id}')">Bilgileri Düzenle</button>
+      <button class="btn" onclick="editKagitMeta('${kagit.id}','${kind}')">Bilgileri Düzenle</button>
     </div>
   </div>
   <div class="card no-print">
     <h3 style="margin-top:0;">Soru Seç (${seciliSorular.length} soru seçili, toplam ${toplamPuan} puan)</h3>
     ${secimHtml}
-    <p class="small" style="margin-top:8px;">Seçtiğiniz sorular hem Sınav Kağıdı'nda (öğrenciye verilecek, cevaplar gizli) hem Cevap Anahtarı'nda (doğru cevaplarla) otomatik oluşur — aşağıdan ikisi arasında geçiş yapıp ayrı ayrı yazdırabilir/indirebilirsiniz.</p>
+    <p class="small" style="margin-top:8px;">Seçtiğiniz sorular hem ${kind === 'calisma' ? 'Çalışma Kağıdı' : 'Sınav Kağıdı'}'nda (öğrenciye verilecek, cevaplar gizli) hem Cevap Anahtarı'nda (doğru cevaplarla) otomatik oluşur — aşağıdan ikisi arasında geçiş yapıp ayrı ayrı yazdırabilir/indirebilirsiniz.</p>
     ${belgeSeciciBar}
   </div>
   <div class="print-area">
     ${printBelgeIcerik}
   </div>`;
 }
-function viewKagitlarBolum(classId, courseId) {
-  const entries = S.sinavKagitlari.filter(k => k.classId === classId && k.courseId === courseId).slice().sort((a, b) => (a.baslik || "").localeCompare(b.baslik || "", "tr"));
-  if (entries.length && !entries.some(e => e.id === activeSinavKagitId)) activeSinavKagitId = entries[0].id;
-  if (!entries.length) activeSinavKagitId = null;
-  const active = kagitById(activeSinavKagitId);
+function viewKagitlarBolum(classId, courseId, kind) {
+  const et = kagitEtiketleri(kind);
+  const entries = kagitListesi(kind).filter(k => k.classId === classId && k.courseId === courseId).slice().sort((a, b) => (a.baslik || "").localeCompare(b.baslik || "", "tr"));
+  if (entries.length && !entries.some(e => e.id === activeKagitId[kind])) activeKagitId[kind] = entries[0].id;
+  if (!entries.length) activeKagitId[kind] = null;
+  const active = kagitById(activeKagitId[kind], kind);
 
   const listHtml = entries.length === 0 ? "" : `
     <div class="card no-print">
       <div class="row" style="flex-wrap:wrap;">
-        ${sekmeDropdown("sinav-kagit", entries.map(e => ({ value: e.id, label: e.baslik })), activeSinavKagitId, "selectKagit('{v}')")}
+        ${sekmeDropdown("kagit-" + kind, entries.map(e => ({ value: e.id, label: e.baslik })), activeKagitId[kind], `selectKagit('${jsq(kind)}','{v}')`)}
       </div>
     </div>`;
 
-  const dosyaAdi = active ? (active.baslik + (activeKagitBelge === "cevap" ? " - Cevap Anahtarı" : "")) : "Sınav Kağıdı";
-  const content = active ? renderKagitDetay(active) : `<div class="card small" style="text-align:center;padding:30px 20px;">Henüz sınav kağıdı oluşturulmadı. "Sınav Kağıdı Hazırla" ile oluşturup soru havuzundan sorularınızı seçebilirsiniz.</div>`;
+  const dosyaAdi = active ? (active.baslik + (activeKagitBelge === "cevap" ? " - Cevap Anahtarı" : "")) : et.baslikVarsayilan;
+  const content = active ? renderKagitDetay(active, kind) : `<div class="card small" style="text-align:center;padding:30px 20px;">${et.bosDurum} "${et.hazirlaBtn}" ile oluşturup soru havuzundan sorularınızı seçebilirsiniz.</div>`;
 
   return `
   <div class="card no-print">
     <div class="row">
-      <button class="btn primary" onclick="addKagit('${classId}','${courseId}')">Sınav Kağıdı Hazırla</button>
-      ${active ? `<button class="btn danger" onclick="deleteKagit('${active.id}')">Bu Kağıdı Sil</button>` : ""}
+      <button class="btn primary" onclick="addKagit('${classId}','${courseId}','${kind}')">${et.hazirlaBtn}</button>
+      ${active ? `<button class="btn danger" onclick="deleteKagit('${active.id}','${kind}')">${et.sil}</button>` : ""}
     </div>
     ${active ? belgeAracCubugu(dosyaAdi) : ""}
   </div>
@@ -6111,9 +6135,12 @@ function viewSinavHavuzu() {
   <div class="row no-print" style="flex-wrap:wrap;">
     <button class="btn ${activeSinavTab === 'havuz' ? 'primary' : ''}" onclick="setSinavTab('havuz')">Soru Havuzu</button>
     <button class="btn ${activeSinavTab === 'kagitlar' ? 'primary' : ''}" onclick="setSinavTab('kagitlar')">Sınav Kağıtları</button>
+    <button class="btn ${activeSinavTab === 'calisma' ? 'primary' : ''}" onclick="setSinavTab('calisma')">Çalışma Soruları</button>
   </div>`;
 
-  const govde = activeSinavTab === "kagitlar" ? viewKagitlarBolum(activeSinavSinifId, activeSinavCourseId) : viewSoruHavuzuBolum(activeSinavSinifId, activeSinavCourseId);
+  const govde = activeSinavTab === "kagitlar" ? viewKagitlarBolum(activeSinavSinifId, activeSinavCourseId, "sinav")
+    : activeSinavTab === "calisma" ? viewKagitlarBolum(activeSinavSinifId, activeSinavCourseId, "calisma")
+    : viewSoruHavuzuBolum(activeSinavSinifId, activeSinavCourseId);
 
   return ustBar + sinifBar + dersBar + tabBar + govde;
 }
