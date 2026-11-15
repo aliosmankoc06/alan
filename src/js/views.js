@@ -48,7 +48,8 @@ const STAJ_TABS = [
 const STAJ_TAKIP_TABS = [
   { id: "ogrenciler", label: "Öğrenciler", icon: "school" },
   { id: "isletmeler", label: "İşletmelere Göre", icon: "building" },
-  { id: "devamsizlik", label: "Devamsızlık", icon: "calendarCheck" }
+  { id: "devamsizlik", label: "Devamsızlık", icon: "calendarCheck" },
+  { id: "not-fisi", label: "Not Fişi", icon: "percent" }
 ];
 const TOPLANTI_TABS = [
   { id: "okul", label: "Okul Zümresi", icon: "users" },
@@ -203,6 +204,7 @@ function renderMain() {
   if (activeModule === "staj-takip") {
     el.innerHTML = activeStajTakipTab === "isletmeler" ? viewStajTakipIsletmeler()
       : activeStajTakipTab === "devamsizlik" ? viewStajTakipDevamsizlik()
+      : activeStajTakipTab === "not-fisi" ? viewStajTakipNotFisi()
       : viewStajTakipOgrenciler();
     return;
   }
@@ -989,7 +991,7 @@ function addStajTakipOgrenci() {
   const dal = document.getElementById("sdo-new-dal").value.trim();
   const isletme = document.getElementById("sdo-new-isletme").value;
   if (!ad) { alert("Öğrenci adı girin."); return; }
-  S.stajdakiOgrenciler.push({ id: uid("sdo"), sinif, okulNo, ad, dal, isletme, sorumluOgretmenId: "", devamsizlik: {} });
+  S.stajdakiOgrenciler.push({ id: uid("sdo"), sinif, okulNo, ad, dal, isletme, sorumluOgretmenId: "", devamsizlik: {}, notFisi: {} });
   save(); renderMain();
 }
 function stajTakipListedenTopluEkleModal() {
@@ -1020,7 +1022,7 @@ function stajTakipListedenTopluEkleUygula() {
   let eklenen = 0;
   ogrencilerForSinif(sinif).forEach(o => {
     if (mevcut.has(o.okulNo)) return;
-    S.stajdakiOgrenciler.push({ id: uid("sdo"), sinif, okulNo: o.okulNo, ad: (o.ad + " " + o.soyad).trim(), dal, isletme: "", sorumluOgretmenId: "", devamsizlik: {} });
+    S.stajdakiOgrenciler.push({ id: uid("sdo"), sinif, okulNo: o.okulNo, ad: (o.ad + " " + o.soyad).trim(), dal, isletme: "", sorumluOgretmenId: "", devamsizlik: {}, notFisi: {} });
     eklenen++;
   });
   save(); closeModal(); renderMain();
@@ -1206,6 +1208,89 @@ function viewStajTakipDevamsizlik() {
       <tbody>${rows}</tbody></table>
       <p class="small" style="margin-top:8px;">YOK: Tam Gün Yok · S.Yok: Sabah Yok · ÖS.Yok: Öğleden Sonra Yok · Okul: Okulda (işletme günü değil) · Tatil: Resmi Tatil · — : Hafta Sonu · · : Tam Gün Var</p>
     </div>
+  </div>`;
+}
+
+/* ---- Stajda Olan Öğrenciler: Dönem Not Fişi ----
+   Gönderilen gerçek "İşletmelerde Meslek Eğitimi Gören Öğrencilere Ait
+   Dönem Not Fişi" (Mesleki ve Teknik Eğitim Yönetmeliği Madde 82) örneğinden
+   — işletme bazında, dönem bazında 6 alt puan: Temrin/İş-Hizmet/Proje/Deney
+   (işletme doldurur), Telafi Eğitim Puanı/Beceri Yarışması Puanı (okul
+   doldurur, (*) işaretli) — ortalaması otomatik hesaplanır. */
+let activeStajNotFisiDonem = "1";
+let activeStajNotFisiIsletme = "ALL";
+function setStajNotFisiDonem(d) { activeStajNotFisiDonem = d; renderMain(); }
+function setStajNotFisiIsletme(v) { activeStajNotFisiIsletme = v; renderMain(); }
+function updateStajTakipNotFisiAlan(ogrenciId, donem, alan, value) {
+  const st = S.stajdakiOgrenciler.find(x => x.id === ogrenciId);
+  if (!st) return;
+  if (!st.notFisi) st.notFisi = {};
+  if (!st.notFisi[donem]) st.notFisi[donem] = { temrin: "", isHizmet: "", proje: "", deney: "", telafiPuani: "", beceriYarismasiPuani: "" };
+  st.notFisi[donem][alan] = value.trim();
+  save(); renderMain();
+}
+function stajNotFisiOrtalama(notFisiDonem) {
+  const alanlar = ["temrin", "isHizmet", "proje", "deney", "telafiPuani", "beceriYarismasiPuani"];
+  const degerler = alanlar.map(a => parseFloat((notFisiDonem || {})[a])).filter(v => !isNaN(v));
+  if (!degerler.length) return null;
+  return degerler.reduce((a, b) => a + b, 0) / degerler.length;
+}
+function viewStajTakipNotFisi() {
+  const donem = activeStajNotFisiDonem;
+  const k = S.kurumBilgileri;
+  const ogretimYili = S.akademikTakvim ? S.akademikTakvim.ogretimYili : "";
+  const isletmeAdlari = [...new Set(S.stajdakiOgrenciler.map(st => st.isletme).filter(Boolean))].sort((a, b) => a.localeCompare(b, "tr"));
+  if (activeStajNotFisiIsletme !== "ALL" && !isletmeAdlari.includes(activeStajNotFisiIsletme)) activeStajNotFisiIsletme = "ALL";
+  const gosterilecekIsletmeler = activeStajNotFisiIsletme === "ALL" ? isletmeAdlari : [activeStajNotFisiIsletme];
+  const alanInput = (st, field, label) => {
+    const nf = (st.notFisi && st.notFisi[donem]) || {};
+    return `<td class="no-print"><input type="number" min="0" max="100" style="width:55px;text-align:center;" value="${escHtml(nf[field] || '')}" title="${label}" onchange="updateStajTakipNotFisiAlan('${st.id}','${donem}','${field}',this.value)"></td><td class="print-only-cell" style="text-align:center;">${escHtml(nf[field] || '—')}</td>`;
+  };
+  const gruplar = gosterilecekIsletmeler.length ? gosterilecekIsletmeler.map(isletmeAdi => {
+    const ogrenciler = S.stajdakiOgrenciler.filter(st => st.isletme === isletmeAdi);
+    const rows = ogrenciler.map(st => {
+      const ort = stajNotFisiOrtalama(st.notFisi && st.notFisi[donem]);
+      const ortGosterim = ort === null ? "—" : ort.toFixed(1);
+      const ortYazi = ort === null ? "—" : sayiYaziIleTr(Math.round(ort));
+      return `<tr>
+        <td>${escHtml(st.okulNo || '')}</td><td>${escHtml(st.ad)}</td><td>${escHtml(st.dal || '')}</td>
+        ${alanInput(st, "temrin", "Temrin")}
+        ${alanInput(st, "isHizmet", "İş-Hizmet")}
+        ${alanInput(st, "proje", "Proje")}
+        ${alanInput(st, "deney", "Deney")}
+        ${alanInput(st, "telafiPuani", "Telafi Eğitim Puanı (*)")}
+        ${alanInput(st, "beceriYarismasiPuani", "Beceri Yarışması Puanı (*)")}
+        <td style="text-align:center;font-weight:600;">${ortGosterim}</td><td class="small">${ortYazi}</td>
+      </tr>`;
+    }).join("") || `<tr><td colspan="11" class="small">Bu işletmede öğrenci yok.</td></tr>`;
+    return `
+    <div class="card" style="overflow-x:auto;margin-bottom:14px;">
+      <p style="text-align:center;font-weight:700;margin:0 0 6px 0;">İŞLETMELERDE MESLEK EĞİTİMİ GÖREN ÖĞRENCİLERE AİT DÖNEM NOT FİŞİ</p>
+      <table style="margin-bottom:10px;"><tr><td><b>Okul/Kurumun Adı</b></td><td>${escHtml(k.okulAdi)} / ${escHtml(k.alanAdi)}</td><td><b>Öğretim Yılı</b></td><td>${escHtml(ogretimYili)}</td><td><b>Dönemi</b></td><td>${donem}. Dönem</td></tr>
+      <tr><td><b>İşletmenin Adı</b></td><td colspan="5">${escHtml(isletmeAdi)}</td></tr></table>
+      <table><thead><tr><th>No</th><th>Adı Soyadı</th><th>Dal</th><th>Temrin</th><th>İş-Hizmet</th><th>Proje</th><th>Deney</th><th>Telafi Eğt. P. (*)</th><th>Beceri Yarş. P. (*)</th><th>Ortalama<br>(Rakam)</th><th>Ortalama<br>(Yazı)</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+      <p class="small" style="margin-top:10px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+        <span>Usta Öğretici / Eğitici Personel<br><br>İmza</span>
+        <span>İşletme Yetkilisi<br><br>İmza</span>
+        <span>${escHtml(k.alanSefiUnvani || "Koor. Müdür Yardımcısı")}<br><br>İmza</span>
+        <span>Okul/Kurum Müdürü<br><br>İmza</span>
+      </p>
+    </div>`;
+  }).join("") : `<div class="card small" style="text-align:center;padding:20px;">Henüz öğrenciye işletme ataması yapılmadı — Öğrenciler sekmesinden atayın.</div>`;
+  return `
+  <div class="card no-print">
+    <h2>Dönem Not Fişi</h2>
+    <p class="small">Her işletme için, Mesleki ve Teknik Eğitim Yönetmeliği Madde 82 uyarınca dönem sonunda işletmeden alınan not fişini buraya işleyin: Temrin/İş-Hizmet/Proje/Deney işletme tarafından, Telafi Eğitim Puanı/Beceri Yarışması Puanı (*) ise okul tarafından doldurulur — ortalama otomatik hesaplanır.</p>
+    <div class="row" style="flex-wrap:wrap;gap:10px;align-items:flex-end;">
+      <div><label class="small">Dönem</label><select onchange="setStajNotFisiDonem(this.value)"><option value="1" ${donem === "1" ? "selected" : ""}>1. Dönem</option><option value="2" ${donem === "2" ? "selected" : ""}>2. Dönem</option></select></div>
+      <div><label class="small">İşletme</label><select onchange="setStajNotFisiIsletme(this.value)"><option value="ALL" ${activeStajNotFisiIsletme === "ALL" ? "selected" : ""}>Tüm İşletmeler</option>${isletmeAdlari.map(ad => `<option value="${escHtml(ad)}" ${ad === activeStajNotFisiIsletme ? "selected" : ""}>${escHtml(ad)}</option>`).join("")}</select></div>
+    </div>
+    ${belgeAracCubugu("Dönem Not Fişi - " + donem + ". Dönem")}
+  </div>
+  <div class="print-area">
+    ${belgeYazdirmaBasligi("Dönem Not Fişi — " + donem + ". Dönem")}
+    ${gruplar}
   </div>`;
 }
 function esSinifDegisti() {
@@ -7648,7 +7733,7 @@ function gerceklestirYeniOgretimYiliGecisi(yeniYil) {
       if (!(st.okulNo && mevcutOkulNolar.has(st.okulNo))) {
         S.stajdakiOgrenciler.push({
           id: uid("sdo"), sinif: sinifAdiBirUstSinifaBump(st.sinif) || st.sinif, okulNo: st.okulNo || "",
-          ad: st.ad || "", dal: st.dal || "", isletme: st.isletme || "", sorumluOgretmenId: "", devamsizlik: {}
+          ad: st.ad || "", dal: st.dal || "", isletme: st.isletme || "", sorumluOgretmenId: "", devamsizlik: {}, notFisi: {}
         });
         if (st.okulNo) mevcutOkulNolar.add(st.okulNo);
       }

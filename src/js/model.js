@@ -281,6 +281,13 @@ function normalizeState(s) {
   s.stajdakiOgrenciler.forEach(st => {
     if (typeof st.sorumluOgretmenId !== "string") st.sorumluOgretmenId = "";
     if (!st.devamsizlik || typeof st.devamsizlik !== "object") st.devamsizlik = {};
+    if (!st.notFisi || typeof st.notFisi !== "object") st.notFisi = {};
+    ["1", "2"].forEach(d => {
+      if (!st.notFisi[d] || typeof st.notFisi[d] !== "object") st.notFisi[d] = {};
+      ["temrin", "isHizmet", "proje", "deney", "telafiPuani", "beceriYarismasiPuani"].forEach(f => {
+        if (typeof st.notFisi[d][f] !== "string") st.notFisi[d][f] = "";
+      });
+    });
   });
   // Şeflik haftalık saat girişi normalde Ders Programı'ndaki "Planlama Bakım
   // Onarım (Alan Şefi)" dersinin zamanlayıcıda hangi güne/kaç saat
@@ -825,7 +832,7 @@ function normalizeState(s) {
       if (st.okulNo && mevcutOkulNolar.has(st.okulNo)) return;
       s.stajdakiOgrenciler.push({
         id: uid("sdo"), sinif: st.sinif || "", okulNo: st.okulNo || "", ad: st.ad || "",
-        dal: st.dal || "", isletme: st.isletme || "", sorumluOgretmenId: "", devamsizlik: {}
+        dal: st.dal || "", isletme: st.isletme || "", sorumluOgretmenId: "", devamsizlik: {}, notFisi: {}
       });
       if (st.okulNo) mevcutOkulNolar.add(st.okulNo);
     });
