@@ -479,7 +479,7 @@ function addIsletme(groupKey, name) {
   if (existing) {
     if (!existing.groups.includes(groupKey)) existing.groups.push(groupKey);
   } else {
-    S.isletmeler.push({ id: uid("isletme"), name, groups: [groupKey] });
+    S.isletmeler.push({ id: uid("isletme"), name, groups: [groupKey], kontenjanlar: {}, talep: "", adres: "" });
   }
   save(); renderMain();
 }
@@ -511,6 +511,7 @@ function editIsletme(id) {
       <div class="modal" style="width:400px;">
         <h3>İşletmeyi Düzenle</h3>
         <label class="small">İşletme Adı</label><input type="text" id="ei-name" value="${escHtml(isl.name)}" style="width:100%">
+        <label class="small">Adres</label><textarea id="ei-adres" rows="2" style="width:100%">${escHtml(isl.adres || "")}</textarea>
         <label class="small" style="margin-top:10px;">Gün Grupları</label>
         ${groupCheck('psc')}${groupCheck('cpc')}${groupCheck('mesem')}
         <div class="row">
@@ -528,6 +529,7 @@ function saveIsletmeEdit(id) {
   const groups = ["psc", "cpc", "mesem"].filter(k => document.getElementById("ei-g-" + k).checked);
   if (groups.length === 0) { alert("En az bir gün grubu seçili olmalı."); return; }
   isl.name = name;
+  isl.adres = document.getElementById("ei-adres").value.trim();
   isl.groups = groups;
   save(); closeModal(); renderMain();
 }

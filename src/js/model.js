@@ -158,7 +158,8 @@ function defaultState() {
       { id: "dal-bmi", ad: "Bilgisayarlı Makine İmalatı Dalı", subeler: ["B"], renkKey: "teal" }
     ],
     seflikHaftalikSaatOverride: null,
-    bakimKartlari: []
+    bakimKartlari: [],
+    isletmeBelirlemeTutanaklari: []
   };
 }
 
@@ -213,7 +214,8 @@ function emptyState() {
     },
     dalTanimlari: [],
     seflikHaftalikSaatOverride: null,
-    bakimKartlari: []
+    bakimKartlari: [],
+    isletmeBelirlemeTutanaklari: []
   };
 }
 
@@ -254,6 +256,7 @@ function normalizeState(s) {
   s.isletmeler.forEach(isl => {
     if (!isl.kontenjanlar || typeof isl.kontenjanlar !== "object") isl.kontenjanlar = {};
     if (typeof isl.talep !== "string") isl.talep = "";
+    if (typeof isl.adres !== "string") isl.adres = "";
     // "BMİ" (noktalı İ) altında girilmiş eski kontenjan sayıları varsa
     // "BMI" (düz I) anahtarına taşı — bkz. öğrenci dal düzeltmesi yukarıda.
     if (isl.kontenjanlar["BMİ"] !== undefined) {
@@ -288,6 +291,11 @@ function normalizeState(s) {
   if (s.seflikHaftalikSaatOverride !== null && !(Array.isArray(s.seflikHaftalikSaatOverride) && s.seflikHaftalikSaatOverride.length === 5)) {
     s.seflikHaftalikSaatOverride = null;
   }
+  if (!Array.isArray(s.isletmeBelirlemeTutanaklari)) s.isletmeBelirlemeTutanaklari = [];
+  s.isletmeBelirlemeTutanaklari.forEach(t => {
+    if (!Array.isArray(t.isletmeler)) t.isletmeler = [];
+    if (!Array.isArray(t.katilimcilar)) t.katilimcilar = [];
+  });
   if (!Array.isArray(s.bakimKartlari)) s.bakimKartlari = [];
   s.bakimKartlari.forEach(k => {
     if (!k.durumlar || typeof k.durumlar !== "object") k.durumlar = {};
@@ -732,7 +740,7 @@ function normalizeState(s) {
       if (existing) {
         groups.forEach(g => { if (!existing.groups.includes(g)) existing.groups.push(g); });
       } else {
-        s.isletmeler.push({ id: uid("isletme"), name, groups: groups.slice() });
+        s.isletmeler.push({ id: uid("isletme"), name, groups: groups.slice(), kontenjanlar: {}, talep: "", adres: "" });
       }
     });
     const studentSeed = [

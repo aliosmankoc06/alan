@@ -58,6 +58,7 @@ let activeModule = "ana";
 let activeTab = "havuz";
 let activeStajTab = "ogrenciler";
 let activeStajTakipTab = "ogrenciler";
+let activeIsletmeBelirlemeTutanakId = null;
 let activeToplantiTab = "okul";
 let activeClassId = S.classes[0] ? S.classes[0].id : null;
 let activeTeacherId = S.teachers[0] ? S.teachers[0].id : null;
@@ -619,7 +620,132 @@ function viewStajKontenjanlar() {
       <table><thead><tr><th>İşletme</th>${dallar.map(d => `<th>${escHtml(d)} Kontenjanı</th>`).join("")}<th>Talep Ettiği Öğrenciler</th></tr></thead>
       <tbody>${kontenjanRows}</tbody></table>
     </div>
+  </div>
+  ${renderIsletmeBelirlemeKarti()}`;
+}
+
+/* ---- İşletme Belirleme Komisyon Tutanağı ----
+   Yıl başında hangi işletmelerin staj için onaylandığını gösteren resmî
+   tutanak (Ortaöğretim Kurumları Yönetmeliği Madde 142 dayanağı). Her
+   tutanak OLUŞTURULDUĞU ANDAKİ işletme listesini (ad+adres) donmuş bir
+   kopya olarak saklar — tıpkı Dönem Arşivi gibi, sonradan işletme listesi
+   değişse de imzalanmış bu tutanağın içeriği asla sessizce değişmez.
+   Komisyon üyeleri, Ayarlar > İmza Sirküsü'nden "İmza Sirkülerinden Ekle"
+   ile tek tıkla eklenir (Toplantılar modülündeki addKatilimciFromSirku ile
+   aynı desen), ya da elle de eklenebilir. */
+function isletmeBelirlemeTutanagiById(id) { return S.isletmeBelirlemeTutanaklari.find(x => x.id === id); }
+function addIsletmeBelirlemeTutanagi() {
+  if (!S.isletmeler.length) { alert("Önce Koordinatörlük sekmesinden işletme ekleyin."); return; }
+  const t = {
+    id: uid("ibt"),
+    tarih: "",
+    ogretimYili: S.akademikTakvim ? S.akademikTakvim.ogretimYili : "",
+    isletmeler: S.isletmeler.map(isl => ({ ad: isl.name, adres: isl.adres || "" })),
+    katilimcilar: []
+  };
+  S.isletmeBelirlemeTutanaklari.push(t);
+  activeIsletmeBelirlemeTutanakId = t.id;
+  save(); renderMain();
+}
+function deleteIsletmeBelirlemeTutanagi(id) {
+  if (!confirm("Bu komisyon tutanağı silinsin mi? Bu işlem geri alınamaz.")) return;
+  S.isletmeBelirlemeTutanaklari = S.isletmeBelirlemeTutanaklari.filter(x => x.id !== id);
+  if (activeIsletmeBelirlemeTutanakId === id) activeIsletmeBelirlemeTutanakId = null;
+  save(); renderMain();
+}
+function selectIsletmeBelirlemeTutanagi(id) { activeIsletmeBelirlemeTutanakId = id; renderMain(); }
+function updateIsletmeBelirlemeAlan(id, field, value) {
+  const t = isletmeBelirlemeTutanagiById(id);
+  if (t) t[field] = value;
+  save(); renderMain();
+}
+function ibtKatilimciEkle(tutanakId) {
+  const t = isletmeBelirlemeTutanagiById(tutanakId);
+  if (!t) return;
+  t.katilimcilar.push({ id: uid("ibtk"), ad: "", unvan: "" });
+  save(); renderMain();
+}
+function ibtKatilimciSirkudenEkle(tutanakId, imzaId) {
+  const t = isletmeBelirlemeTutanagiById(tutanakId);
+  const im = S.imzaSirkuleri.find(x => x.id === imzaId);
+  if (!t || !im) return;
+  t.katilimcilar.push({ id: uid("ibtk"), ad: im.adSoyad, unvan: im.unvan });
+  save(); renderMain();
+}
+function ibtKatilimciGuncelle(tutanakId, id, field, value) {
+  const t = isletmeBelirlemeTutanagiById(tutanakId);
+  const k = t && t.katilimcilar.find(x => x.id === id);
+  if (k) k[field] = value;
+  save();
+}
+function ibtKatilimciSil(tutanakId, id) {
+  const t = isletmeBelirlemeTutanagiById(tutanakId);
+  if (!t) return;
+  t.katilimcilar = t.katilimcilar.filter(x => x.id !== id);
+  save(); renderMain();
+}
+function renderIsletmeBelirlemeDetay(t) {
+  const k = S.kurumBilgileri;
+  const isletmeRows = t.isletmeler.map((i, idx) => `<tr><td>${idx + 1}</td><td>${escHtml(i.ad)}</td><td>${escHtml(i.adres || "—")}</td></tr>`).join("")
+    || `<tr><td colspan="3" class="small">Bu tutanak oluşturulduğunda kayıtlı işletme yoktu.</td></tr>`;
+  const sirkuOptions = S.imzaSirkuleri.map(im => `<option value="${im.id}">${escHtml(im.adSoyad)} — ${escHtml(im.unvan)}</option>`).join("");
+  const katilimciRows = t.katilimcilar.map(kt => `
+    <tr>
+      <td class="no-print"><input type="text" value="${escHtml(kt.ad)}" style="width:100%" onchange="ibtKatilimciGuncelle('${t.id}','${kt.id}','ad',this.value)"></td>
+      <td class="print-only-cell">${escHtml(kt.ad)}</td>
+      <td class="no-print"><input type="text" value="${escHtml(kt.unvan)}" style="width:100%" onchange="ibtKatilimciGuncelle('${t.id}','${kt.id}','unvan',this.value)"></td>
+      <td class="print-only-cell">${escHtml(kt.unvan)}</td>
+      <td class="print-only" style="width:90px;">İmza</td>
+      <td class="no-print"><button class="btn danger" onclick="ibtKatilimciSil('${t.id}','${kt.id}')">Sil</button></td>
+    </tr>`).join("");
+  return `
+  <div class="card no-print" style="margin-bottom:10px;">
+    <div class="row" style="flex-wrap:wrap;">
+      <div><label class="small">Tarih</label><input type="text" placeholder="gg.aa.yyyy" value="${escHtml(t.tarih)}" style="width:120px" onchange="updateIsletmeBelirlemeAlan('${t.id}','tarih',this.value)"></div>
+      <div><label class="small">Öğretim Yılı</label><input type="text" value="${escHtml(t.ogretimYili)}" style="width:120px" onchange="updateIsletmeBelirlemeAlan('${t.id}','ogretimYili',this.value)"></div>
+    </div>
+  </div>
+  <div style="text-align:center;margin-bottom:12px;">
+    <div style="font-weight:700;">${escHtml((k.okulAdi || "").toLocaleUpperCase("tr-TR"))}</div>
+    <div style="font-weight:700;">İŞLETME BELİRLEME KOMİSYONU KARAR TUTANAĞI</div>
+  </div>
+  <p class="small" style="margin-bottom:10px;"><b>Tarih:</b> ${escHtml(t.tarih || '-')} &nbsp;&nbsp; <b>Öğretim Yılı:</b> ${escHtml(t.ogretimYili || '-')}</p>
+  <p class="small" style="margin-bottom:14px;">${escHtml(k.okulAdi)} ${escHtml(k.alanAdi)} öğrencilerinin ${escHtml(t.ogretimYili)} eğitim-öğretim yılında işletmelerde mesleki eğitim/staj eğitimi görecekleri işletmeler, Millî Eğitim Bakanlığı Ortaöğretim Kurumları Yönetmeliği'nin 142. maddesi hükmü uyarınca komisyonumuzca incelenmiş olup, aşağıda adı ve adresi yazılı işletmelerin bu eğitim için uygun olduğuna komisyonumuzca oybirliği ile karar verilmiştir.</p>
+  <table style="margin-bottom:16px;"><thead><tr><th style="width:36px;">No</th><th>İşletme Adı</th><th>Adresi</th></tr></thead><tbody>${isletmeRows}</tbody></table>
+  <h3>Komisyon Üyeleri</h3>
+  <table><thead><tr><th>Ad Soyad</th><th>Unvan</th><th class="print-only">İmza</th><th class="no-print"></th></tr></thead>
+  <tbody>${katilimciRows || `<tr><td colspan="4" class="small">Henüz komisyon üyesi eklenmedi.</td></tr>`}</tbody></table>
+  <div class="row no-print" style="margin-top:8px;align-items:center;">
+    <button class="btn" onclick="ibtKatilimciEkle('${t.id}')">Üye Ekle</button>
+    ${S.imzaSirkuleri.length ? `
+    <select onchange="if(this.value){ibtKatilimciSirkudenEkle('${t.id}', this.value); this.value='';}">
+      <option value="">İmza Sirkülerinden Ekle...</option>
+      ${sirkuOptions}
+    </select>` : `<span class="small">İmza Sirküsü boş — Ayarlar'dan ekleyebilirsiniz.</span>`}
   </div>`;
+}
+function renderIsletmeBelirlemeKarti() {
+  const entries = S.isletmeBelirlemeTutanaklari.slice().sort((a, b) => (b.tarih || "").localeCompare(a.tarih || ""));
+  if (entries.length && !entries.some(e => e.id === activeIsletmeBelirlemeTutanakId)) activeIsletmeBelirlemeTutanakId = entries[0].id;
+  if (!entries.length) activeIsletmeBelirlemeTutanakId = null;
+  const active = isletmeBelirlemeTutanagiById(activeIsletmeBelirlemeTutanakId);
+  const listHtml = entries.length === 0 ? "" : `
+    <div class="row no-print" style="flex-wrap:wrap;">
+      ${sekmeDropdown("ibt", entries.map(e => ({ value: e.id, label: (e.ogretimYili || "?") + (e.tarih ? " · " + e.tarih : "") })), activeIsletmeBelirlemeTutanakId, "selectIsletmeBelirlemeTutanagi('{v}')")}
+    </div>`;
+  const dosyaAdi = active ? "İşletme Belirleme Komisyon Tutanağı - " + (active.ogretimYili || "") : "İşletme Belirleme Komisyon Tutanağı";
+  return `
+  <div class="card no-print" style="margin-top:16px;">
+    <h2>İşletme Belirleme Komisyon Tutanağı</h2>
+    <p class="small">Yıl başında hangi işletmelerin staj için onaylandığını gösteren resmî tutanak. Oluşturduğunuzda, o anki işletme listesi (ad+adres) donmuş bir kopya olarak bu tutanağa kaydedilir — daha sonra işletme listeniz değişse de bu tutanağın içeriği değişmez.</p>
+    <div class="row">
+      <button class="btn primary" onclick="addIsletmeBelirlemeTutanagi()">Yeni Tutanak Oluştur</button>
+      ${active ? `<button class="btn danger" onclick="deleteIsletmeBelirlemeTutanagi('${active.id}')">Bu Tutanağı Sil</button>` : ""}
+    </div>
+    ${active ? belgeAracCubugu(dosyaAdi) : ""}
+    ${listHtml}
+  </div>
+  ${active ? `<div class="print-area"><div class="card">${renderIsletmeBelirlemeDetay(active)}</div></div>` : ""}`;
 }
 /* -- Sekme 5: Sonuç / Yerleştirme (çıktı) -- */
 function viewStajSonuc() {
