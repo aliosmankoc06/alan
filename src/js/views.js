@@ -7020,10 +7020,25 @@ function saveTeacherEdit(id) {
 }
 function deleteTeacher(id) {
   if (!confirm("Bu öğretmeni silmek istiyor musunuz?")) return;
-  S.teachers = S.teachers.filter(t => t.id !== id);
+  const t = teacherById(id);
+  // Bu öğretmen bazı derslerde TEK yetkili öğretmen olarak kilitlenmişse,
+  // silme sonrası o dersin öğretmen havuzu sessizce boşalır ve kullanıcı
+  // "Programı Dağıt" yapınca nedenini asla anlamaz — önceden tespit edip
+  // açıkça bildiriyoruz.
+  const etkilenenDersler = [];
+  S.classes.forEach(cl => cl.assignments.forEach(a => {
+    if ((a.eligibleTeacherIds || []).length === 1 && a.eligibleTeacherIds[0] === id) {
+      const course = courseById(a.courseId);
+      etkilenenDersler.push(cl.name + " — " + (course ? course.name : "?"));
+    }
+  }));
+  S.teachers = S.teachers.filter(x => x.id !== id);
   S.classes.forEach(cl => cl.assignments.forEach(a => { if (a.eligibleTeacherIds) a.eligibleTeacherIds = a.eligibleTeacherIds.filter(x => x !== id); }));
   Object.keys(S.schedule).forEach(k => { S.schedule[k].teacherIds = S.schedule[k].teacherIds.filter(x => x !== id); });
   save(); renderMain();
+  if (etkilenenDersler.length) {
+    alert(`"${t ? t.name : 'Öğretmen'}" silindi.\n\nŞu ders(ler) bu öğretmene özel kilitliydi, artık hiçbir öğretmene atanmamış durumda — Sınıflar ve Ders Atama'dan yeniden öğretmen seçmeniz gerekiyor, yoksa dağıtımda bu dersler atlanır:\n\n` + etkilenenDersler.join("\n"));
+  }
 }
 
 /* ---- Sınıflar ve Ders Atama ---- */
