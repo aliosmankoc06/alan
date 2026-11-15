@@ -468,7 +468,7 @@ function viewStajOgrenciler() {
         <td>${st.dal || ''}</td>
         <td class="no-print"><div class="row" style="margin:0;"><button class="btn" onclick="editStudent('${st.id}')">Düzenle</button><button class="btn danger" onclick="deleteStudent('${st.id}')">Sil</button></div></td>
       </tr>`).join("");
-    return `<div class="card"><h2 style="margin-top:0;">${escHtml(sinif)}</h2><table><tr><th>Okul No</th><th>Ad Soyad</th><th>Dal</th><th class="no-print"></th></tr>${rows}</table></div>`;
+    return `<div class="card"><div class="row no-print" style="justify-content:space-between;align-items:center;margin-top:0;"><h2 style="margin:0;">${escHtml(sinif)}</h2><button class="btn danger" onclick="deleteStajSinifi('${jsq(sinif)}')">Bu Sınıfı Topluca Sil</button></div><h2 class="print-only" style="margin-top:0;">${escHtml(sinif)}</h2><table><tr><th>Okul No</th><th>Ad Soyad</th><th>Dal</th><th class="no-print"></th></tr>${rows}</table></div>`;
   }).join("") : `<div class="card"><p class="small">Henüz öğrenci eklenmedi.</p></div>`;
 
   return `
@@ -607,7 +607,26 @@ function isletmeTalepHucresiHtml(isl) {
     : (S.students.length ? `<span class="small no-print">Tüm öğrenciler eklendi</span>` : `<span class="small no-print">Önce Öğrenciler sekmesinden öğrenci ekleyin</span>`);
   return `<div class="no-print" style="min-width:170px;">${chipler}${ekleDropdown}</div><span class="print-only-inline">${escHtml(liste.join(", ") || "—")}</span>`;
 }
+/* Bu sekmede ÜÇ AYRI belge var (Kontenjanlar, Komisyon Tutanağı, Talep
+   Formu). Yazdırma mekanizması (printCurrentView -> window.print()) sayfa
+   genelinde çalışır: sayfada hangi .print-area'lar varsa HEPSİNİ birden
+   yazdırır. Bu yüzden üçü de aynı anda DOM'da dururSA, biri yazdırılınca
+   üçü de çıkar. Çözüm: activeIsletmeBelge'ye göre HER ZAMAN SADECE BİRİNİN
+   HTML'i üretilir, diğer ikisi sayfada hiç var olmaz (CSS ile gizlemek
+   yetmez, window.print() CSS'i uygular ama DOM'da olanı yine de basar). */
+let activeIsletmeBelge = "kontenjan";
+function setIsletmeBelge(id) { activeIsletmeBelge = id; renderMain(); }
+function isletmeBelgeSeciciBar() {
+  const secenekler = [
+    { id: "kontenjan", label: "İşletme Kontenjanları" },
+    { id: "komisyon-tutanak", label: "İşletme Belirleme Komisyon Tutanağı" },
+    { id: "talep-formu", label: "Öğrenci Talep Formu" }
+  ];
+  return `<div class="row no-print" style="flex-wrap:wrap;">${secenekler.map(s => `<button class="btn ${s.id === activeIsletmeBelge ? 'primary' : ''}" onclick="setIsletmeBelge('${s.id}')">${s.label}</button>`).join("")}</div>`;
+}
 function viewStajKontenjanlar() {
+  if (activeIsletmeBelge === "komisyon-tutanak") return isletmeBelgeSeciciBar() + renderIsletmeBelirlemeKarti();
+  if (activeIsletmeBelge === "talep-formu") return isletmeBelgeSeciciBar() + renderIsletmeTalepFormuKarti();
   const dallar = [...new Set(S.students.map(s => s.dal).filter(Boolean))];
   const kontenjanRows = S.isletmeler.map(isl => `
     <tr>
@@ -619,6 +638,7 @@ function viewStajKontenjanlar() {
   <div class="card no-print">
     <h2>İşletme Kontenjanları</h2>
     <p class="small">Her işletmenin dal başına kaç öğrenci alabileceğini ve varsa özellikle istediği (isimle talep ettiği) öğrencileri buradan girin. İşletme listesi <b>Koordinatörlük</b> sekmesine eklediğiniz işletmelerden gelir.</p>
+    ${isletmeBelgeSeciciBar()}
     ${belgeAracCubugu("Staj Yerleştirme - İşletme Kontenjanları")}
   </div>
   <div class="print-area">
@@ -627,9 +647,7 @@ function viewStajKontenjanlar() {
       <table><thead><tr><th>İşletme</th>${dallar.map(d => `<th>${escHtml(d)} Kontenjanı</th>`).join("")}<th>Talep Ettiği Öğrenciler</th></tr></thead>
       <tbody>${kontenjanRows}</tbody></table>
     </div>
-  </div>
-  ${renderIsletmeBelirlemeKarti()}
-  ${renderIsletmeTalepFormuKarti()}`;
+  </div>`;
 }
 
 /* ---- İşletme Belirleme Komisyon Tutanağı ----
@@ -1317,6 +1335,12 @@ function addStudent() {
 function deleteStudent(id) {
   if (!confirm("Bu öğrenciyi listeden silmek istiyor musunuz?")) return;
   S.students = S.students.filter(s => s.id !== id);
+  save(); renderMain();
+}
+function deleteStajSinifi(sinif) {
+  const sayisi = S.students.filter(s => (s.sinif || "—") === sinif).length;
+  if (!confirm(`"${sinif}" sınıfındaki ${sayisi} öğrenci Staj Yerleştirme listesinden topluca silinsin mi? Bu işlem geri alınamaz.`)) return;
+  S.students = S.students.filter(s => (s.sinif || "—") !== sinif);
   save(); renderMain();
 }
 function editStudent(id) {

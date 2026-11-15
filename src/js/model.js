@@ -859,6 +859,29 @@ function normalizeState(s) {
       if (st.okulNo) mevcutOkulNolar.add(st.okulNo);
     });
   }
+  // Bir kerelik temizlik: Staj Yerleştirme (S.students) kullanıcının KENDİ
+  // seçtiği (gelecek yıl planlanan, örn. 11. sınıf) öğrenciler için — gerçek
+  // 12. sınıf stajyerleri (işletmesi atanmış olsun ya da olmasın, hepsi) artık
+  // Stajda Olan Öğrenciler'de takip ediliyor, burada durmasının bir anlamı
+  // yok ve kullanıcı için kafa karıştırıcı. Hiçbir veri kaybolmaz: zaten
+  // yukarıdaki kopyalamayla Stajda Olan Öğrenciler'de var; henüz orada
+  // olmayan (örn. işletmesi hiç atanmamış) 12. sınıf kayıtları da şimdi oraya
+  // taşınır. 9/10/11. sınıf ya da sınıf adı ayrıştırılamayan kayıtlara hiç
+  // dokunulmaz — kullanıcının kendi eklediği/planladığı öğrenciler olabilir.
+  if (!s.stajYerlestirmeEskiStajyerlerTemizlendi) {
+    s.stajYerlestirmeEskiStajyerlerTemizlendi = true;
+    const stajdakiOkulNolar = new Set(s.stajdakiOgrenciler.map(st => st.okulNo).filter(Boolean));
+    s.students = s.students.filter(st => {
+      if (sinifAdiGradeCikar(st.sinif) !== 12) return true;
+      if (st.okulNo && stajdakiOkulNolar.has(st.okulNo)) return false;
+      s.stajdakiOgrenciler.push({
+        id: uid("sdo"), sinif: st.sinif || "", okulNo: st.okulNo || "", ad: st.ad || "",
+        dal: st.dal || "", isletme: st.isletme || "", sorumluOgretmenId: "", devamsizlik: {}, notFisi: {}
+      });
+      if (st.okulNo) stajdakiOkulNolar.add(st.okulNo);
+      return false;
+    });
+  }
   if (s.coordAssignments.length > 0 || s.classes.some(c => c.id && c.id.startsWith("koord-"))) {
     s.coordAssignments = [];
     s.classes = s.classes.filter(c => !(c.id && c.id.startsWith("koord-")));
