@@ -4013,7 +4013,9 @@ function saveNewBakimKarti() {
   const makineId = document.getElementById("bk-makine").value;
   const tur = document.getElementById("bk-tur").value;
   const ay = document.getElementById("bk-ay").value.trim();
-  const kart = { id: uid("bk"), makineId, tur, ay, imzaOgretmeni: "", durumlar: {}, tarihler: {}, aciklama: "" };
+  const bugun = new Date();
+  const olusturmaTarihi = String(bugun.getDate()).padStart(2, "0") + "." + String(bugun.getMonth() + 1).padStart(2, "0") + "." + bugun.getFullYear();
+  const kart = { id: uid("bk"), makineId, tur, ay, olusturmaTarihi, imzaOgretmeni: "", durumlar: {}, tarihler: {}, aciklama: "" };
   S.bakimKartlari.push(kart);
   activeBakimKartId = kart.id;
   save(); closeModal(); renderMain();
@@ -4081,6 +4083,7 @@ function renderBakimKartiDetay(kart) {
     <h2 style="margin:0 0 2px 0;">${escHtml(tanim.baslik)}</h2>
     <p class="small" style="margin:0;">MAKİNE: <b>${escHtml(makine ? makine.ad : "?")}</b>${makine && makine.lab ? " · " + escHtml(makine.lab) : ""}</p>
     <p class="small" style="margin:0;">${escHtml(tanim.not)}</p>
+    <p class="small" style="margin:2px 0 0 0;">Kartın Oluşturulma Tarihi: <b>${escHtml(kart.olusturmaTarihi || "—")}</b></p>
     <div class="row no-print" style="margin-top:6px;max-width:260px;"><label class="small" style="white-space:nowrap;">Ay:</label><input type="text" style="width:100%" value="${escHtml(kart.ay)}" onchange="updateBakimKartiAy('${kart.id}',this.value)"></div>
     <p class="small print-only-cell" style="margin:4px 0 0 0;">AY: ${escHtml(kart.ay || '—')}</p>
   </div>
@@ -4135,6 +4138,75 @@ function viewBakimFormuBolumu() {
   <div class="print-area">
     ${belgeYazdirmaBasligi(dosyaAdi)}
     ${content}
+  </div>`;
+}
+
+/* ---- Bakım Yapılan Tezgahlar: makine bazlı bakım kartı geçmişi ---- */
+let activeBakimGecmisiMakineId = "__ALL__";
+function setBakimGecmisiMakine(id) { activeBakimGecmisiMakineId = id; renderMain(); }
+function acBakimKartindan(kartId) {
+  activeEnvanterTab = "bakim-formu";
+  activeBakimKartId = kartId;
+  renderMain();
+}
+function bakimKartiSorunSayisi(kart) {
+  return Object.values(kart.durumlar).filter(kod => kod && kod !== "ok").length;
+}
+function viewBakimGecmisiBolumu() {
+  const makineler = S.envanter.makineler.slice().sort((a, b) => (a.lab || "").localeCompare(b.lab || "", "tr") || (a.ad || "").localeCompare(b.ad || "", "tr"));
+  if (activeBakimGecmisiMakineId !== "__ALL__" && !makineler.some(m => m.id === activeBakimGecmisiMakineId)) activeBakimGecmisiMakineId = "__ALL__";
+  const kartlarByMakine = id => S.bakimKartlari.filter(k => k.makineId === id);
+
+  if (activeBakimGecmisiMakineId === "__ALL__") {
+    const rows = makineler.map(m => {
+      const kartlar = kartlarByMakine(m.id);
+      const sonTarih = kartlar.map(k => k.olusturmaTarihi).filter(Boolean).sort().slice(-1)[0];
+      const sorunluKartSayisi = kartlar.filter(k => bakimKartiSorunSayisi(k) > 0).length;
+      return `<tr>
+        <td>${escHtml(m.ad)}</td>
+        <td>${escHtml(m.lab || "—")}</td>
+        <td style="text-align:center;">${kartlar.length}</td>
+        <td style="text-align:center;">${sonTarih || "—"}</td>
+        <td style="text-align:center;">${sorunluKartSayisi ? `<span class="pill warn">${sorunluKartSayisi}</span>` : "0"}</td>
+        <td><button class="btn" onclick="setBakimGecmisiMakine('${m.id}')">Bakım Kayıtlarını Gör</button></td>
+      </tr>`;
+    }).join("");
+    return `
+    <div class="card no-print">
+      <h2>Bakım Yapılan Tezgahlar</h2>
+      <p class="small">Her makine için oluşturulmuş bakım kartlarının sayısını, son bakım tarihini ve sorun tespit edilen kart sayısını buradan görebilirsiniz. Detay için bir makineye tıklayın.</p>
+      <div style="overflow-x:auto;">
+      <table><thead><tr><th>Makine</th><th>Laboratuvar/Atölye</th><th>Bakım Kartı Sayısı</th><th>Son Bakım Tarihi</th><th>Sorunlu Kart</th><th></th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="6" class="small">Henüz makine eklenmedi.</td></tr>`}</tbody></table>
+      </div>
+    </div>`;
+  }
+
+  const m = makineById(activeBakimGecmisiMakineId);
+  const kartlar = kartlarByMakine(m.id).slice().sort((a, b) => (a.olusturmaTarihi || "").localeCompare(b.olusturmaTarihi || ""));
+  const rows = kartlar.map(k => {
+    const tanim = BAKIM_FORMU_TURLERI[k.tur];
+    const sorun = bakimKartiSorunSayisi(k);
+    return `<tr>
+      <td>${tanim ? escHtml(tanim.label) : escHtml(k.tur)}</td>
+      <td>${escHtml(k.ay || "—")}</td>
+      <td>${escHtml(k.olusturmaTarihi || "—")}</td>
+      <td>${escHtml(k.imzaOgretmeni || "—")}</td>
+      <td style="text-align:center;">${sorun ? `<span class="pill warn">${sorun}</span>` : "0"}</td>
+      <td><button class="btn" onclick="acBakimKartindan('${k.id}')">Kartı Aç</button></td>
+    </tr>`;
+  }).join("");
+  return `
+  <div class="card no-print">
+    <div class="row" style="justify-content:space-between;align-items:center;">
+      <h2 style="margin:0;">Bakım Yapılan Tezgahlar — ${escHtml(m.ad)}</h2>
+      <button class="btn" onclick="setBakimGecmisiMakine('__ALL__')">◀ Tezgah Listesine Dön</button>
+    </div>
+    <p class="small">${escHtml(m.lab || "")}</p>
+    <div style="overflow-x:auto;">
+    <table><thead><tr><th>Bakım Türü</th><th>Ay</th><th>Oluşturulma Tarihi</th><th>İmza Atacak Öğretmen</th><th>Sorunlu Madde</th><th></th></tr></thead>
+    <tbody>${rows || `<tr><td colspan="6" class="small">Bu makine için henüz bakım kartı oluşturulmadı.</td></tr>`}</tbody></table>
+    </div>
   </div>`;
 }
 
@@ -4341,6 +4413,7 @@ function renderMakineDetay(m) {
   const bakimTablo = renderMakineLogTablosu(m.id, "bakimKayitlari",
     [{ key: "tarih", label: "Tarih" }, { key: "tip", label: "Bakım Tipi" }, { key: "islemler", label: "Yapılan İşlemler", type: "textarea" }, { key: "sonuc", label: "Sonuç" }, { key: "yapan", label: "Yapan" }],
     m.bakimKayitlari, "Periyodik Bakım Kayıtları", "addBakim");
+  const bakimFormuNotu = `<p class="small no-print" style="margin:-4px 0 10px 0;">Not: Yukarıdaki serbest "Periyodik Bakım Kayıtları" tablosu ile <b>Atölye Envanter → Bakım Formu</b> sekmesindeki Günlük/Haftalık/6 Aylık bakım kartları birbirinden tamamen bağımsızdır — biri diğerine otomatik kaydolmaz. Bakım kartlarının bu makineye ait geçmişini görmek için <b>Bakım Yapılan Tezgahlar</b> sekmesini kullanın.</p>`;
   const parcaTablo = renderMakineLogTablosu(m.id, "yedekParcalar",
     [{ key: "parcaAdi", label: "Parça Adı" }, { key: "parcaKodu", label: "Parça Kodu" }, { key: "miktar", label: "Miktar" }, { key: "minStok", label: "Min. Stok" }, { key: "tedarikci", label: "Tedarikçi" }],
     m.yedekParcalar, "Yedek Parça Listesi", "addParca");
@@ -4352,7 +4425,7 @@ function renderMakineDetay(m) {
     ["acilDurum", "Acil Durum İletişim Bilgileri"]
   ].map(([field, label]) => talimatBlok(m, field, label)).join("");
 
-  return genel + arizaTablo + onarimTablo + bakimTablo + parcaTablo + talimatBaslik + talimatIcerik;
+  return genel + arizaTablo + onarimTablo + bakimTablo + bakimFormuNotu + parcaTablo + talimatBaslik + talimatIcerik;
 }
 function renderMakineOzetTablosu(list) {
   const rows = list.map((m, i) => `
@@ -4437,6 +4510,7 @@ function viewMakinelerBolumu() {
     <div class="row">
       <button class="btn primary" onclick="addMakine()">Makine Ekle</button>
       <button class="btn" onclick="importEnvanterFromExcel()">Excel Yükle</button>
+      ${active ? `<button class="btn" onclick="selectMakine('__ALL__')">◀ Listeye Dön</button>` : ""}
       ${active ? `<button class="btn danger" onclick="deleteMakine('${active.id}')">Bu Makineyi Sil</button>` : ""}
     </div>
     ${belgeAracCubugu(dosyaAdi)}
@@ -4663,11 +4737,13 @@ function viewAtolyeEnvanter() {
   const tabs = [
     { id: "makineler", label: "Makine Envanteri" },
     { id: "bakim-formu", label: "Bakım Formu" },
+    { id: "bakim-gecmisi", label: "Bakım Yapılan Tezgahlar" },
     { id: "durum-tespit", label: "Durum Tespit Formları" }
   ];
   const tabBar = `<div class="row no-print" style="flex-wrap:wrap;">${tabs.map(t => `<button class="btn ${t.id === activeEnvanterTab ? 'primary' : ''}" onclick="setEnvanterTab('${t.id}')">${escHtml(t.label)}</button>`).join("")}</div>`;
   const body = activeEnvanterTab === "durum-tespit" ? viewDurumTespitBolumu()
     : activeEnvanterTab === "bakim-formu" ? viewBakimFormuBolumu()
+    : activeEnvanterTab === "bakim-gecmisi" ? viewBakimGecmisiBolumu()
     : viewMakinelerBolumu();
   return tabBar + body;
 }

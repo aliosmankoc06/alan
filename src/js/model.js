@@ -332,6 +332,7 @@ function normalizeState(s) {
     if (typeof k.aciklama !== "string") k.aciklama = "";
     if (typeof k.imzaOgretmeni !== "string") k.imzaOgretmeni = "";
     if (typeof k.ay !== "string") k.ay = "";
+    if (typeof k.olusturmaTarihi !== "string") k.olusturmaTarihi = "";
   });
   if (typeof s.eskiSistemKaldirildi !== "boolean") s.eskiSistemKaldirildi = false;
   if (s.akademikTakvim === undefined) s.akademikTakvim = null;
