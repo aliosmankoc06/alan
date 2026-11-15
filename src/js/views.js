@@ -6774,9 +6774,10 @@ function updateCourseCode(id, value) {
   save();
 }
 function deleteCourse(id) {
-  if (!confirm("Bu dersi ders havuzundan silmek istiyor musunuz? (Sınıflara yapılmış atamalar da etkilenir)")) return;
+  if (!confirm("Bu dersi ders havuzundan silmek istiyor musunuz? (Sınıflara yapılmış atamalar ve bu derse ait, programa zaten dağıtılmış saatler de kaldırılır)")) return;
   S.courses = S.courses.filter(c => c.id !== id);
   S.classes.forEach(cl => { cl.assignments = cl.assignments.filter(a => a.courseId !== id); });
+  Object.keys(S.schedule).forEach(k => { if (S.schedule[k].courseId === id) delete S.schedule[k]; });
   save(); renderMain();
 }
 function editCourse(id) {
