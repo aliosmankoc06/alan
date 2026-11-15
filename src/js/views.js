@@ -6543,8 +6543,16 @@ function updateOdaAdi(id, value) {
   save(); renderMain();
 }
 function deleteOda(id) {
-  if (!confirm("Bu laboratuvar/atölye silinsin mi? Bu adı zaten kullanan makine/form kayıtları etkilenmez, sadece listeden kaldırılır.")) return;
+  if (!confirm("Bu laboratuvar/atölye silinsin mi? Makine/Durum Tespit kayıtlarındaki isim etkilenmez (orada ad olarak saklanır). Ancak bu mekan Ders Programı'nda bir derse seçiliyse, o seçim de kaldırılır.")) return;
   S.rooms = S.rooms.filter(x => x.id !== id);
+  S.classes.forEach(cls => {
+    (cls.assignments || []).forEach(a => {
+      if (Array.isArray(a.roomIds)) a.roomIds = a.roomIds.filter(rid => rid !== id);
+    });
+  });
+  Object.values(S.schedule).forEach(cell => {
+    if (Array.isArray(cell.roomIds)) cell.roomIds = cell.roomIds.filter(rid => rid !== id);
+  });
   save(); renderMain();
 }
 function renderImzaSirkuleriKarti() {
