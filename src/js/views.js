@@ -53,7 +53,8 @@ const STAJ_TAKIP_TABS = [
 ];
 const TOPLANTI_TABS = [
   { id: "okul", label: "Okul Zümresi", icon: "users" },
-  { id: "il", label: "İl Zümresi", icon: "building" }
+  { id: "il", label: "İl Zümresi", icon: "building" },
+  { id: "rehberlik-raporu", label: "Rehberlik Faaliyet Raporu", icon: "clipboardCheck" }
 ];
 let activeModule = "ana";
 let activeTab = "havuz";
@@ -190,7 +191,9 @@ function renderMain() {
   if (activeModule === "ogrenci-listesi") { el.innerHTML = viewOgrenciListesi(); return; }
   if (activeModule === "norm-kadro") { el.innerHTML = viewNormKadro(); return; }
   if (activeModule === "toplantilar") {
-    el.innerHTML = activeToplantiTab === "il" ? viewPlaceholderModule("İl Zümresi", "İl zümre toplantı tutanaklarınızı buraya birlikte kuracağız.") : viewOkulZumresi();
+    el.innerHTML = activeToplantiTab === "il" ? viewPlaceholderModule("İl Zümresi", "İl zümre toplantı tutanaklarınızı buraya birlikte kuracağız.")
+      : activeToplantiTab === "rehberlik-raporu" ? viewRehberlikFaaliyetRaporu()
+      : viewOkulZumresi();
     return;
   }
   if (activeModule === "staj-yerlestirme") {
@@ -3234,6 +3237,186 @@ const VELI_GUNDEM_STANDART = [
   "Veli görüş, öneri ve talepleri",
   "Dilek, temenniler ve kapanış"
 ];
+/* ---- Sınıf Rehberlik Faaliyet Raporu ----
+   Gönderilen gerçek "Sınıf Rehberlik Faaliyet Raporu" (1. ve 2. Dönem)
+   örneklerinden (10-A sınıfı, 2025-2026) alınan AY/HAFTA/KAZANIM tablosu.
+   Bu MEB sınıf rehberlik programının haftalık kazanım sırası — gerçekte
+   bulunan tek örnek 10. sınıfa ait olduğu için, diğer sınıflar için de
+   BAŞLANGIÇ ŞABLONU olarak kullanılır ama her hücre serbestçe
+   düzenlenebilir (farklı sınıf/yıl için kazanım farklıysa elle
+   düzeltilsin diye asla salt-okunur yapılmadı). */
+const REHBERLIK_KAZANIM_SABLONU = {
+  "1": [
+    { ay: "EYLÜL", hafta: 1, kazanim: "" },
+    { ay: "EYLÜL", hafta: 2, kazanim: "Okul içinde ve dışında eğitsel ve sosyal etkinliklere katılmanın gelişimine katkılarını değerlendirir." },
+    { ay: "EYLÜL", hafta: 3, kazanim: "Okul içinde ve dışında etkinliklere katılırken ilgi ve yeteneklerini dikkate alır." },
+    { ay: "EYLÜL", hafta: 4, kazanim: "Alan/Bölüm/Dal/ders seçiminde ilgi yeteneklerini dikkate alır." },
+    { ay: "EYLÜL", hafta: 5, kazanim: "" },
+    { ay: "EKİM", hafta: 1, kazanim: "Yaşamındaki karar verme sürecini etkileyen faktörleri açıklar." },
+    { ay: "EKİM", hafta: 2, kazanim: "Karar verme basamaklarını kullanır." },
+    { ay: "EKİM", hafta: 3, kazanim: "Öğrenme ve verimli çalışma stratejilerini açıklar." },
+    { ay: "EKİM", hafta: 4, kazanim: "Öğrenme ve verimli çalışma stratejilerini açıklar." },
+    { ay: "EKİM", hafta: 5, kazanim: "Hatırlamayı zorlaştıran ve unutmaya neden olan faktörleri açıklar." },
+    { ay: "KASIM", hafta: 1, kazanim: "Sınıf Risk Haritasının oluşturulması." },
+    { ay: "KASIM", hafta: 2, kazanim: "Ara Tatili" },
+    { ay: "KASIM", hafta: 3, kazanim: "Öğrenme ve verimli çalışma stratejilerini kullanma açısından kendisini değerlendirir." },
+    { ay: "KASIM", hafta: 4, kazanim: "Kısa ve uzun vadeli kariyer amaçlarını belirler." },
+    { ay: "KASIM", hafta: 5, kazanim: "" },
+    { ay: "ARALIK", hafta: 1, kazanim: "Kısa ve uzun vadeli kariyer amaçlarını belirler." },
+    { ay: "ARALIK", hafta: 2, kazanim: "Akademik amaçlarıyla seçmek istediği kariyerlerin gerektirdiği akademik koşullar arasında bağ kurar." },
+    { ay: "ARALIK", hafta: 3, kazanim: "Beden imgesini etkileyen faktörler açısından kendini değerlendirir." },
+    { ay: "ARALIK", hafta: 4, kazanim: "Gelişim dönemi ile duygusal dalgalanmaları arasında bağ kurar." },
+    { ay: "ARALIK", hafta: 5, kazanim: "Kariyer beklentileri ile kariyer amaçlarını karşılaştırır." },
+    { ay: "OCAK", hafta: 1, kazanim: "Kariyer beklentileri ile kariyer amaçlarını karşılaştırır." },
+    { ay: "OCAK", hafta: 2, kazanim: "Kariyer karar verme süreçlerinde kendi görüşleri ile aile ve yakın çevresinin görüşlerini karşılaştırır." },
+    { ay: "OCAK", hafta: 3, kazanim: "Derslerin mesleklerle ilişkisini açıklar." },
+    { ay: "OCAK", hafta: 4, kazanim: "Yarıyıl tatili" },
+    { ay: "OCAK", hafta: 5, kazanim: "" }
+  ],
+  "2": [
+    { ay: "ŞUBAT", hafta: 1, kazanim: "Ders/alan/dal seçerken karar verme becerisini kullanır." },
+    { ay: "ŞUBAT", hafta: 2, kazanim: "Kariyer hazırlığı sürecinde belirlediği amaçlar doğrultusunda alan/dal/ders seçimi yapar." },
+    { ay: "ŞUBAT", hafta: 3, kazanim: "Eğitsel çabanın akademik hedeflere ulaşmadaki etkisini değerlendirir." },
+    { ay: "ŞUBAT", hafta: 4, kazanim: "Sosyal ipuçlarını yorumlayarak uygun tepkiler verir." },
+    { ay: "ŞUBAT", hafta: 5, kazanim: "" },
+    { ay: "MART", hafta: 1, kazanim: "Sahip olduğu karakter güçlerini geliştirmek için çaba gösterir." },
+    { ay: "MART", hafta: 2, kazanim: "Yaşamda karşılaşılan zorlukların çaba ve zaman ile üstesinden gelebileceğini fark eder." },
+    { ay: "MART", hafta: 3, kazanim: "Ara Tatili" },
+    { ay: "MART", hafta: 4, kazanim: "Yaşamda karşılaşılan zorlukların çaba ve zaman ile üstesinden gelebileceğini fark eder." },
+    { ay: "MART", hafta: 5, kazanim: "" },
+    { ay: "NİSAN", hafta: 1, kazanim: "Çatışma çözme becerilerini kullanır." },
+    { ay: "NİSAN", hafta: 2, kazanim: "İyilik haline ilişkin edindiği bilgileri yaşamında uygulamayı alışkanlık haline getirir." },
+    { ay: "NİSAN", hafta: 3, kazanim: "Bilişim teknolojileri kullanımında kendini yönetir." },
+    { ay: "NİSAN", hafta: 4, kazanim: "Yerel ve küresel sorunları fark eder." },
+    { ay: "NİSAN", hafta: 5, kazanim: "Öğrenme ortamlarındaki duygularını düzenler." },
+    { ay: "MAYIS", hafta: 1, kazanim: "Gerektiğinde arkadaşlığını sonlandırır." },
+    { ay: "MAYIS", hafta: 2, kazanim: "" },
+    { ay: "MAYIS", hafta: 3, kazanim: "Gerektiğinde arkadaşlığını sonlandırır." },
+    { ay: "MAYIS", hafta: 4, kazanim: "" },
+    { ay: "MAYIS", hafta: 5, kazanim: "" },
+    { ay: "HAZİRAN", hafta: 1, kazanim: "Takım çalışmalarının kişisel gelişimine olan etkilerini fark eder." },
+    { ay: "HAZİRAN", hafta: 2, kazanim: "Kişisel hakların korunması ve kişisel güvenliğin sağlanması için yönergeleri izlemeyi alışkanlık haline getirir." },
+    { ay: "HAZİRAN", hafta: 3, kazanim: "Doğal yaşamı korumak için duyarlı davranır." },
+    { ay: "HAZİRAN", hafta: 4, kazanim: "Sınıf rehberlik programı etkinliklerine/yaşantılarına ilişkin duygu ve düşüncelerini yansıtır." }
+  ]
+};
+function rehberlikRaporuById(id) { return S.rehberlikFaaliyetRaporlari.find(x => x.id === id); }
+let activeRehberlikRaporuId = null;
+function addRehberlikRaporuModal() {
+  const root = document.getElementById("modal-root");
+  root.innerHTML = `
+    <div class="modal-bg" onclick="if(event.target===this) closeModal()">
+      <div class="modal" style="width:380px;">
+        <h3>Yeni Rehberlik Faaliyet Raporu</h3>
+        <label class="small">Sınıf</label>
+        <select id="rfr-sinif" style="width:100%">
+          ${ogrenciListesiSiniflariDalaGore().map(s => `<option value="${escHtml(s)}">${escHtml(s)}</option>`).join("")}
+        </select>
+        <label class="small">Dönem</label>
+        <select id="rfr-donem" style="width:100%"><option value="1">1. Dönem</option><option value="2">2. Dönem</option></select>
+        <div class="row">
+          <button class="btn primary" onclick="saveNewRehberlikRaporu()">Oluştur</button>
+          <button class="btn" onclick="closeModal()">İptal</button>
+        </div>
+      </div>
+    </div>`;
+}
+function saveNewRehberlikRaporu() {
+  const classId = document.getElementById("rfr-sinif").value;
+  const donem = document.getElementById("rfr-donem").value;
+  if (!classId) { alert("Sınıf seçin."); return; }
+  const r = {
+    id: uid("rfr"), classId, donem,
+    ogretimYili: S.akademikTakvim ? S.akademikTakvim.ogretimYili : "",
+    haftalar: (REHBERLIK_KAZANIM_SABLONU[donem] || []).map(h => ({ ay: h.ay, hafta: h.hafta, kazanim: h.kazanim })),
+    veliToplantiSayisi: "", yonlendirilenKizSayisi: "", yonlendirilenErkekSayisi: ""
+  };
+  S.rehberlikFaaliyetRaporlari.push(r);
+  activeRehberlikRaporuId = r.id;
+  save(); closeModal(); renderMain();
+}
+function deleteRehberlikRaporu(id) {
+  if (!confirm("Bu rehberlik faaliyet raporu silinsin mi? Bu işlem geri alınamaz.")) return;
+  S.rehberlikFaaliyetRaporlari = S.rehberlikFaaliyetRaporlari.filter(x => x.id !== id);
+  if (activeRehberlikRaporuId === id) activeRehberlikRaporuId = null;
+  save(); renderMain();
+}
+function selectRehberlikRaporu(id) { activeRehberlikRaporuId = id; renderMain(); }
+function updateRehberlikHaftaKazanim(raporId, index, value) {
+  const r = rehberlikRaporuById(raporId);
+  if (!r || !r.haftalar[index]) return;
+  r.haftalar[index].kazanim = value;
+  save();
+}
+function updateRehberlikAlan(raporId, field, value) {
+  const r = rehberlikRaporuById(raporId);
+  if (r) r[field] = value.trim();
+  save();
+}
+function renderRehberlikRaporuDetay(r) {
+  const k = S.kurumBilgileri;
+  const ayGruplari = [];
+  r.haftalar.forEach((h, i) => {
+    let grup = ayGruplari.find(g => g.ay === h.ay);
+    if (!grup) { grup = { ay: h.ay, satirlar: [] }; ayGruplari.push(grup); }
+    grup.satirlar.push({ ...h, index: i });
+  });
+  const tabloSatirlari = ayGruplari.map(g => g.satirlar.map((s, i) => `
+    <tr>
+      ${i === 0 ? `<td rowspan="${g.satirlar.length}" style="font-weight:600;vertical-align:top;">${escHtml(g.ay)}</td>` : ""}
+      <td style="text-align:center;">${s.hafta}. Hafta</td>
+      <td class="no-print"><input type="text" style="width:100%" value="${escHtml(s.kazanim)}" onchange="updateRehberlikHaftaKazanim('${r.id}',${s.index},this.value)"></td>
+      <td class="print-only-cell">${escHtml(s.kazanim || '—')}</td>
+    </tr>`).join("")).join("");
+  return `
+  <div style="text-align:center;margin-bottom:10px;">
+    <div style="font-weight:700;">${escHtml((k.okulAdi || "").toLocaleUpperCase("tr-TR"))}</div>
+    <div style="font-weight:700;">${escHtml(r.ogretimYili)} EĞİTİM-ÖĞRETİM YILI ${escHtml(r.classId)} SINIFI REHBERLİK ${r.donem}. DÖNEM SONU FAALİYET RAPORU</div>
+  </div>
+  <h3>Yapılan Çalışmalar (Sınıf Rehberlik Kazanımları, Etkinlik, Sunum, Bilgilendirme vs.)</h3>
+  <table><thead><tr><th>Ay</th><th style="width:90px;">Hafta</th><th>Yapılan Çalışma</th></tr></thead><tbody>${tabloSatirlari}</tbody></table>
+  <div class="row no-print" style="margin-top:12px;flex-wrap:wrap;">
+    <div><label class="small">Yapılan Veli Toplantı Sayısı</label><input type="text" style="width:80px" value="${escHtml(r.veliToplantiSayisi)}" onchange="updateRehberlikAlan('${r.id}','veliToplantiSayisi',this.value)"></div>
+    <div><label class="small">Rehberlik Servisine Yönlendirilen Kız</label><input type="text" style="width:80px" value="${escHtml(r.yonlendirilenKizSayisi)}" onchange="updateRehberlikAlan('${r.id}','yonlendirilenKizSayisi',this.value)"></div>
+    <div><label class="small">Erkek</label><input type="text" style="width:80px" value="${escHtml(r.yonlendirilenErkekSayisi)}" onchange="updateRehberlikAlan('${r.id}','yonlendirilenErkekSayisi',this.value)"></div>
+  </div>
+  <p class="small">Yapılan Veli Toplantı Sayısı: ${escHtml(r.veliToplantiSayisi || '—')} &nbsp;&nbsp; Rehberlik Servisine Yönlendirilen Öğrenci Sayısı: Kız: ${escHtml(r.yonlendirilenKizSayisi || '—')} &nbsp; Erkek: ${escHtml(r.yonlendirilenErkekSayisi || '—')}</p>
+  <p class="small" style="margin-top:10px;">Sınıf rehberlik planındaki çalışmalar yapılıp yazılacak. Her dönem sonunda idareye teslim edilecek. 4 hafta süren aylar için 4 hafta, 5 hafta süren aylar için 5 hafta doldurulacak.<br>
+  ı) Sınıfıyla ilgili yürüttüğü rehberlik çalışmalarına ilişkin raporu her dönem sonunda eğitim kurumu müdürüne sunar. (Millî Eğitim Bakanlığı Rehberlik ve Psikolojik Danışma Hizmetleri Yönetmeliği, Sınıf Rehber Öğretmeninin Görevleri)</p>
+  <div style="display:flex;justify-content:space-between;margin-top:24px;flex-wrap:wrap;gap:20px;">
+    <div><div>Sınıf Rehber Öğretmeni</div><div style="margin-top:24px;font-weight:600;">${escHtml(k.alanSefiAdi || "")}</div></div>
+    <div style="text-align:right;"><div>Okul Müdürü</div><div style="margin-top:24px;font-weight:600;">${escHtml(k.mudurAdi || "")}</div></div>
+  </div>`;
+}
+function viewRehberlikFaaliyetRaporu() {
+  const entries = S.rehberlikFaaliyetRaporlari.slice().sort((a, b) => (b.classId || "").localeCompare(a.classId || "") || (a.donem || "").localeCompare(b.donem || ""));
+  if (entries.length && !entries.some(e => e.id === activeRehberlikRaporuId)) activeRehberlikRaporuId = entries[0].id;
+  if (!entries.length) activeRehberlikRaporuId = null;
+  const active = rehberlikRaporuById(activeRehberlikRaporuId);
+  const listHtml = entries.length === 0 ? "" : `
+    <div class="card no-print">
+      <div class="row" style="flex-wrap:wrap;">
+        ${sekmeDropdown("rfr", entries.map(e => ({ value: e.id, label: e.classId + " · " + e.donem + ". Dönem" })), activeRehberlikRaporuId, "selectRehberlikRaporu('{v}')")}
+      </div>
+    </div>`;
+  const dosyaAdi = active ? "Rehberlik Faaliyet Raporu - " + active.classId + " - " + active.donem + ". Dönem" : "Rehberlik Faaliyet Raporu";
+  const content = active ? renderRehberlikRaporuDetay(active) : `<div class="card small" style="text-align:center;padding:30px 20px;">Henüz bir rehberlik faaliyet raporu oluşturulmadı. "Yeni Rapor Oluştur" ile başlayın.</div>`;
+  return `
+  <div class="card no-print">
+    <h2>Sınıf Rehberlik Faaliyet Raporu</h2>
+    <p class="small">Her dönem sonunda sınıf bazında idareye teslim edilen rehberlik faaliyet raporu. Haftalık kazanım listesi, gerçek bir 10. sınıf örneğinden alınan MEB rehberlik programı şablonuyla geliyor — her hücreyi kendi sınıfınıza/yılınıza göre serbestçe düzenleyebilirsiniz.</p>
+    <div class="row">
+      <button class="btn primary" onclick="addRehberlikRaporuModal()">Yeni Rapor Oluştur</button>
+      ${active ? `<button class="btn danger" onclick="deleteRehberlikRaporu('${active.id}')">Bu Raporu Sil</button>` : ""}
+    </div>
+    ${active ? belgeAracCubugu(dosyaAdi) : ""}
+  </div>
+  ${listHtml}
+  <div class="print-area">
+    ${belgeYazdirmaBasligi(dosyaAdi)}
+    <div class="card" style="overflow-x:auto;">${content}</div>
+  </div>`;
+}
 function toplantiById(id) { return S.toplantilar.find(x => x.id === id); }
 function addToplanti() {
   const root = document.getElementById("modal-root");

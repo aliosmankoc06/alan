@@ -159,7 +159,8 @@ function defaultState() {
     ],
     seflikHaftalikSaatOverride: null,
     bakimKartlari: [],
-    isletmeBelirlemeTutanaklari: []
+    isletmeBelirlemeTutanaklari: [],
+    rehberlikFaaliyetRaporlari: []
   };
 }
 
@@ -215,7 +216,8 @@ function emptyState() {
     dalTanimlari: [],
     seflikHaftalikSaatOverride: null,
     bakimKartlari: [],
-    isletmeBelirlemeTutanaklari: []
+    isletmeBelirlemeTutanaklari: [],
+    rehberlikFaaliyetRaporlari: []
   };
 }
 
@@ -303,6 +305,13 @@ function normalizeState(s) {
   s.isletmeBelirlemeTutanaklari.forEach(t => {
     if (!Array.isArray(t.isletmeler)) t.isletmeler = [];
     if (!Array.isArray(t.katilimcilar)) t.katilimcilar = [];
+  });
+  if (!Array.isArray(s.rehberlikFaaliyetRaporlari)) s.rehberlikFaaliyetRaporlari = [];
+  s.rehberlikFaaliyetRaporlari.forEach(r => {
+    if (!Array.isArray(r.haftalar)) r.haftalar = [];
+    if (typeof r.veliToplantiSayisi !== "string") r.veliToplantiSayisi = "";
+    if (typeof r.yonlendirilenKizSayisi !== "string") r.yonlendirilenKizSayisi = "";
+    if (typeof r.yonlendirilenErkekSayisi !== "string") r.yonlendirilenErkekSayisi = "";
   });
   if (!Array.isArray(s.bakimKartlari)) s.bakimKartlari = [];
   s.bakimKartlari.forEach(k => {
