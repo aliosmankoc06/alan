@@ -492,6 +492,7 @@ function normalizeState(s) {
     if (!Array.isArray(top.katilimcilar)) top.katilimcilar = [];
     if (!Array.isArray(top.gorevDagilimi)) top.gorevDagilimi = [];
     if (!Array.isArray(top.gundemMaddeleri)) top.gundemMaddeleri = [];
+    if (!Array.isArray(top.devamsizlikBasariTablosu)) top.devamsizlikBasariTablosu = [];
   });
   if (!s.envanter || typeof s.envanter !== "object") s.envanter = {};
   if (!Array.isArray(s.envanter.makineler)) s.envanter.makineler = [];

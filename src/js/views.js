@@ -3237,6 +3237,30 @@ const VELI_GUNDEM_STANDART = [
   "Veli görüş, öneri ve talepleri",
   "Dilek, temenniler ve kapanış"
 ];
+/* Gönderilen gerçek "9/A Veli Toplantısı Tutanağı" (dönem sonu) örneğinden
+   alınan, kelimesi kelimesine aynı 13 maddelik gündem — yukarıdaki
+   VELI_GUNDEM_STANDART'tan (tanışma/ilk toplantı) farklı olarak, dönem
+   ortası/sonu toplantılarında kullanılan okul güvenliği/disiplin
+   bildirimlerini ve devamsızlık/başarı değerlendirme maddelerini içerir.
+   2. ve 3. maddenin devamsızlık/başarı İÇERİĞİ (gerçek öğrenci adı, gün
+   sayısı, notlar) KASITLI OLARAK buraya kopyalanmadı — bunlar hassas
+   kişisel veri; bunun yerine renderToplantiDetay()'da ayrı, boş/
+   doldurulabilir bir tabloya yönlendirilir (bkz. devamsizlikBasariTablosu). */
+const VELI_DONEM_SONU_GUNDEM_STANDART = [
+  { baslik: "Açılış ve Yoklama", notlar: "Toplantı açılmış ve katılan velilerin yoklaması yapılmıştır. Katılım listesi tutanağa eklenmiştir." },
+  { baslik: "Devamsızlık Durumunun Değerlendirilmesi", notlar: "Velilere devamsızlık sınırları hatırlatılmıştır: Özürsüz devamsızlık en fazla 10 gün, özürlü devamsızlık en fazla 20 gün, toplamda ise 30 gün olup bu sınırı aşan öğrenciler o ders yılını tamamlayamamaktadır. (Aşağıdaki Devamsızlık Durumu tablosuna bakınız.)" },
+  { baslik: "Dönem Ders Başarı Durumunun Değerlendirilmesi", notlar: "Öğrencilerin dönem ders notları incelenmiş, 50 puanın altında kalan dersler başarısız olarak değerlendirilmiştir. (Aşağıdaki Ders Başarı Durumu tablosuna bakınız.)" },
+  { baslik: "Okul Güvenliği İçin Alınan Önlemler Hakkında Bilgilendirme", notlar: "Son dönemde yaşanan hadiseler nedeniyle eğitim kurumlarımızda güvenlik ve disiplin tedbirlerinin yeniden hatırlatılması ve daha sıkı uygulanması zaruri hâle gelmiştir. Bilindiği üzere; başta Millî Eğitim Bakanlığı Ortaöğretim Kurumları Yönetmeliği, Millî Eğitim Bakanlığı Okul Öncesi ve İlköğretim Kurumları Yönetmeliği, Millî Eğitim Bakanlığı Eğitim Kurumları Sosyal Etkinlikler Yönetmeliği ve ilgili genelgeler olmak üzere yürürlükteki mevzuat; okul düzeni, öğrenci davranışları ve güvenlik hususunda açık hükümler içermektedir. Bu çerçevede aşağıda belirtilen hususların istisnasız ve tavizsiz uygulanması gerekmektedir." },
+  { baslik: "Okul Giriş-Çıkış ve Zaman Disiplini", notlar: "Öğrencilerin okula zamanında gelmeleri ve derslere katılmaları zorunludur. Okula giriş-çıkış saatleri dışında izinsiz ayrılmalara kesinlikle müsaade edilmeyecektir. İlk ders yoklamasında devamsızlığı tespit edilen öğrencilerin velileriyle aynı gün nöbetçi idareci tarafından iletişime geçileceği ve devamsızlık gerekçelerinin kayıt altına alınacağı belirtilmiştir." },
+  { baslik: "Kıyafet (Okul Forması) Zorunluluğu", notlar: "Okulumuzda okul kıyafeti zorunludur. Belirlenen kıyafete aykırı durumlarda gerekli uyarılar yapılacak; tekrar eden ihlallerde ilgili mevzuat çerçevesinde işlem tesis edilecektir. Öğrencilerin okul önlüğü veya iş önlüğü ile okula gelmeleri, atölye ve laboratuvar derslerinde koruyucu ekipman kullanmaları zorunludur." },
+  { baslik: "Okula Girişler ve Ziyaretçi Uygulaması", notlar: "Okul ve kurumlarımıza ziyaretçi kabulü sınırlandırılmıştır. Zorunlu hâllerde ve randevu alınarak gelen ziyaretçiler için kimlik kontrolü yapılacak, ziyaret kaydı tutulacak ve görüşmeler kontrollü alanlarda gerçekleştirilecektir. Velilerin çocuklarını okul kapısından teslim etmeleri ve kapıdan almaları gerektiği hatırlatılmıştır." },
+  { baslik: "Öğle Arası ve Okul Dışına Çıkış", notlar: "Öğle aralarında okul bahçe kapıları kapalı tutulacaktır. Okuldan çıkış yalnızca öğrenci velisinin yazılı talebi ve okul idaresinin uygun görmesi hâlinde mümkündür. Bunun dışındaki çıkışlar disiplin ihlali sayılacaktır." },
+  { baslik: "Cep Telefonu ve Dijital Araçların Kullanımı", notlar: "Okul ortamlarında öğrencilerin cep telefonu kullanımı ilgili genelge doğrultusunda sınırlandırılmıştır. Ders saatlerinde cep telefonu kullanımına kesinlikle izin verilmeyecek; ihlallerde gerekli işlemler yapılacaktır." },
+  { baslik: "Okul Çevresi ve Veli Erişim Düzeni", notlar: "Öğrencilerini okula getiren veliler çocuklarını okul kapısından teslim edecek ve aynı şekilde kapıdan teslim alacaktır. Velilerin okul bahçesine girişleri sınırlandırılmıştır. Okul içi alanların yalnızca eğitim faaliyetleri için kullanılacağı ve kontrolsüz kalabalık oluşumuna izin verilmeyeceği belirtilmiştir." },
+  { baslik: "Genel Esas", notlar: "Okulumuzda uygulanan okul kıyafeti zorunluluğu, cep telefonu sınırlaması, giriş-çıkış kuralları ve ziyaretçi düzenlemeleri bir kısıtlama değil; düzen, disiplin ve öğrencilerin güvenliğinin teminatıdır. Velilerimizin bu kuralları tartışma konusu yapmamaları, çocuklarını bu kurallara uygun şekilde yönlendirmeleri ve okul idarelerinin aldığı kararları desteklemeleri beklenmektedir." },
+  { baslik: "Okul-Veli İletişimi ve e-Okul Kullanımı", notlar: "Velilerin e-Okul sistemi üzerinden öğrencilerinin devamsızlık, not ve davranış bilgilerini takip etmeleri gerektiği hatırlatılmıştır. Sınıf öğretmeniyle iletişimin kopmaması ve sorun yaşandığında derhal okula başvurulması istenmiştir." },
+  { baslik: "Dilek ve Temenniler", notlar: "Velilerin soru ve görüşleri dinlenmiştir. Toplantı, tüm katılımcıların dilek ve temennileriyle sona ermiştir." }
+];
 /* ---- Sınıf Rehberlik Faaliyet Raporu ----
    Gönderilen gerçek "Sınıf Rehberlik Faaliyet Raporu" (1. ve 2. Dönem)
    örneklerinden (10-A sınıfı, 2025-2026) alınan AY/HAFTA/KAZANIM tablosu.
@@ -3425,11 +3449,18 @@ function addToplanti() {
       <div class="modal" style="width:420px;">
         <h3>Yeni Toplantı Ekle</h3>
         <label class="small">Toplantı Türü</label>
-        <select id="at-tur" style="width:100%">
+        <select id="at-tur" style="width:100%" onchange="document.getElementById('at-veli-sablon-wrap').style.display = this.value==='veli' ? 'block' : 'none';">
           <option value="sube">Şube Öğretmenler Kurulu</option>
           <option value="zumre">Zümre Toplantısı</option>
           <option value="veli">Veli Toplantısı</option>
         </select>
+        <div id="at-veli-sablon-wrap" style="display:none;">
+          <label class="small">Veli Toplantısı Şablonu</label>
+          <select id="at-veli-sablon" style="width:100%">
+            <option value="ilk">Tanışma / İlk Toplantı</option>
+            <option value="donem-sonu">Dönem Ortası / Sonu Toplantısı (devamsızlık+başarı değerlendirmesi, okul güvenliği bildirimi)</option>
+          </select>
+        </div>
         <label class="small">Başlık</label><input type="text" id="at-baslik" placeholder="örn. 10-A Sınıfı 1. Dönem Şube Öğretmenler Kurulu" style="width:100%">
         <label class="small">Sınıf / Ders (opsiyonel)</label><input type="text" id="at-sinifders" style="width:100%">
         <label class="small">Öğretim Yılı</label><input type="text" id="at-yil" value="${S.akademikTakvim ? S.akademikTakvim.ogretimYili : ''}" style="width:100%">
@@ -3446,7 +3477,10 @@ function saveNewToplanti() {
   const baslik = document.getElementById("at-baslik").value.trim();
   if (!baslik) { alert("Başlık girin."); return; }
   const tur = document.getElementById("at-tur").value;
-  const standart = tur === "sube" ? SUBE_GUNDEM_STANDART : tur === "veli" ? VELI_GUNDEM_STANDART : ZUMRE_GUNDEM_STANDART;
+  const veliSablon = tur === "veli" && document.getElementById("at-veli-sablon") ? document.getElementById("at-veli-sablon").value : "";
+  const standart = tur === "sube" ? SUBE_GUNDEM_STANDART
+    : tur === "veli" ? (veliSablon === "donem-sonu" ? VELI_DONEM_SONU_GUNDEM_STANDART : VELI_GUNDEM_STANDART)
+    : ZUMRE_GUNDEM_STANDART;
   const top = {
     id: uid("top"), tur, baslik,
     sinifVeyaDers: document.getElementById("at-sinifders").value.trim(),
@@ -3454,8 +3488,8 @@ function saveNewToplanti() {
     donem: document.getElementById("at-donem").value.trim(),
     baskan: document.getElementById("at-baskan").value.trim(),
     zumreNo: "", tarih: "", yer: "", saat: "",
-    katilimcilar: [], gorevDagilimi: [],
-    gundemMaddeleri: standart.map(baslik => ({ id: uid("gm"), baslik, notlar: "" }))
+    katilimcilar: [], gorevDagilimi: [], devamsizlikBasariTablosu: [],
+    gundemMaddeleri: standart.map(s => ({ id: uid("gm"), baslik: s.baslik || s, notlar: s.notlar || "" }))
   };
   S.toplantilar.push(top);
   activeToplantiId = top.id;
@@ -3602,6 +3636,55 @@ function removeGundemMaddesi(topId, id) {
   save(); renderMain();
 }
 function selectToplanti(id) { activeToplantiId = id; renderMain(); }
+/* Veli toplantısı (dönem sonu şablonu) için devamsızlık/başarı tablosu —
+   gerçek belgedeki "Normal/Takipte/Dikkat/Sınır Aşıldı" eşiklerini aynen
+   uygular. Öğrenci adları "Sınıftan Doldur" ile S.ogrenciListesi'nden
+   çekilir, gün sayısı/başarısız dersler HER ZAMAN BOŞ gelir — kullanıcı
+   kendi e-Okul verisine göre elle girer, asla tahmin edilmez. */
+function devamsizlikDurumHesapla(gun) {
+  const n = parseFloat(String(gun).replace(",", "."));
+  if (isNaN(n)) return "";
+  if (n >= 30) return "SINIR AŞILDI";
+  if (n >= 25) return "DİKKAT";
+  if (n >= 20) return "TAKİPTE";
+  return "Normal";
+}
+function toplantiSinifSinaDoldur(topId) {
+  const top = toplantiById(topId);
+  if (!top) return;
+  if (!top.sinifVeyaDers) { alert("Önce \"Bilgileri Düzenle\"den Sınıf/Ders alanına sınıfı yazın (örn. 9-A)."); return; }
+  const mevcutAdlar = new Set(top.devamsizlikBasariTablosu.map(r => r.ad));
+  const ogrenciler = ogrencilerForSinif(top.sinifVeyaDers);
+  if (!ogrenciler.length) { alert(`Öğrenci Listesi'nde "${top.sinifVeyaDers}" sınıfına ait kayıt bulunamadı.`); return; }
+  let eklenen = 0;
+  ogrenciler.forEach(o => {
+    const ad = (o.ad + " " + o.soyad).trim();
+    if (mevcutAdlar.has(ad)) return;
+    top.devamsizlikBasariTablosu.push({ id: uid("dbt"), ad, gun: "", basarisizDersler: "" });
+    mevcutAdlar.add(ad);
+    eklenen++;
+  });
+  save(); renderMain();
+  alert(eklenen ? `${eklenen} öğrenci eklendi.` : "Eklenecek yeni öğrenci bulunamadı (hepsi zaten listede).");
+}
+function devamsizlikBasariSatirEkle(topId) {
+  const top = toplantiById(topId);
+  if (!top) return;
+  top.devamsizlikBasariTablosu.push({ id: uid("dbt"), ad: "", gun: "", basarisizDersler: "" });
+  save(); renderMain();
+}
+function updateDevamsizlikBasariSatir(topId, id, field, value) {
+  const top = toplantiById(topId);
+  const r = top && top.devamsizlikBasariTablosu.find(x => x.id === id);
+  if (r) r[field] = value;
+  save(); renderMain();
+}
+function removeDevamsizlikBasariSatir(topId, id) {
+  const top = toplantiById(topId);
+  if (!top) return;
+  top.devamsizlikBasariTablosu = top.devamsizlikBasariTablosu.filter(x => x.id !== id);
+  save(); renderMain();
+}
 function renderToplantiDetay(top) {
   const isVeli = top.tur === "veli";
   const katilimciAdPlaceholder = isVeli ? "Veli Adı Soyadı" : "Ad Soyad";
@@ -3625,6 +3708,20 @@ function renderToplantiDetay(top) {
       <td class="print-only-cell">${escHtml(g.sorumluluk)}</td>
       <td class="no-print"><button class="btn danger" onclick="removeGorevSatiri('${top.id}','${g.id}')">Sil</button></td>
     </tr>`).join("");
+  const dbtRows = top.devamsizlikBasariTablosu.map((r, i) => {
+    const durum = devamsizlikDurumHesapla(r.gun);
+    return `<tr>
+      <td>${i + 1}</td>
+      <td class="no-print"><input type="text" value="${escHtml(r.ad)}" style="width:100%" onchange="updateDevamsizlikBasariSatir('${top.id}','${r.id}','ad',this.value)"></td>
+      <td class="print-only-cell">${escHtml(r.ad)}</td>
+      <td class="no-print"><input type="text" value="${escHtml(r.gun)}" style="width:70px;text-align:center;" placeholder="gün" onchange="updateDevamsizlikBasariSatir('${top.id}','${r.id}','gun',this.value)"></td>
+      <td class="print-only-cell" style="text-align:center;">${escHtml(r.gun || '—')}</td>
+      <td class="no-print"><textarea rows="2" style="width:100%;" placeholder="örn. Matematik: 26" onchange="updateDevamsizlikBasariSatir('${top.id}','${r.id}','basarisizDersler',this.value)">${escHtml(r.basarisizDersler)}</textarea></td>
+      <td class="print-only-cell">${escHtml(r.basarisizDersler || '—')}</td>
+      <td class="small" style="text-align:center;font-weight:${durum === 'Normal' || !durum ? '400' : '700'};color:${durum === 'SINIR AŞILDI' ? 'var(--warn)' : durum === 'DİKKAT' ? 'var(--warn)' : durum === 'TAKİPTE' ? 'var(--accent-ink)' : 'inherit'};">${escHtml(durum || '—')}</td>
+      <td class="no-print"><button class="btn danger" onclick="removeDevamsizlikBasariSatir('${top.id}','${r.id}')">Sil</button></td>
+    </tr>`;
+  }).join("");
   const gundemHtml = top.gundemMaddeleri.map((g, i) => `
     <div class="card" style="page-break-inside:avoid;">
       <div class="row" style="justify-content:space-between;align-items:center;margin-top:0;">
@@ -3678,6 +3775,18 @@ function renderToplantiDetay(top) {
     </div>
     <p class="small print-only" style="margin-top:8px;">Toplam Katılımcı: ${top.katilimcilar.length}</p>
   </div>
+  ${isVeli ? `
+  <div class="card" style="overflow-x:auto;">
+    <h2>Devamsızlık ve Ders Başarı Durumu</h2>
+    <p class="small no-print">Gün sayısı ve başarısız dersler e-Okul'dan bakılarak elle girilir — sistem sadece durumu (Normal/Takipte/Dikkat/Sınır Aşıldı) otomatik hesaplar. "Sınıftan Doldur", Öğrenci Listesi'ndeki (Sınıf/Ders alanına yazdığınız) sınıfın tüm öğrencilerini tek seferde ekler.</p>
+    <table><thead><tr><th>No</th><th>Öğrenci Adı Soyadı</th><th>Devamsızlık (gün)</th><th>Başarısız Dersler (50 Altı)</th><th>Durum</th><th class="no-print"></th></tr></thead>
+    <tbody>${dbtRows || `<tr><td colspan="6" class="small">Henüz öğrenci eklenmedi.</td></tr>`}</tbody></table>
+    <div class="row no-print" style="margin-top:6px;">
+      <button class="btn" onclick="toplantiSinifSinaDoldur('${top.id}')">Sınıftan Doldur</button>
+      <button class="btn" onclick="devamsizlikBasariSatirEkle('${top.id}')">Satır Ekle</button>
+    </div>
+    <p class="small" style="margin-top:6px;">* Kırmızı: Sınır Aşıldı (30+ gün) &nbsp;|&nbsp; Dikkat (25-29 gün) &nbsp;|&nbsp; Takipte (20-24 gün)</p>
+  </div>` : ''}
   ${top.tur === 'zumre' ? `
   <div class="card">
     <h2>Görev Dağılımı</h2>
