@@ -1101,9 +1101,17 @@ async function exportCurrentViewAsWord(dosyaAdi, landscape) {
 }
 let indirMenuDosyaAdi = "";
 let indirMenuLandscape = false;
-function toggleIndirMenu(dosyaAdi, landscape) {
+/* Bazı modüllerin (Günlük/Yıllık Plan, Norm Kadro) ekrandaki print-area'dan
+   kopyalamak yerine S'ten daha zengin, resmi şablona uygun bir Excel
+   üreten kendi özel fonksiyonu var (örn. indirGunlukPlanExcel). Bu fonksiyon
+   adı veriliyorsa "Excel Olarak İndir" onu çağırır, PDF/Word yine genel
+   exportCurrentViewAsPdf/Word'ü kullanır — hiçbir mevcut özel Excel
+   fonksiyonuna dokunmadan PDF/Word eksiğini tamamlar. */
+let indirMenuOzelExcelFn = null;
+function toggleIndirMenu(dosyaAdi, landscape, ozelExcelFn) {
   indirMenuDosyaAdi = dosyaAdi;
   indirMenuLandscape = !!landscape;
+  indirMenuOzelExcelFn = ozelExcelFn || null;
   const menu = document.getElementById("indir-menu");
   if (!menu) return;
   const willOpen = menu.style.display !== "block";
@@ -1113,7 +1121,10 @@ function toggleIndirMenu(dosyaAdi, landscape) {
 function runIndirOption(format) {
   document.querySelectorAll(".indir-menu").forEach(m => { m.style.display = "none"; });
   if (format === "pdf") exportCurrentViewAsPdf(indirMenuDosyaAdi, indirMenuLandscape);
-  else if (format === "excel") exportCurrentViewAsExcel(indirMenuDosyaAdi, indirMenuLandscape);
+  else if (format === "excel") {
+    if (indirMenuOzelExcelFn && typeof window[indirMenuOzelExcelFn] === "function") window[indirMenuOzelExcelFn](indirMenuDosyaAdi);
+    else exportCurrentViewAsExcel(indirMenuDosyaAdi, indirMenuLandscape);
+  }
   else if (format === "word") exportCurrentViewAsWord(indirMenuDosyaAdi, indirMenuLandscape);
 }
 document.addEventListener("click", (e) => {
@@ -1121,11 +1132,11 @@ document.addEventListener("click", (e) => {
     document.querySelectorAll(".indir-menu").forEach(m => { m.style.display = "none"; });
   }
 });
-function belgeAracCubugu(dosyaAdi, landscape) {
+function belgeAracCubugu(dosyaAdi, landscape, ozelExcelFn) {
   return `<div class="row no-print" style="margin-top:10px;">
     <button class="btn primary" onclick="printCurrentView(${landscape ? "true" : "false"})">Yazdır</button>
     <div class="indir-dropdown">
-      <button class="btn" onclick="toggleIndirMenu('${jsq(dosyaAdi)}', ${landscape ? "true" : "false"})">İndir ▾</button>
+      <button class="btn" onclick="toggleIndirMenu('${jsq(dosyaAdi)}', ${landscape ? "true" : "false"}, ${ozelExcelFn ? `'${jsq(ozelExcelFn)}'` : "null"})">İndir ▾</button>
       <div id="indir-menu" class="indir-menu">
         <div onclick="runIndirOption('pdf')">PDF Olarak Kaydet</div>
         <div onclick="runIndirOption('excel')">Excel Olarak İndir</div>
@@ -1930,7 +1941,7 @@ function viewPlanModule() {
   <div class="card no-print">
     <h2>${title}</h2>
     <p class="small">${aciklama}</p>
-    ${activeEntry ? `<div class="row no-print" style="margin-top:8px;"><button class="btn" onclick="indirGunlukPlanExcel('${jsq(dosyaAdi)}')">İndir (Excel)</button><button class="btn danger" onclick="deletePlanEntry('${kind}','${activeEntry.id}')">Bu Planı Sil</button></div>` : ""}
+    ${activeEntry ? `<div class="row no-print" style="margin-top:8px;"><button class="btn danger" onclick="deletePlanEntry('${kind}','${activeEntry.id}')">Bu Planı Sil</button></div>${belgeAracCubugu(dosyaAdi, false, "indirGunlukPlanExcel")}` : ""}
   </div>
   ${listHtml}
   <div class="print-area">
@@ -1963,9 +1974,9 @@ function renderYillikPlanSecTab() {
   ${activeEntry ? `
   <div class="card no-print">
     <div class="row no-print">
-      <button class="btn primary" onclick="indirYillikPlanExcel('${jsq(dosyaAdi)}')">İndir (Excel)</button>
       <button class="btn danger" onclick="deletePlanEntry('yillik','${activeEntry.id}')">Bu Planı Sil</button>
     </div>
+    ${belgeAracCubugu(dosyaAdi, false, "indirYillikPlanExcel")}
   </div>` : ""}
   ${listHtml}
   <div class="print-area">
@@ -2459,18 +2470,16 @@ function viewNormKadro() {
   const normKadroSayisi = normKadroSayisiHesapla(genelToplam);
   const alanSefi = S.teachers.find(t => (idari ? idari.assignments : []).some(a => a.courseId === "pbo-10" && (a.eligibleTeacherIds || []).includes(t.id)));
 
+  const dosyaAdi = "Norm Kadro" + (S.akademikTakvim && S.akademikTakvim.ogretimYili ? " " + S.akademikTakvim.ogretimYili : "");
   return `
   <div class="card no-print">
     <h2>Norm Kadro Hesabı</h2>
     <p class="small">Ders Programı'ndaki güncel ders atamalarınızdan otomatik hesaplanır — sınıflara ders/öğretmen ekledikçe/çıkardıkça burası da güncellenir. Öğrenci sayılarını ve koordinatörlük satırlarını elle girin.</p>
     ${dalFiltresi !== "ALL" && dalTanimiById(dalFiltresi) ? `<p class="pill info">Gösterilen AMP dersleri "${escHtml(dalTanimiById(dalFiltresi).ad)}" ile sınırlı — Koordinatörlük ve Şeflik satırları her zaman alan geneli gösterilir. Resmî Norm Kadro sayısını kontrol ederken sol menüden "Tüm Dallar"ı seçin; Excel'e aktarma her zaman alan genelini içerir.</p>` : ""}
-    <div class="row no-print">
-      <button class="btn primary" onclick="printCurrentView(false)">Yazdır</button>
-      <button class="btn" onclick="indirNormKadroExcel('Norm Kadro ${jsq(S.akademikTakvim ? S.akademikTakvim.ogretimYili : "")}')">İndir (Excel)</button>
-    </div>
+    ${belgeAracCubugu(dosyaAdi, false, "indirNormKadroExcel")}
   </div>
   <div class="print-area">
-    ${belgeYazdirmaBasligi("Norm Kadro Hesabı" + (S.akademikTakvim ? " · " + S.akademikTakvim.ogretimYili : ""))}
+    ${belgeYazdirmaBasligi(dosyaAdi)}
     <div class="card" style="overflow-x:auto;">
       <table>
         <thead><tr><th>No</th><th>Sınıf</th><th>Öğrenci Sayısı</th><th>Ders Adı</th><th>Haftalık Saat</th><th>Grup Sayısı</th><th>Toplam Ders Saati</th><th>Açıklama</th></tr></thead>
