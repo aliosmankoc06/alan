@@ -621,7 +621,8 @@ function viewStajKontenjanlar() {
       <tbody>${kontenjanRows}</tbody></table>
     </div>
   </div>
-  ${renderIsletmeBelirlemeKarti()}`;
+  ${renderIsletmeBelirlemeKarti()}
+  ${renderIsletmeTalepFormuKarti()}`;
 }
 
 /* ---- İşletme Belirleme Komisyon Tutanağı ----
@@ -746,6 +747,88 @@ function renderIsletmeBelirlemeKarti() {
     ${listHtml}
   </div>
   ${active ? `<div class="print-area"><div class="card">${renderIsletmeBelirlemeDetay(active)}</div></div>` : ""}`;
+}
+/* ---- İşletme Öğrenci Talep Formu ----
+   Gönderilen gerçek "Öğrenci Talep Formu" örneklerinden (Ek-1): işletmenin
+   doldurup okula gönderdiği bir form. Okulun TÜM alanlarını kapsayan ALAN/
+   DAL tablosu vardı — biz sadece bu sistemin kapsadığı alanı/dalları
+   (S.dalTanimlari) gösteriyoruz, alakasız alanları kopyalamadık. İşletme
+   adı/adresi S.isletmeler'den otomatik gelir; telefon/İSG/banka/vergi gibi
+   işletmenin KENDİSİNİN dolduracağı alanlar kasıtlı olarak BOŞ bırakılır
+   (sistemde ayrıca tutulmasına gerek yok) — sadece "bu yıl/gelecek yıl
+   istenen öğrenci sayısı" sayıları, yazdırmadan önce hızlıca girilebilsin
+   diye işletme kaydının üzerinde saklanır. */
+let activeTalepFormuIsletmeId = null;
+function setTalepFormuIsletme(id) { activeTalepFormuIsletmeId = id; renderMain(); }
+function updateTalepFormuSayi(isletmeId, dalId, alan, value) {
+  const isl = isletmeById(isletmeId);
+  if (!isl) return;
+  if (!isl.talepFormuSayilari || typeof isl.talepFormuSayilari !== "object") isl.talepFormuSayilari = {};
+  if (!isl.talepFormuSayilari[dalId]) isl.talepFormuSayilari[dalId] = { buYil: "", gelecekYil: "" };
+  isl.talepFormuSayilari[dalId][alan] = value.trim();
+  save();
+}
+function renderIsletmeTalepFormuKarti() {
+  if (!activeTalepFormuIsletmeId || !isletmeById(activeTalepFormuIsletmeId)) {
+    activeTalepFormuIsletmeId = S.isletmeler[0] ? S.isletmeler[0].id : null;
+  }
+  const isl = activeTalepFormuIsletmeId ? isletmeById(activeTalepFormuIsletmeId) : null;
+  const k = S.kurumBilgileri;
+  const ogretimYili = S.akademikTakvim ? S.akademikTakvim.ogretimYili : "";
+  const gelecekYil = (() => { const m = String(ogretimYili).match(/^(\d{4})-(\d{4})$/); return m ? (parseInt(m[1], 10) + 1) + "-" + (parseInt(m[2], 10) + 1) : ""; })();
+  const dalSatirlari = isl ? S.dalTanimlari.map(d => {
+    const sayilar = (isl.talepFormuSayilari || {})[d.id] || { buYil: "", gelecekYil: "" };
+    return `<tr>
+      <td>${escHtml(k.alanAdi)}</td>
+      <td>${escHtml(d.ad)}</td>
+      <td class="no-print"><input type="number" min="0" style="width:70px" value="${escHtml(sayilar.buYil)}" onchange="updateTalepFormuSayi('${isl.id}','${d.id}','buYil',this.value)"></td>
+      <td class="print-only-cell">${escHtml(sayilar.buYil || '—')}</td>
+      <td class="no-print"><input type="number" min="0" style="width:70px" value="${escHtml(sayilar.gelecekYil)}" onchange="updateTalepFormuSayi('${isl.id}','${d.id}','gelecekYil',this.value)"></td>
+      <td class="print-only-cell">${escHtml(sayilar.gelecekYil || '—')}</td>
+    </tr>`;
+  }).join("") : "";
+  const dosyaAdi = isl ? "İşletme Öğrenci Talep Formu - " + isl.name : "İşletme Öğrenci Talep Formu";
+  return `
+  <div class="card no-print" style="margin-top:16px;">
+    <h2>İşletme Öğrenci Talep Formu</h2>
+    <p class="small">Bir işletme seçip, o işletmeye göndereceğiniz boş talep formunu (Ek-1) hazırlayın — işletme adı/adresi otomatik gelir, öğrenci sayılarını (varsa) siz önceden doldurabilirsiniz, kalan alanları (telefon, İSG, banka vb.) işletme kendisi elle doldurup size geri gönderir.</p>
+    <label class="small">İşletme</label>
+    <select style="max-width:360px;" onchange="setTalepFormuIsletme(this.value)">
+      ${S.isletmeler.map(i => `<option value="${i.id}" ${i.id === activeTalepFormuIsletmeId ? "selected" : ""}>${escHtml(i.name)}</option>`).join("") || `<option value="">— işletme yok —</option>`}
+    </select>
+    ${isl ? belgeAracCubugu(dosyaAdi) : ""}
+  </div>
+  ${isl ? `
+  <div class="print-area">
+    ${belgeYazdirmaBasligi(dosyaAdi)}
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;"><div></div><div><b>Ek-1</b></div></div>
+      <p style="text-align:center;font-weight:700;">${escHtml((k.okulAdi || "").toLocaleUpperCase("tr-TR"))} MÜDÜRLÜĞÜNE</p>
+      <p class="small">${escHtml(ogretimYili)} Eğitim-Öğretim Yılı İşletmelerde Beceri Eğitimi Uygulamaları için işletmemizde aşağıda belirtilen sayıda ve belirtilen bölümlerde beceri eğitimi yaptırmak üzere stajyer öğrenci talebimizin değerlendirilmesini, bilgilerinize arz/rica ederim.</p>
+      <p class="small" style="text-align:right;">Yetkili isim-imza-kaşe</p>
+      <table style="margin-top:10px;">
+        <tr><td style="width:220px;"><b>İŞLETMENİN ADI</b></td><td>${escHtml(isl.name)}</td></tr>
+        <tr><td><b>ADRES</b></td><td>${escHtml(isl.adres || "")}</td></tr>
+        <tr><td><b>TELEFON / FAKS NO</b></td><td class="no-print">&nbsp;</td><td class="print-only-cell">&nbsp;</td></tr>
+        <tr><td><b>FAALİYET ALANI</b></td><td>&nbsp;</td></tr>
+        <tr><td><b>İŞLETME PERSONEL SAYISI</b></td><td>&nbsp;</td></tr>
+        <tr><td><b>İŞLETMENİZDEKİ İSG HİZMET DURUMU</b></td><td>☐ Kendimiz Sağlıyoruz &nbsp;&nbsp; ☐ Dışarıdan Sağlanıyor &nbsp;&nbsp; ☐ Sağlanmıyor</td></tr>
+        <tr><td><b>İŞLETMEYE AİT BANKA – IBAN BİLGİSİ</b></td><td>……………… BANKASI …………… ŞUBESİ &nbsp;&nbsp; TR……</td></tr>
+        <tr><td><b>İŞLETME SGK SİCİL NO</b> (yoksa VERGİ NO)</td><td>&nbsp;</td></tr>
+        <tr><td><b>DEVLET KATKISI İLE İLGİLİ TERCİHİ</b></td><td>☐ Devlet katkısından yararlanmak istiyorum &nbsp;&nbsp; ☐ İstemiyorum</td></tr>
+        <tr><td><b>İŞLETME YETKİLİSİ ADI SOYADI</b></td><td>&nbsp;</td></tr>
+        <tr><td><b>EĞİTİM SORUMLUSU ADI SOYADI</b></td><td>&nbsp;</td></tr>
+      </table>
+      <h3 style="margin-top:14px;">Stajyer Öğrenci Talep Detayları</h3>
+      <table><thead><tr><th>Alan</th><th>Dal</th><th>Öğrenci Sayısı (${escHtml(ogretimYili)})</th><th></th><th>Öğrenci Sayısı (${escHtml(gelecekYil)})</th><th></th></tr></thead>
+      <tbody>${dalSatirlari || `<tr><td colspan="6" class="small">Ayarlar'dan dal tanımlayın.</td></tr>`}</tbody></table>
+      <p class="small" style="margin-top:14px;">
+        1- Bu form taahhüt niteliğinde olmayıp, öğrenci verilmesi uygun görülen işletmeler okulumuzdaki kurul tarafından değerlendirilerek ayrıca sözleşme yapılacaktır.<br>
+        2- Öğrencinin tüm sigorta ve devlet katkısı işlemleri okulumuz tarafından yürütülecektir.<br>
+        3- Formun işleme konulması için ilgili yerlerin eksiksiz doldurulması ve okulumuza ulaştırılması gerekmektedir.
+      </p>
+    </div>
+  </div>` : `<div class="card small" style="text-align:center;padding:20px;">Önce Koordinatörlük sekmesinden işletme ekleyin.</div>`}`;
 }
 /* -- Sekme 5: Sonuç / Yerleştirme (çıktı) -- */
 function viewStajSonuc() {

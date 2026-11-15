@@ -479,7 +479,7 @@ function addIsletme(groupKey, name) {
   if (existing) {
     if (!existing.groups.includes(groupKey)) existing.groups.push(groupKey);
   } else {
-    S.isletmeler.push({ id: uid("isletme"), name, groups: [groupKey], kontenjanlar: {}, talep: "", adres: "" });
+    S.isletmeler.push({ id: uid("isletme"), name, groups: [groupKey], kontenjanlar: {}, talep: "", adres: "", talepFormuSayilari: {} });
   }
   save(); renderMain();
 }

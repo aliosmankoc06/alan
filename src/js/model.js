@@ -257,6 +257,7 @@ function normalizeState(s) {
     if (!isl.kontenjanlar || typeof isl.kontenjanlar !== "object") isl.kontenjanlar = {};
     if (typeof isl.talep !== "string") isl.talep = "";
     if (typeof isl.adres !== "string") isl.adres = "";
+    if (!isl.talepFormuSayilari || typeof isl.talepFormuSayilari !== "object") isl.talepFormuSayilari = {};
     // "BMİ" (noktalı İ) altında girilmiş eski kontenjan sayıları varsa
     // "BMI" (düz I) anahtarına taşı — bkz. öğrenci dal düzeltmesi yukarıda.
     if (isl.kontenjanlar["BMİ"] !== undefined) {
@@ -758,7 +759,7 @@ function normalizeState(s) {
       if (existing) {
         groups.forEach(g => { if (!existing.groups.includes(g)) existing.groups.push(g); });
       } else {
-        s.isletmeler.push({ id: uid("isletme"), name, groups: groups.slice(), kontenjanlar: {}, talep: "", adres: "" });
+        s.isletmeler.push({ id: uid("isletme"), name, groups: groups.slice(), kontenjanlar: {}, talep: "", adres: "", talepFormuSayilari: {} });
       }
     });
     const studentSeed = [
