@@ -794,6 +794,39 @@ function normalizeState(s) {
       ];
     }
   }
+  // Soru Havuzu > hazır sınav soruları (kullanıcının kendi hazırladığı gerçek
+  // sınav evraklarından, bkz. soru-havuzu-hazir-veri.js). Tek seferlik bir
+  // seed'dir: isim+sınıf seviyesiyle kullanıcının GERÇEK ders/sınıf listesine
+  // eşleştirilir, sabit id varsayılmaz — eşleşen ders yoksa o dersin soruları
+  // sessizce atlanır. Bayrak sayesinde bir daha asla tekrar eklenmez, yani
+  // kullanıcı bu sorulardan birini silerse geri gelmez.
+  if (!s.soruHavuzuHazirYuklendi) {
+    s.soruHavuzuHazirYuklendi = true;
+    if (typeof SORU_HAVUZU_HAZIR_VERI !== "undefined") {
+      const norm = v => String(v || "").trim().toLocaleLowerCase("tr-TR");
+      SORU_HAVUZU_HAZIR_VERI.forEach(hk => {
+        const dersler = s.courses.filter(c => c.grade === hk.sinifGrade && norm(c.name) === norm(hk.dersAdi));
+        dersler.forEach(course => {
+          const siniflar = s.classes.filter(cl => cl.grade === hk.sinifGrade && (cl.assignments || []).some(a => a.courseId === course.id));
+          siniflar.forEach(cls => {
+            hk.sorular.forEach(hq => {
+              s.sinavHavuzu.sorular.push({
+                id: uid("sr"),
+                classId: cls.id,
+                courseId: course.id,
+                tur: hq.tur,
+                soruMetni: hq.soruMetni,
+                secenekler: (hq.secenekler || []).map(sc => ({ id: uid("sc"), harf: sc.harf, metin: sc.metin, dogru: !!sc.dogru })),
+                cevapAnahtari: hq.cevapAnahtari || "",
+                puan: hq.puan,
+                konu: hq.konu || ""
+              });
+            });
+          });
+        });
+      });
+    }
+  }
   s.classes.forEach(cl => {
     cl.assignments.forEach(a => {
       if (!Array.isArray(a.eligibleTeacherIds)) a.eligibleTeacherIds = [];
