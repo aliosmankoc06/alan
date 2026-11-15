@@ -4213,6 +4213,9 @@ function saveMakineGenel(id) {
 function deleteMakine(id) {
   if (!confirm("Bu makine ve tüm arıza/bakım/talimat kayıtları silinsin mi? Bu işlem geri alınamaz.")) return;
   S.envanter.makineler = S.envanter.makineler.filter(x => x.id !== id);
+  const silinenKartIdler = new Set(S.bakimKartlari.filter(k => k.makineId === id).map(k => k.id));
+  S.bakimKartlari = S.bakimKartlari.filter(k => k.makineId !== id);
+  if (silinenKartIdler.has(activeBakimKartId)) activeBakimKartId = null;
   if (activeMakineId === id) activeMakineId = "__ALL__";
   save(); renderMain();
 }
