@@ -1053,7 +1053,9 @@ function extractProgramlarScheduleForExcel() {
           const gc = isKoord ? { bg: "EDE3F5", ink: "5B3A85" } : gradeColor(cls ? cls.grade : 0);
           const line1 = (isKoord ? "Koordinatörlük" : (course ? course.name : "?")) + (cell.locked ? " (kilitli)" : "");
           const line2 = isKoord ? (cell.isletme || "İşletme belirlenmedi") : (cls ? cls.name : "");
-          return { text: line1 + (line2 ? "\n" + line2 : ""), bg: gc.bg.replace("#", ""), ink: gc.ink.replace("#", "") };
+          const odaAdlari = (cell.roomIds || []).map(rid => { const r = roomById(rid); return r ? r.name : null; }).filter(Boolean);
+          const line3 = odaAdlari.join(", ");
+          return { text: line1 + (line2 ? "\n" + line2 : "") + (line3 ? "\n" + line3 : ""), bg: gc.bg.replace("#", ""), ink: gc.ink.replace("#", "") };
         } else if (off) {
           return { text: "İzinli", bg: "F4F6FA", ink: "555555" };
         } else if (blocked) {
@@ -6963,6 +6965,15 @@ function viewSinif() {
         </label>`).join("");
       const locked = isAssignmentLocked(cls.id, a.id);
       const placement = assignmentPlacementSummary(cls.id, a.id);
+      const seciliOdalar = S.rooms.filter(r => (a.roomIds || []).includes(r.id));
+      const odaChecks = S.rooms.map(r => `
+        <label style="margin-right:10px;font-size:12px;">
+          <input type="checkbox" ${(a.roomIds || []).includes(r.id) ? 'checked' : ''} onchange="toggleAssignmentRoom('${cls.id}','${a.id}','${r.id}')"> ${escHtml(r.name)}
+        </label>`).join("");
+      const odaBlogu = S.rooms.length === 0
+        ? `<summary class="small" style="color:var(--ink-soft);">Mekan/Atölye (henüz tanımlı laboratuvar/atölye yok — Ayarlar'dan ekleyebilirsiniz)</summary>`
+        : `<summary class="small" style="cursor:pointer;color:var(--ink-soft);">Mekan/Atölye (opsiyonel — seçerseniz aynı saatte aynı mekanı kullanan başka bir ders olup olmadığı kontrol edilir) ${seciliOdalar.length ? `<span class="pill info">${escHtml(seciliOdalar.map(r => r.name).join(", "))}</span>` : ''}</summary>
+           <div style="margin-top:6px;">${odaChecks}</div>`;
       return `
         <div class="card" style="padding:10px 14px;margin-bottom:8px;${locked ? 'border-color:var(--teal);background:var(--teal-card-bg);' : ''}">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
@@ -6986,6 +6997,9 @@ function viewSinif() {
               <button class="btn" style="padding:4px 9px;font-size:11.5px;" onclick="setAllEligible('${cls.id}','${a.id}',false)">Hepsini Kaldır (tek tek seç)</button>
               <div style="margin-top:6px;">${teacherChecks}</div>
             </div>
+          </details>
+          <details style="margin-top:6px;" ${seciliOdalar.length ? 'open' : ''}>
+            ${odaBlogu}
           </details>
         </div>`;
     }).join("");
@@ -7175,6 +7189,18 @@ function setAllEligible(classId, assignmentId, on) {
   const cls = classById(classId);
   const a = cls.assignments.find(x => x.id === assignmentId);
   a.eligibleTeacherIds = on ? S.teachers.map(t => t.id) : [];
+  save(); renderMain();
+}
+/* Bir derse mekan/atölye seçmek, zaten dağıtılmış (S.schedule'a yerleşmiş)
+   saatleri geriye dönük değiştirmez — öğretmen sayısı/kilit değişiklikleri
+   gibi, ancak bir sonraki "Programı Dağıt/Yenile"de etkili olur. */
+function toggleAssignmentRoom(classId, assignmentId, roomId) {
+  const cls = classById(classId);
+  const a = cls && cls.assignments.find(x => x.id === assignmentId);
+  if (!a) return;
+  if (!Array.isArray(a.roomIds)) a.roomIds = [];
+  if (a.roomIds.includes(roomId)) a.roomIds = a.roomIds.filter(x => x !== roomId);
+  else a.roomIds.push(roomId);
   save(); renderMain();
 }
 
@@ -7680,9 +7706,11 @@ function renderEditableTeacherGrid(teacherId) {
         const cls = classById(cell.classId);
         const isKoord = cell.courseId === KOORD_COURSE_ID;
         const gradeCls = isKoord ? "grade-cell-koord" : "grade-cell-" + (cls ? cls.grade : 0);
+        const odaAdlari = (cell.roomIds || []).map(rid => { const r = roomById(rid); return r ? r.name : null; }).filter(Boolean);
         html += `<td><div class="sched-cell filled ${gradeCls}" style="${selStyle}" ${eventAttrs}>
           <div class="c1">${isKoord ? 'Koordinatörlük' : (course ? course.name : '?')}${cell.locked ? ' 🔒' : ''}</div>
           <div class="c2">${isKoord ? (cell.isletme || 'İşletme belirlenmedi') : (cls ? cls.name : '')}</div>
+          ${odaAdlari.length ? `<div class="c2" style="font-size:9.5px;opacity:.75;">${escHtml(odaAdlari.join(", "))}</div>` : ''}
         </div></td>`;
       } else if (off) {
         html += `<td><div class="sched-cell" style="background:var(--panel-2);">
