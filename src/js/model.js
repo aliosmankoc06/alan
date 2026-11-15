@@ -1060,7 +1060,7 @@ async function bulutSenkronunuKontrolEt() {
   localStorage.setItem(LS_KEY, JSON.stringify(S));
   if (typeof renderTabbar === "function") renderTabbar();
   if (typeof renderMain === "function") renderMain();
-  if (typeof renderSurumWidget === "function") renderSurumWidget();
+  if (typeof renderYilWidget === "function") renderYilWidget();
   if (typeof showSaveToast === "function") showSaveToast(false, "Veriler başka bir bilgisayardan senkronize edildi");
 }
 function scheduleProgramSenkronizeEt() {

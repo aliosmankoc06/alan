@@ -322,7 +322,7 @@ function restoreSchoolDefaults() {
   });
 }
 function openSavedProgram(id) {
-  confirmDestructive("Şu anki çalışmanız, açacağınız kayıtlı programın üzerine yazılıp değişecek. Önce mevcut hâlini korumak istiyorsanız Vazgeç deyip önce \"Kaydet\" yapın.", () => {
+  confirmDestructive("Şu anki çalışmanız, açacağınız kayıtlı programın üzerine yazılıp değişecek. Emin değilseniz Vazgeç deyip önce \"Farklı Kaydet\" ile isimli bir kopya alın — isimli kaydedilmemiş hâliniz bu işlemle kaybolur.", () => {
     const versions = loadVersions();
     const v = versions.find(x => x.id === id);
     if (!v) return;
@@ -333,7 +333,7 @@ function openSavedProgram(id) {
     activeTab = "programlar";
     renderTabbar();
     renderMain();
-    renderSurumWidget();
+    renderYilWidget();
   });
 }
 function exportDataFile() {
@@ -369,7 +369,7 @@ function applyImportedPayload(raw) {
         saveVersionsList(payload.versions);
       }
       setModule("ana");
-      renderSurumWidget();
+      renderYilWidget();
       alert("Yedek başarıyla yüklendi.");
     });
   } catch (err) {
@@ -416,10 +416,11 @@ function renderSavedProgramsCard() {
     const d = new Date(v.savedAt);
     const dateStr = isNaN(d.getTime()) ? "" : d.toLocaleString('tr-TR');
     return `<tr>
-      <td>${v.name}</td>
+      <td>${escHtml(v.name)}</td>
       <td class="small">${dateStr}</td>
       <td>
         <button class="btn" onclick="openSavedProgram('${v.id}')">Aç</button>
+        <button class="btn" onclick="surumAdiniDuzenle('${v.id}')">Yeniden Adlandır</button>
         <button class="btn danger" onclick="deleteVersion('${v.id}')">Sil</button>
       </td>
     </tr>`;
@@ -427,8 +428,9 @@ function renderSavedProgramsCard() {
   return `
   <div class="card">
     <h2>Kayıtlı Programlarım</h2>
-    <p class="small">"Kaydet" dediğinizde çalışma alanınız <b>silinmez</b> — sadece o anki hâlin isimli bir kopyası burada saklanır, siz aynı yerden çalışmaya devam edersiniz. Farklı bir kayıtlı kopyayı buradan <b>açabilir</b> (o anki çalışmanızın üzerine yazar) ya da silebilirsiniz.</p>
-    <table><tr><th>Ad</th><th>Kaydedilme Tarihi</th><th></th></tr>${rows}</table>
+    <p class="small">Çalışma alanınız zaten her değişiklikte otomatik kaydediliyor — bu kart, bunun dışında, o anki hâlin TAMAMININ isimli, ayrı bir kopyasını almak içindir (ör. yıl sonunda bir "yedek" almak, ya da tamamen farklı bir deneme programı yürütmek istediğinizde). "Farklı Kaydet" ile yeni bir kopya alın; buradan istediğiniz kopyayı <b>açabilir</b> (o anki çalışmanızın üzerine yazar) ya da silebilirsiniz.</p>
+    <div class="row"><button class="btn primary" onclick="farkliKaydetSurum()">Farklı Kaydet</button></div>
+    <table style="margin-top:10px;"><tr><th>Ad</th><th>Kaydedilme Tarihi</th><th></th></tr>${rows}</table>
     <p class="small" style="margin-top:10px;">Tamamen sıfırdan, boş bir programla başlamak isterseniz: <button class="btn danger" onclick="startNewProgram()">Boş Bir Programla Başla</button></p>
   </div>`;
 }
@@ -7935,15 +7937,6 @@ function sonKayitBaslangicDurumunuGoster() {
   try { varOlanKayit = !!localStorage.getItem(LS_KEY); } catch (e) {}
   el.textContent = varOlanKayit ? "✓ Kayıtlı verilerle açıldı" : "Henüz kayıt yok";
 }
-function kaydetManuel() {
-  save();
-  const btn = document.getElementById("kaydet-btn");
-  if (!btn) return;
-  const eski = btn.textContent;
-  btn.textContent = "✓ Kaydedildi";
-  setTimeout(() => { btn.textContent = eski; }, 1200);
-}
-
 /* ---- Genel Arama ---- */
 let globalSearchResults = [];
 function trLower(s) { return String(s || "").toLocaleLowerCase("tr-TR"); }
@@ -8125,6 +8118,7 @@ function updateTakvimYili(value) {
   }
   save();
   renderMain();
+  renderYilWidget();
 }
 function updateSinavTarihi(key, value) {
   ensureAkademikTakvim().sinavTarihleri[key] = value.trim();
@@ -8235,6 +8229,7 @@ function viewAyarlar() {
   ${renderDalTanimlariKarti()}
   ${renderOdaTanimlariKarti()}
   ${renderImzaSirkuleriKarti()}
+  ${renderSavedProgramsCard()}
   ${renderDonemArsiviKarti()}`;
 }
 const DAL_SUBE_HARFLERI = ["A", "B", "C", "D", "E", "F"];
@@ -8569,12 +8564,15 @@ function gerceklestirYeniOgretimYiliGecisi(yeniYil) {
   activeModule = "ana";
   renderTabbar();
   renderMain();
+  renderYilWidget();
   alert(`"${yeniYil}" öğretim yılına geçildi. Önceki yılınız Dönem Arşivi'nde "${eskiYilAdi}" adıyla saklanıyor.`);
 }
 function renderYeniOgretimYiliKarti() {
+  const yil = S.akademikTakvim && S.akademikTakvim.ogretimYili ? S.akademikTakvim.ogretimYili : "Belirlenmedi";
   return `
-  <div class="card">
+  <div class="card" id="yeni-ogretim-yili-karti">
     <h2>Yeni Öğretim Yılına Geç</h2>
+    <p class="small">Şu anki öğretim yılı: <b>${escHtml(yil)}</b></p>
     <p class="small">Her öğretim yılı başında, tüm sınıfları bir üst sınıfa taşımak (9-A → 10-A, 10-A → 11-A, 11-A → 12-A gibi) ve 12. sınıfları mezun edip aktif çalışmadan çıkarmak için kullanın. Öğrenci Listesi ve Staj modülleri de otomatik güncellenir. Geçiş öncesi şu anki hâlin tamamı otomatik olarak Dönem Arşivi'ne kaydedilir — hiçbir şey kaybolmaz, istediğinizde geri açıp bakabilirsiniz.</p>
     <div class="row"><button class="btn primary" onclick="yeniOgretimYilinaGec()">Yeni Öğretim Yılına Geç</button></div>
   </div>`;
@@ -9456,7 +9454,6 @@ function deleteVersion(id) {
   saveVersionsList(loadVersions().filter(x => x.id !== id));
   if (getAktifSurumId() === id) setAktifSurumId(null);
   renderMain();
-  renderSurumWidget();
 }
 function surumAdiniDuzenle(id) {
   const versions = loadVersions();
@@ -9467,18 +9464,18 @@ function surumAdiniDuzenle(id) {
     v.name = yeniAd.trim();
     saveVersionsList(versions);
     renderMain();
-    renderSurumWidget();
   });
 }
 
-/* ---- Sol menüdeki "Kaydet" altı sürüm anahtarı ----
-   Kullanıcı "Farklı Kaydet" ile çalışmasının o anki hâlini isimli bir
-   sürüm olarak saklayabilir (ör. "2026-2027 Eğitim-Öğretim Yılı"),
-   sonra sol menüdeki bu açılır listeden istediği sürüme geçip kaldığı
-   yerden devam edebilir ya da geçmiş bir sürümü açabilir. */
+/* ---- Sol menüdeki Eğitim-Öğretim Yılı göstergesi ----
+   Burası artık bir "sürüm/kayıt" seçici değil — doğrudan Akademik
+   Takvim'deki güncel öğretim yılını gösterir; tıklanınca Ayarlar'daki
+   "Yeni Öğretim Yılına Geç" kartına götürür. "Farklı Kaydet" (isimli
+   tam-kopya yedekleme) özelliği kaldırılmadı, sadece Ayarlar'daki
+   "Kayıtlı Programlarım" kartına taşındı — bkz. farkliKaydetSurum(). */
 function farkliKaydetSurum() {
   const varsayilan = S.akademikTakvim && S.akademikTakvim.ogretimYili ? S.akademikTakvim.ogretimYili + " Eğitim-Öğretim Yılı" : "";
-  promptModal("Şu anki hâlin tamamını (bütün modülleriyle) hangi isimle kaydedeyim?\n\nÇalışma alanınız silinmez — bu isimle bir kopya saklanır ve bundan sonra \"Kaydet\" dediğinizde bu isimli kayıt güncellenir.", varsayilan, (name) => {
+  promptModal("Şu anki hâlin tamamını (bütün modülleriyle) hangi isimle kaydedeyim?\n\nÇalışma alanınız silinmez — bu isimle ayrı bir kopya saklanır.", varsayilan, (name) => {
     if (!name || !name.trim()) return;
     const versions = loadVersions();
     const yeni = { id: uid("ver"), name: name.trim(), savedAt: new Date().toISOString(), data: JSON.parse(JSON.stringify(S)) };
@@ -9486,45 +9483,25 @@ function farkliKaydetSurum() {
     saveVersionsList(versions);
     setAktifSurumId(yeni.id);
     save();
-    renderSurumWidget();
-  });
-}
-function surumaGec(id) {
-  const versions = loadVersions();
-  const v = versions.find(x => x.id === id);
-  if (!v) return;
-  if (getAktifSurumId() === id) { toggleTabDropdown("surum-secici"); return; }
-  confirmDestructive(`"${v.name}" adlı kayıt açılacak. Şu anki çalışmanız zaten kendi kaydına (${getAktifSurumId() ? '"' + (versions.find(x => x.id === getAktifSurumId()) || {}).name + '"' : "kayıtsız çalışma"}) işlenmiş durumda, kaybolmaz. Devam edilsin mi?`, () => {
-    S = normalizeState(JSON.parse(JSON.stringify(v.data)));
-    setAktifSurumId(id);
-    save();
-    renderTabbar();
     renderMain();
-    renderSurumWidget();
   });
 }
-function renderSurumWidget() {
-  const el = document.getElementById("surum-widget");
+function yilWidgetTiklandi() {
+  setModule("ayarlar");
+  setTimeout(() => {
+    const el = document.getElementById("yeni-ogretim-yili-karti");
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, 50);
+}
+function renderYilWidget() {
+  const el = document.getElementById("yil-widget");
   if (!el) return;
-  const versions = loadVersions();
-  const aktifId = getAktifSurumId();
-  const aktif = versions.find(x => x.id === aktifId);
-  const items = versions.slice().reverse().map(v => `
-    <div class="tab-dropdown-item ${v.id === aktifId ? 'active' : ''}" style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
-      <span onclick="surumaGec('${jsq(v.id)}')" style="flex:1;cursor:pointer;">${v.id === aktifId ? "✓ " : ""}${escHtml(v.name)}</span>
-      <span onclick="event.stopPropagation(); surumAdiniDuzenle('${jsq(v.id)}');" style="cursor:pointer;" title="Adını düzenle">✎</span>
-      <span onclick="event.stopPropagation(); deleteVersion('${jsq(v.id)}');" style="cursor:pointer;" title="Bu kaydı sil">✕</span>
-    </div>`).join("");
+  const yil = S.akademikTakvim && S.akademikTakvim.ogretimYili ? S.akademikTakvim.ogretimYili : "Öğretim Yılı Belirlenmedi";
   el.innerHTML = `
-    <div class="tab-dropdown no-print surum-chip-wrap">
-      <button class="surum-chip" onclick="toggleTabDropdown('surum-secici')" title="Kaydedilmiş isimli kayıtlar arasında geçiş yapın">
-        <span class="surum-chip-ad">${aktif ? escHtml(aktif.name) : "İsimsiz Çalışma"}</span>
-        ${icon("chevron")}
-      </button>
-      <div id="tabdd-surum-secici" class="tab-dropdown-menu" style="left:0;right:0;width:auto;">
-        ${items || '<div class="tab-dropdown-item small">Henüz isimli bir kayıt yok</div>'}
-      </div>
-    </div>`;
+    <button class="yil-chip" onclick="yilWidgetTiklandi()" title="Yeni öğretim yılına geçmek için tıklayın">
+      <span class="yil-chip-ad">${escHtml(yil)}</span>
+      ${icon("chevron")}
+    </button>`;
 }
 function preDistributionChecks() {
   const warnings = [];

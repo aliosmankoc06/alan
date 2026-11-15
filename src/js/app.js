@@ -25,7 +25,7 @@ renderSidebarBrand();
 renderDalFiltresiWidget();
 applyTheme(currentTheme());
 sonKayitBaslangicDurumunuGoster();
-renderSurumWidget();
+renderYilWidget();
 
 if (typeof bulutSenkronunuKontrolEt === "function") bulutSenkronunuKontrolEt();
 if (typeof bulutBaslat === "function") bulutBaslat();
