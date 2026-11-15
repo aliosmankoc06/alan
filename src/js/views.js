@@ -7012,6 +7012,19 @@ function viewSinif() {
         <input type="checkbox" ${schoolDays.includes(i) ? 'checked' : ''} onchange="toggleSchoolDay('${cls.id}',${i})"> ${d}
       </label>`).join("");
     const isIdari = cls.id === "cl-idari";
+    const kapaliSaatSatirlari = (() => {
+      let html = "";
+      for (let h = 0; h < S.hoursPerDay; h++) {
+        html += `<tr><td class="small" style="text-align:center;">${h + 1}</td>`;
+        DAYS.forEach((d, day) => {
+          const dolu = Object.values(S.schedule).some(c => c.classId === cls.id && c.day === day && c.hour === h);
+          const kapali = !!S.blockedSlots[blockKey(cls.id, day, h)];
+          html += `<td style="text-align:center;"><input type="checkbox" ${kapali ? 'checked' : ''} ${dolu && !kapali ? 'disabled title="Bu saatte zaten ders var"' : ''} onchange="sinifKapaliSaatToggle('${cls.id}',${day},${h},this.checked)"></td>`;
+        });
+        html += "</tr>";
+      }
+      return html;
+    })();
 
     detail = `
       <div style="display:flex;gap:16px;margin-bottom:14px;align-items:center;flex-wrap:wrap;">
@@ -7033,6 +7046,12 @@ function viewSinif() {
         <p class="small">İşletmede mesleki eğitime giden (staj) sınıflar için sadece okula geldikleri günler işaretlenmeli — dağıtım motoru derslerini sadece bu günlere yerleştirir. Okula her gün gelen sınıflar için hepsini işaretli bırakın.</p>
         <div>${dayChecks}</div>
       </div>` : ``}
+      ${isIdari ? '' : `
+      <details class="card" style="margin-bottom:16px;">
+        <summary style="cursor:pointer;font-weight:600;">Kapalı Saatler (tören, gezi, ortak etkinlik — bu sınıfı o saatlerde programdan hariç tut)</summary>
+        <p class="small" style="margin-top:8px;">İşaretlediğiniz saatlere dağıtım motoru ("Programı Dağıt/Yenile") hiçbir ders yerleştirmez. Zaten ders olan bir saat önce o dersi kaldırmadan kapatılamaz.</p>
+        <div style="overflow-x:auto;"><table style="font-size:11px;"><thead><tr><th></th>${DAYS.map(d => `<th>${d}</th>`).join("")}</tr></thead><tbody>${kapaliSaatSatirlari}</tbody></table></div>
+      </details>`}
       <h2>${cls.name} — Atanmış Dersler</h2>
       ${assignedRows || '<p class="small">Henüz ders atanmadı.</p>'}
       ${dersHavuzuDropdown ? `<div style="margin-top:20px;">${dersHavuzuDropdown}</div>` : ``}
@@ -7113,6 +7132,19 @@ function toggleSchoolDay(classId, day) {
   if (!cls.schoolDays) cls.schoolDays = [0, 1, 2, 3, 4];
   if (cls.schoolDays.includes(day)) cls.schoolDays = cls.schoolDays.filter(d => d !== day);
   else { cls.schoolDays.push(day); cls.schoolDays.sort(); }
+  save(); renderMain();
+}
+/* Dağıtım motoru (scheduler.js: isClassFree) S.blockedSlots'u hep okuyordu,
+   ama bu satırı işaretleyecek bir ekran yoktu. Zaten ders olan bir saat
+   kapatılamaz — önce dersin kaldırılması gerekir. */
+function sinifKapaliSaatToggle(classId, day, hour, checked) {
+  if (checked) {
+    const dolu = Object.values(S.schedule).some(c => c.classId === classId && c.day === day && c.hour === hour);
+    if (dolu) { alert("Bu saatte sınıfın zaten bir dersi var — önce o dersi kaldırın ya da başka bir saate taşıyın."); renderMain(); return; }
+    S.blockedSlots[blockKey(classId, day, hour)] = true;
+  } else {
+    delete S.blockedSlots[blockKey(classId, day, hour)];
+  }
   save(); renderMain();
 }
 function gradeFromClassName(name) {
