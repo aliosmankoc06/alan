@@ -4493,9 +4493,26 @@ function sinifIcinDalAdi(sinifAdi, eskiKod) {
   const yeniDal = sube ? dalTanimiForSube(sube) : null;
   return yeniDal ? yeniDal.ad : (DAL_LABELS[eskiKod] || eskiKod);
 }
-function viewBeceriSinavi() {
+/* viewBeceriSinavi() ve aktifDalIcinEkle() aynı sınıf kaynağını kullanıyor
+   — Aktif Dal süzgecine (dalFiltresi) dbfSiniflar() ile aynı desende
+   (ayrıştırılamayan/belirsiz olan her zaman gösterilir) burada da saygı
+   duyulsun diye tek bir yerden hesaplanıyor. */
+function beceriSinavSiniflari() {
   const siniflarKaynagi = S.classes.filter(c => c.grade === 12 && !c.excludeFromDistribution);
-  const siniflar = siniflarKaynagi.length ? siniflarKaynagi.map(c => ({ id: c.name, dal: c.dal })) : [{ id: "12-A", dal: "MBO" }, { id: "12-B", dal: "BMI" }];
+  let siniflar = siniflarKaynagi.length ? siniflarKaynagi.map(c => ({ id: c.name, dal: c.dal })) : [{ id: "12-A", dal: "MBO" }, { id: "12-B", dal: "BMI" }];
+  if (dalFiltresi !== "ALL") {
+    const filtreli = siniflar.filter(s => {
+      const sube = sinifAdindanSubeAyikla(s.id);
+      if (!sube) return true;
+      const dal = dalTanimiForSube(sube);
+      return !dal || dal.id === dalFiltresi;
+    });
+    if (filtreli.length) siniflar = filtreli;
+  }
+  return siniflar;
+}
+function viewBeceriSinavi() {
+  const siniflar = beceriSinavSiniflari();
   if (!siniflar.some(s => s.id === activeBeceriSinif)) activeBeceriSinif = siniflar[0].id;
   const aktifSinifTanimi = siniflar.find(s => s.id === activeBeceriSinif) || siniflar[0];
   const sinifBar = `<div class="row no-print" style="flex-wrap:wrap;">${sekmeDropdown("beceri-sinif", siniflar.map(s => ({ value: s.id, label: s.id + " — " + sinifIcinDalAdi(s.id, s.dal) })), activeBeceriSinif, "setBeceriSinif('{v}')")}</div>`;
@@ -4520,8 +4537,7 @@ function viewBeceriSinavi() {
   </div>`;
 }
 function aktifDalIcinEkle() {
-  const siniflarKaynagi = S.classes.filter(c => c.grade === 12 && !c.excludeFromDistribution);
-  const siniflar = siniflarKaynagi.length ? siniflarKaynagi.map(c => ({ id: c.name, dal: c.dal })) : [{ id: "12-A", dal: "MBO" }, { id: "12-B", dal: "BMI" }];
+  const siniflar = beceriSinavSiniflari();
   const t = siniflar.find(s => s.id === activeBeceriSinif);
   return t ? t.dal : "MBO";
 }
