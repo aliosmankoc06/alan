@@ -7016,22 +7016,24 @@ function donemArsiviOzet(veri) {
     performansKaydiSayisi: (veri.performansKayitlari || []).length
   };
 }
+/* Arşiv kaydının "veri" alanı artık S'in TAMAMININ derin kopyası (eskiden
+   sadece 4 koleksiyon tutuluyordu) — böylece hem "Yedek Al" ile dışa
+   aktarılan dosyaya dahil olur (eski "Farklı Kaydet" sürümleri sadece
+   localStorage'da kalıp yedeğe girmiyordu), hem de Yeni Öğretim Yılına
+   Geç gibi sınıf/öğrenci/staj verisini de değiştiren işlemler öncesi
+   eksiksiz bir geri dönüş noktası sağlar. donemArsiviOzet() aynı anahtarları
+   (ogrenciListesi vb.) okuduğu için eski 4-koleksiyonlu arşivlerle de,
+   yeni tam-kopya arşivlerle de sorunsuz çalışır. */
+function donemArsiviKaydet(etiket) {
+  const arsiv = { id: uid("da"), etiket: etiket.trim(), tarih: new Date().toLocaleDateString("tr-TR"), veri: JSON.parse(JSON.stringify(S)) };
+  S.donemArsivi.push(arsiv);
+  return arsiv;
+}
 function donemArsiviOlustur() {
   const varsayilan = (S.akademikTakvim && S.akademikTakvim.ogretimYili ? S.akademikTakvim.ogretimYili + " " : "") + "Dönem Sonu";
-  promptModal("Bu arşive hangi etiketi vermek istersiniz? (örn. \"2025-2026 2. Dönem Sonu\")\n\nÖğrenci Listesi, Sınav Notları, Performans Notları ve Performans Kayıtları'nın şu anki hali, bu etiketle dondurulup arşivlenecek — yeni dönemde bu kayıtları değiştirseniz/sıfırlasanız da buradaki arşiv kopyası aynen kalır.", varsayilan, (etiket) => {
+  promptModal("Bu arşive hangi etiketi vermek istersiniz? (örn. \"2025-2026 2. Dönem Sonu\")\n\nŞu anki çalışmanızın tamamı bu etiketle dondurulup arşivlenecek — ileride değiştirseniz/sıfırlasanız da buradaki arşiv kopyası aynen kalır.", varsayilan, (etiket) => {
     if (!etiket || !etiket.trim()) return;
-    const arsiv = {
-      id: uid("da"),
-      etiket: etiket.trim(),
-      tarih: new Date().toLocaleDateString("tr-TR"),
-      veri: {
-        ogrenciListesi: JSON.parse(JSON.stringify(S.ogrenciListesi)),
-        sinavNotlari: JSON.parse(JSON.stringify(S.sinavNotlari)),
-        performansNotlari: JSON.parse(JSON.stringify(S.performansNotlari)),
-        performansKayitlari: JSON.parse(JSON.stringify(S.performansKayitlari))
-      }
-    };
-    S.donemArsivi.push(arsiv);
+    const arsiv = donemArsiviKaydet(etiket);
     save(); renderMain();
     alert(`"${arsiv.etiket}" arşivlendi.`);
   });
@@ -7083,10 +7085,119 @@ function renderDonemArsiviKarti() {
   return `
   <div class="card">
     <h2>Dönem Arşivi</h2>
-    <p class="small">Dönem veya yıl sonunda, o anki Öğrenci Listesi/Sınav Notları/Performans Notları/Performans Kayıtları'nı etiketli bir arşive dondurun — yeni döneme geçip bu kayıtları değiştirseniz veya sıfırlasanız bile, buradaki kopya aynen kalır ve sonradan görüntüleyebilirsiniz. Arşivlenen kayıtlar düzenlenemez, sadece görüntülenir veya silinir.</p>
+    <p class="small">Dönem veya yıl sonunda, şu anki çalışmanızın tamamını etiketli bir arşive dondurun — sonradan değiştirseniz veya sıfırlasanız bile, buradaki kopya aynen kalır ve istediğinizde görüntüleyebilirsiniz. Arşivlenen kayıtlar düzenlenemez, sadece görüntülenir veya silinir. ("Yeni Öğretim Yılına Geç" aşağıda kendi arşivini otomatik oluşturur, burayı ayrıca kullanmanıza gerek yok.)</p>
     <table><thead><tr><th>Etiket</th><th>Tarih</th><th>Özet</th><th></th></tr></thead>
     <tbody>${rows || `<tr><td colspan="4" class="small">Henüz arşiv oluşturulmadı.</td></tr>`}</tbody></table>
     <div class="row"><button class="btn primary" onclick="donemArsiviOlustur()">Şu Anki Durumu Arşivle</button></div>
+  </div>
+  ${renderYeniOgretimYiliKarti()}`;
+}
+
+/* ---- Yeni Öğretim Yılına Geç ----
+   Her öğretim yılı başında sınıfları bir üst sınıfa taşır (9->10->11->12,
+   şube harfi aynı kalır), 12. sınıfları mezun edip aktif çalışmadan çıkarır,
+   ve bunu Öğrenci Listesi + Staj Yerleştirme + Stajda Olan Öğrenciler'e de
+   yayar. Geri dönüşsüz görünse de değil: işlem öncesi şu anki hâlin TAMAMI
+   Dönem Arşivi'ne otomatik kaydedilir (bkz. donemArsiviKaydet), yani eski
+   yıl hiçbir zaman kaybolmaz. Yıllık/Günlük Plan'ın kendi "sınıf" alanı
+   serbest metin olduğu için (örn. "AMP 10-A") buraya KASITLI OLARAK dahil
+   edilmedi — güvenle ayrıştırılamayan bir alanı sessizce tahmin etmek yerine
+   kullanıcının elle kontrol etmesi tercih edildi. */
+function yeniOgretimYiliOnerisi() {
+  const simdiki = S.akademikTakvim && S.akademikTakvim.ogretimYili ? S.akademikTakvim.ogretimYili : "";
+  const m = String(simdiki).match(/^(\d{4})-(\d{4})$/);
+  return m ? (parseInt(m[1], 10) + 1) + "-" + (parseInt(m[2], 10) + 1) : "";
+}
+function yeniOgretimYilinaGec() {
+  const simdikiYil = S.akademikTakvim && S.akademikTakvim.ogretimYili ? S.akademikTakvim.ogretimYili : "";
+  promptModal("Yeni öğretim yılını girin (örn. 2027-2028):", yeniOgretimYiliOnerisi(), (yeniYil) => {
+    if (!yeniYil || !yeniYil.trim()) return;
+    const bumpOlacak = S.classes.filter(c => c.grade >= 9 && c.grade <= 11).length;
+    const mezunOlacak = S.classes.filter(c => c.grade === 12).length;
+    confirmDestructive(
+      `"${yeniYil.trim()}" öğretim yılına geçilecek. Şunlar olacak:\n\n` +
+      `• Şu anki çalışmanızın TAMAMI "${simdikiYil || "Önceki Yıl"} Eğitim-Öğretim Yılı" adıyla Dönem Arşivi'ne otomatik kaydedilecek (Ayarlar'dan her zaman geri açıp görüntüleyebilirsiniz, hiçbir şey kaybolmaz).\n` +
+      `• ${bumpOlacak} sınıf bir üst sınıfa geçecek (örn. 10-A → 11-A). Bu sınıfların DERS ATAMALARI sıfırlanacak — yeni yılın müfredatı farklı olduğu için Ders Programı'ndan yeniden atama yapmanız gerekecek.\n` +
+      `• ${mezunOlacak} sınıf (12. sınıflar) MEZUN olup aktif çalışmadan çıkacak.\n` +
+      `• Öğrenci Listesi'ndeki sınıfları da otomatik güncellenecek, mezunlar listeden çıkacak.\n` +
+      `• Staj Yerleştirme'de planladığınız (eski 11. sınıf, şimdi gerçekten 12. olan) öğrenciler "Stajda Olan Öğrenciler" modülüne taşınacak; eski 12. sınıf (mezun olan) stajyer kayıtları o modülden çıkacak.\n\n` +
+      `Devam edilsin mi?`,
+      () => gerceklestirYeniOgretimYiliGecisi(yeniYil.trim())
+    );
+  });
+}
+function gerceklestirYeniOgretimYiliGecisi(yeniYil) {
+  const eskiYilAdi = (S.akademikTakvim && S.akademikTakvim.ogretimYili ? S.akademikTakvim.ogretimYili : "Önceki Yıl") + " Eğitim-Öğretim Yılı";
+  donemArsiviKaydet(eskiYilAdi);
+
+  // Stajda Olan Öğrenciler: bu yılın aktif (12. sınıf) stajyerleri mezun
+  // oluyor, aktif listeden çıkar (az önce TAMAMI arşivlendiği için kaybolmaz).
+  // Bu adım, aşağıdaki S.students taşıma adımından ÖNCE çalışmalı — yoksa
+  // o adımın az sonra yeni eklediği (eski 11->şimdi 12) kayıtları da
+  // "grade===12" testiyle yanlışlıkla hemen silerdi. Geriye kalan (henüz
+  // 12 olmayan, örn. işletmesi erkenden ayarlanmış bir 11. sınıf) kayıtlar
+  // da aynı şekilde bir üst sınıfa taşınır — aşağıdaki S.students taşıma
+  // adımının "zaten var mı" kontrolü bunu bümlenmemiş (eski) hâliyle değil,
+  // doğru (bümlenmiş) hâliyle karşılaştırsın diye.
+  S.stajdakiOgrenciler = S.stajdakiOgrenciler.filter(st => sinifAdiGradeCikar(st.sinif) !== 12);
+  S.stajdakiOgrenciler.forEach(st => { const yeni = sinifAdiBirUstSinifaBump(st.sinif); if (yeni) st.sinif = yeni; });
+
+  // Staj Yerleştirme (S.students): eski 11. sınıf planlananlar şimdi
+  // gerçekten 12. oldu -> Stajda Olan Öğrenciler'e taşı; eski 12. (mezun)
+  // tamamen çıkar; 9/10 ya da sınıf numarası ayrıştırılamayanlar dokunulmadan kalır.
+  const mevcutOkulNolar = new Set(S.stajdakiOgrenciler.map(st => st.okulNo).filter(Boolean));
+  S.students = S.students.filter(st => {
+    const grade = sinifAdiGradeCikar(st.sinif);
+    if (grade === 11) {
+      if (!(st.okulNo && mevcutOkulNolar.has(st.okulNo))) {
+        S.stajdakiOgrenciler.push({
+          id: uid("sdo"), sinif: sinifAdiBirUstSinifaBump(st.sinif) || st.sinif, okulNo: st.okulNo || "",
+          ad: st.ad || "", dal: st.dal || "", isletme: st.isletme || "", sorumluOgretmenId: "", devamsizlik: {}
+        });
+        if (st.okulNo) mevcutOkulNolar.add(st.okulNo);
+      }
+      return false;
+    }
+    if (grade === 12) return false;
+    return true;
+  });
+
+  // Sınıflar: 9-11 bir üst sınıfa (ders ataması sıfırlanır), 12 mezun olup kaldırılır.
+  const mezunSinifIdleri = new Set();
+  S.classes.forEach(c => {
+    if (c.grade >= 9 && c.grade <= 11) {
+      const yeniAd = sinifAdiBirUstSinifaBump(c.name);
+      if (yeniAd) c.name = yeniAd;
+      c.grade += 1;
+      c.assignments = [];
+    } else if (c.grade === 12) {
+      mezunSinifIdleri.add(c.id);
+    }
+  });
+  mezunSinifIdleri.forEach(id => clearClassSchedule(id));
+  S.classes = S.classes.filter(c => !mezunSinifIdleri.has(c.id));
+  if (activeClassId && mezunSinifIdleri.has(activeClassId)) activeClassId = S.classes[0] ? S.classes[0].id : null;
+
+  // Öğrenci Listesi: mezunlar çıkar, kalanların sınıfı bir üst sınıfa taşınır.
+  S.ogrenciListesi = S.ogrenciListesi
+    .filter(o => sinifAdiGradeCikar(o.sinif) !== 12)
+    .map(o => { const yeni = sinifAdiBirUstSinifaBump(o.sinif); if (yeni) o.sinif = yeni; return o; });
+
+  ensureAkademikTakvim();
+  S.akademikTakvim.ogretimYili = yeniYil;
+
+  save();
+  activeModule = "ana";
+  renderTabbar();
+  renderMain();
+  alert(`"${yeniYil}" öğretim yılına geçildi. Önceki yılınız Dönem Arşivi'nde "${eskiYilAdi}" adıyla saklanıyor.`);
+}
+function renderYeniOgretimYiliKarti() {
+  return `
+  <div class="card">
+    <h2>Yeni Öğretim Yılına Geç</h2>
+    <p class="small">Her öğretim yılı başında, tüm sınıfları bir üst sınıfa taşımak (9-A → 10-A, 10-A → 11-A, 11-A → 12-A gibi) ve 12. sınıfları mezun edip aktif çalışmadan çıkarmak için kullanın. Öğrenci Listesi ve Staj modülleri de otomatik güncellenir. Geçiş öncesi şu anki hâlin tamamı otomatik olarak Dönem Arşivi'ne kaydedilir — hiçbir şey kaybolmaz, istediğinizde geri açıp bakabilirsiniz.</p>
+    <div class="row"><button class="btn primary" onclick="yeniOgretimYilinaGec()">Yeni Öğretim Yılına Geç</button></div>
   </div>`;
 }
 

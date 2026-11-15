@@ -1035,6 +1035,23 @@ function sinifAdindanSubeAyikla(sinifAdi) {
   return m ? (m[1] || m[2]) : null;
 }
 
+/* Yeni Öğretim Yılına Geç — bir sınıf/öğrenci adındaki sınıf numarasını
+   bulup çıkarır (sinifAdiGradeCikar) ya da bir üst sınıfa yükseltir
+   (sinifAdiBirUstSinifaBump), "9-A"/"9/A"/"AMP 9A" gibi her yazım şeklini
+   (sadece ilk rakam dizisine bakarak) kapsar. Rakam bulamazsa null döner —
+   çağıran taraf bunu "ayrıştıramadım, dokunma" olarak ele almalı, asla
+   tahmin etmemeli. */
+function sinifAdiGradeCikar(sinifAdi) {
+  const m = String(sinifAdi || "").match(/\d+/);
+  return m ? parseInt(m[0], 10) : null;
+}
+function sinifAdiBirUstSinifaBump(sinifAdi) {
+  const s = String(sinifAdi || "");
+  const m = s.match(/\d+/);
+  if (!m) return null;
+  return s.slice(0, m.index) + (parseInt(m[0], 10) + 1) + s.slice(m.index + m[0].length);
+}
+
 /* Zamanlayıcının kendi eski/sabit dal kategorisi (DAL_LABELS) ile yeni,
    Ayarlar'dan yönetilen S.dalTanimlari arasındaki köprü. "Gerçek" bir dal
    olmayan, zamanlayıcıya özgü kategoriler (9. sınıf ortak, seçmeli, idari
