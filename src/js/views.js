@@ -4025,13 +4025,14 @@ function deleteBakimKarti(id) {
   save(); renderMain();
 }
 function selectBakimKarti(id) { activeBakimKartId = id; renderMain(); }
+function closeBakimKarti() { activeBakimKartId = null; renderMain(); }
 function bakimKartiYeniDonemBaslat(id) {
   const kart = bakimKartiById(id);
   if (!kart) return;
-  if (!confirm("Bu kart olduğu gibi arşivde kalacak (Bakım Yapılan Tezgahlar sekmesinden her zaman erişebilirsiniz) ve aynı makine/tür için boş, temiz yeni bir kart açılacak. Devam edilsin mi?")) return;
+  if (!confirm("Bu kart olduğu gibi arşivde kalacak (Bakım Yapılan Tezgahlar sekmesinden her zaman erişebilirsiniz) ve aynı makine/tür için boş, temiz yeni bir kart açılacak. Bu sayfa kapanıp listeye dönülecek. Devam edilsin mi?")) return;
   const yeni = { id: uid("bk"), makineId: kart.makineId, tur: kart.tur, ay: "", olusturmaTarihi: formatTrTarih(new Date()), imzaOgretmeni: kart.imzaOgretmeni, durumlar: {}, tarihler: {}, aciklama: "" };
   S.bakimKartlari.push(yeni);
-  activeBakimKartId = yeni.id;
+  activeBakimKartId = null;
   save(); renderMain();
 }
 function bakimKartiTarihleriOtomaticDoldur(id) {
@@ -4164,38 +4165,50 @@ function viewBakimFormuBolumu() {
     if (tb !== null) return 1;
     return (a.ay || "").localeCompare(b.ay || "", "tr");
   });
-  if (entries.length && !entries.some(e => e.id === activeBakimKartId)) activeBakimKartId = entries[0].id;
-  if (!entries.length) activeBakimKartId = null;
-  const active = bakimKartiById(activeBakimKartId);
+  // Sekme her açıldığında/kart silindiğinde otomatik olarak bir kart AÇIK
+  // gösterilmez — kapalı/liste hâli varsayılandır, bir kart ancak açıkça
+  // "Aç" denince görüntülenir (bkz. Makine Envanteri'ndeki "Detay" deseni).
+  if (activeBakimKartId && !entries.some(e => e.id === activeBakimKartId)) activeBakimKartId = null;
+  const active = activeBakimKartId ? bakimKartiById(activeBakimKartId) : null;
   const etiketFor = k => {
     const m = makineById(k.makineId);
     const tanim = BAKIM_FORMU_TURLERI[k.tur];
     return (m ? m.ad : "?") + " · " + (tanim ? tanim.label : k.tur) + (k.ay ? " · " + k.ay : "");
   };
-  const listHtml = entries.length === 0 ? "" : `
+  const listSatirlari = entries.map(k => {
+    const m = makineById(k.makineId);
+    const tanim = BAKIM_FORMU_TURLERI[k.tur];
+    const sorun = bakimKartiSorunSayisi(k);
+    return `<tr>
+      <td>${escHtml(m ? m.ad : "?")}</td>
+      <td>${tanim ? escHtml(tanim.label) : escHtml(k.tur)}</td>
+      <td>${escHtml(k.ay || "—")}</td>
+      <td>${escHtml(k.olusturmaTarihi || "—")}</td>
+      <td style="text-align:center;">${sorun ? `<span class="pill warn">${sorun}</span>` : "0"}</td>
+      <td><button class="btn" onclick="selectBakimKarti('${k.id}')">Aç</button></td>
+    </tr>`;
+  }).join("");
+  const listHtml = `
     <div class="card no-print">
-      <div class="row" style="flex-wrap:wrap;">
-        ${sekmeDropdown("bakim-kart", entries.map(e => ({ value: e.id, label: etiketFor(e) })), activeBakimKartId, "selectBakimKarti('{v}')")}
-      </div>
+      <h2>Bakım Kartları</h2>
+      ${entries.length ? `<div style="overflow-x:auto;"><table><thead><tr><th>Makine</th><th>Tür</th><th>Ay</th><th>Oluşturulma Tarihi</th><th>Sorunlu Madde</th><th></th></tr></thead><tbody>${listSatirlari}</tbody></table></div>`
+        : `<p class="small">Henüz bir bakım kartı oluşturulmadı. "Yeni Bakım Kartı Oluştur" ile başlayın: önce makineyi, sonra bakım türünü (Günlük/Haftalık/6 Aylık) seçin.</p>`}
     </div>`;
   const dosyaAdi = active ? "Bakım Formu - " + etiketFor(active) : "Atölye Bakım Formu";
-  const content = active ? renderBakimKartiDetay(active) : `<div class="card small" style="text-align:center;padding:30px 20px;">Henüz bir bakım kartı oluşturulmadı. "Yeni Bakım Kartı Oluştur" ile başlayın: önce makineyi, sonra bakım türünü (Günlük/Haftalık/6 Aylık) seçin.</div>`;
   return `
   <div class="card no-print">
     <h2>Atölye Bakım Formu</h2>
-    <p class="small">Bir makine ve bakım türü seçip yeni bir kart oluşturun; açılan formdaki her maddeyi tıklayarak işaretleyin (sırayla: boş → ${Object.values(BAKIM_FORMU_TURLERI).map(t => t.durumSecenekleri.map(d => d.sembol).join("→")).join(" / ")} → boş), gerekirse açıklama yazın, imza atacak öğretmeni seçin, sonra yazdırın/indirin.</p>
+    <p class="small">Bir makine ve bakım türü seçip yeni bir kart oluşturun; açılan formdaki her maddeyi tıklayarak işaretleyin (sırayla: boş → ${Object.values(BAKIM_FORMU_TURLERI).map(t => t.durumSecenekleri.map(d => d.sembol).join("→")).join(" / ")} → boş), gerekirse açıklama yazın, imza atacak öğretmeni seçin, sonra yazdırın/indirin. İşiniz bitince "Kapat, Listeye Dön" ile kartı kapatıp temiz listeye geri dönebilirsiniz.</p>
     <div class="row" style="margin-top:8px;">
       <button class="btn primary" onclick="addBakimKartiModal()">Yeni Bakım Kartı Oluştur</button>
+      ${active ? `<button class="btn" onclick="closeBakimKarti()">◀ Kapat, Listeye Dön</button>` : ""}
       ${active ? `<button class="btn" onclick="bakimKartiYeniDonemBaslat('${active.id}')" title="Bu kart arşivde kalır (Bakım Yapılan Tezgahlar'dan erişilebilir), aynı makine/tür için temiz yeni bir kart açılır">Dönemi Tamamla, Yeni Sayfa Aç</button>` : ""}
       ${active ? `<button class="btn danger" onclick="deleteBakimKarti('${active.id}')">Bu Kartı Sil</button>` : ""}
     </div>
     ${active ? belgeAracCubugu(dosyaAdi) : ""}
   </div>
-  ${listHtml}
-  <div class="print-area">
-    ${belgeYazdirmaBasligi(dosyaAdi)}
-    ${content}
-  </div>`;
+  ${active ? "" : listHtml}
+  ${active ? `<div class="print-area">${belgeYazdirmaBasligi(dosyaAdi)}${renderBakimKartiDetay(active)}</div>` : ""}`;
 }
 
 /* ---- Bakım Yapılan Tezgahlar: makine bazlı bakım kartı geçmişi ---- */
