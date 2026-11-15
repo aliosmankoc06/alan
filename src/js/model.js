@@ -827,11 +827,31 @@ function normalizeState(s) {
                 secenekler: (hq.secenekler || []).map(sc => ({ id: uid("sc"), harf: sc.harf, metin: sc.metin, dogru: !!sc.dogru })),
                 cevapAnahtari: hq.cevapAnahtari || "",
                 puan: hq.puan,
-                konu: hq.konu || ""
+                konu: hq.konu || "",
+                donem: hq.donem || ""
               });
             });
           });
         });
+      });
+    }
+  }
+  // Yukarıdaki seed migrasyonu ilk kez çalıştığında (soruHavuzuHazirYuklendi
+  // bayrağı henüz yoktu) Dönem alanı henüz tasarlanmamıştı, yani o an
+  // eklenen kayıtlar dönemsiz kaldı. Bu, o kayıtları soruMetni eşleşmesiyle
+  // GERİYE DÖNÜK tek seferlik doldurur — kullanıcının elle değiştirdiği bir
+  // kaydı asla ezmez (sadece dönem alanı hâlâ boşsa doldurur).
+  if (!s.soruHavuzuDonemBackfillUygulandi) {
+    s.soruHavuzuDonemBackfillUygulandi = true;
+    if (typeof SORU_HAVUZU_HAZIR_VERI !== "undefined") {
+      const donemHaritasi = new Map();
+      SORU_HAVUZU_HAZIR_VERI.forEach(hk => {
+        hk.sorular.forEach(hq => {
+          if (hq.donem && !donemHaritasi.has(hq.soruMetni)) donemHaritasi.set(hq.soruMetni, hq.donem);
+        });
+      });
+      s.sinavHavuzu.sorular.forEach(q => {
+        if (!q.donem && donemHaritasi.has(q.soruMetni)) q.donem = donemHaritasi.get(q.soruMetni);
       });
     }
   }
