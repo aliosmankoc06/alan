@@ -160,7 +160,8 @@ function defaultState() {
     seflikHaftalikSaatOverride: null,
     bakimKartlari: [],
     isletmeBelirlemeTutanaklari: [],
-    rehberlikFaaliyetRaporlari: []
+    rehberlikFaaliyetRaporlari: [],
+    sorumlulukSinavlari: []
   };
 }
 
@@ -217,7 +218,8 @@ function emptyState() {
     seflikHaftalikSaatOverride: null,
     bakimKartlari: [],
     isletmeBelirlemeTutanaklari: [],
-    rehberlikFaaliyetRaporlari: []
+    rehberlikFaaliyetRaporlari: [],
+    sorumlulukSinavlari: []
   };
 }
 
@@ -312,6 +314,16 @@ function normalizeState(s) {
     if (typeof r.veliToplantiSayisi !== "string") r.veliToplantiSayisi = "";
     if (typeof r.yonlendirilenKizSayisi !== "string") r.yonlendirilenKizSayisi = "";
     if (typeof r.yonlendirilenErkekSayisi !== "string") r.yonlendirilenErkekSayisi = "";
+  });
+  if (!Array.isArray(s.sorumlulukSinavlari)) s.sorumlulukSinavlari = [];
+  s.sorumlulukSinavlari.forEach(sn => {
+    if (!Array.isArray(sn.kriterler)) sn.kriterler = [];
+    sn.kriterler.forEach(k => { if (!k.id) k.id = uid("ssk"); });
+    ["dersAdi", "sinifSube", "okulNo", "ogrenciAdi", "sinavTarihi", "sinavSaati", "sinavKonusu", "sinavSuresi",
+     "ogrenmeBirimi", "donem", "aracGerecler", "islemSirasi", "cevapAnahtari",
+     "komisyonUyesi1", "komisyonUyesi2", "komisyonBaskani", "sonuc"].forEach(f => {
+      if (typeof sn[f] !== "string") sn[f] = "";
+    });
   });
   if (!Array.isArray(s.bakimKartlari)) s.bakimKartlari = [];
   s.bakimKartlari.forEach(k => {

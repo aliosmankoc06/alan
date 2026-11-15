@@ -21,6 +21,7 @@ const MODULES = [
   { id: "sonuc-karnesi", label: "Sonuç Karnesi", icon: "badge", group: "Sınav & Değerlendirme" },
   { id: "kalfalik-ustalik", label: "Kalfalık / Ustalık Sınavı", icon: "medal", group: "Sınav & Değerlendirme" },
   { id: "beceri-sinavi", label: "Beceri Sınavı", icon: "clipboardCheck", group: "Sınav & Değerlendirme" },
+  { id: "sorumluluk-sinavi", label: "Sorumluluk Sınavı", icon: "penSquare", group: "Sınav & Değerlendirme" },
   { id: "donem-raporlari", label: "Ders Kesim / Yazılı Teslim", icon: "report", group: "Dönem Raporları" },
   { id: "seflik-raporu", label: "Şeflik Aylık Raporu", icon: "calendarCheck", group: "Dönem Raporları" },
   { id: "ayarlar", label: "Ayarlar", icon: "settings", group: "Sistem" }
@@ -218,6 +219,7 @@ function renderMain() {
   if (activeModule === "sonuc-karnesi") { el.innerHTML = viewSonucKarnesi(); return; }
   if (activeModule === "kalfalik-ustalik") { el.innerHTML = viewKalfalikUstalik(); return; }
   if (activeModule === "beceri-sinavi") { el.innerHTML = viewBeceriSinavi(); return; }
+  if (activeModule === "sorumluluk-sinavi") { el.innerHTML = viewSorumlulukSinavi(); return; }
   if (activeModule === "donem-raporlari") { el.innerHTML = viewDonemRaporlari(); return; }
   if (activeModule === "seflik-raporu") { el.innerHTML = viewSeflikRaporlari(); return; }
   if (activeModule === "sinav-havuzu") { el.innerHTML = viewSinavHavuzu(); return; }
@@ -5696,6 +5698,197 @@ function aktifDalIcinEkle() {
   const siniflar = beceriSinavSiniflari();
   const t = siniflar.find(s => s.id === activeBeceriSinif);
   return t ? t.dal : "MBO";
+}
+
+/* ============================================================
+   SORUMLULUK SINAVI (ayrı, serbest modül)
+   Gönderilen gerçek "Sorumluluk Sınavı Değerlendirme Formu" örneklerinden
+   (CNC Tornalama, Matkap Bileme, İşletmelerde Mesleki Eğitim 9/10) alınan
+   yapı: Beceri Sınavı'yla aynı AİLEDEN (kriter+puan tablosu, cevap
+   anahtarı, GEÇTİ/KALDI, komisyon imzası) ama kasıtlı olarak Beceri
+   Sınavı'nın kendi kodunu/verisini PAYLAŞMIYOR — Beceri Sınavı yıl sonu,
+   12. sınıf (AMP) özelinde sabit bir akışken, Sorumluluk Sınavı HERHANGİ
+   bir ders/konu için, istenildiği zaman, tek bir öğrenciye uygulanan ayrı
+   bir değerlendirme; aynı koda bağlamak ikisini de kırılgan hale getirirdi.
+   ============================================================ */
+function sorumlulukSinaviById(id) { return S.sorumlulukSinavlari.find(x => x.id === id); }
+let activeSorumlulukSinavId = null;
+function addSorumlulukSinaviModal() {
+  const root = document.getElementById("modal-root");
+  root.innerHTML = `
+    <div class="modal-bg" onclick="if(event.target===this) closeModal()">
+      <div class="modal" style="width:400px;">
+        <h3>Yeni Sorumluluk Sınavı</h3>
+        <label class="small">Ders Adı</label><input type="text" id="ss-ders" style="width:100%" placeholder="örn. Bilgisayar Kontrollü Üretim (CNC/CAM)">
+        <label class="small">Öğrenci Adı Soyadı</label><input type="text" id="ss-ogrenci" style="width:100%">
+        <label class="small">Sınıf / Şube</label><input type="text" id="ss-sinif" style="width:100%" placeholder="örn. AMP - 12 / B">
+        <label class="small">Okul Numarası</label><input type="text" id="ss-okulno" style="width:100%">
+        <div class="row">
+          <button class="btn primary" onclick="saveNewSorumlulukSinavi()">Oluştur</button>
+          <button class="btn" onclick="closeModal()">İptal</button>
+        </div>
+      </div>
+    </div>`;
+}
+function saveNewSorumlulukSinavi() {
+  const ogrenciAdi = document.getElementById("ss-ogrenci").value.trim();
+  if (!ogrenciAdi) { alert("Öğrenci adı girin."); return; }
+  const sn = {
+    id: uid("ss"),
+    dersAdi: document.getElementById("ss-ders").value.trim(),
+    ogrenciAdi, sinifSube: document.getElementById("ss-sinif").value.trim(), okulNo: document.getElementById("ss-okulno").value.trim(),
+    sinavTarihi: "", sinavSaati: "", sinavKonusu: "", sinavSuresi: "", ogrenmeBirimi: "", donem: "", aracGerecler: "",
+    islemSirasi: "", kriterler: [], cevapAnahtari: "", komisyonUyesi1: "", komisyonUyesi2: "", komisyonBaskani: S.kurumBilgileri.mudurAdi || "", sonuc: ""
+  };
+  S.sorumlulukSinavlari.push(sn);
+  activeSorumlulukSinavId = sn.id;
+  save(); closeModal(); renderMain();
+}
+function deleteSorumlulukSinavi(id) {
+  if (!confirm("Bu sorumluluk sınavı kaydı silinsin mi? Bu işlem geri alınamaz.")) return;
+  S.sorumlulukSinavlari = S.sorumlulukSinavlari.filter(x => x.id !== id);
+  if (activeSorumlulukSinavId === id) activeSorumlulukSinavId = null;
+  save(); renderMain();
+}
+function selectSorumlulukSinavi(id) { activeSorumlulukSinavId = id; renderMain(); }
+function updateSorumlulukSinaviAlan(id, field, value) {
+  const sn = sorumlulukSinaviById(id);
+  if (sn) sn[field] = value;
+  save(); renderMain();
+}
+function ssKriterEkle(id) {
+  const sn = sorumlulukSinaviById(id);
+  if (!sn) return;
+  sn.kriterler.push({ id: uid("ssk"), kriter: "", aciklama: "", takdirEdilenPuan: "", alinanPuan: "" });
+  save(); renderMain();
+}
+function ssKriterGuncelle(id, kriterId, field, value) {
+  const sn = sorumlulukSinaviById(id);
+  const k = sn && sn.kriterler.find(x => x.id === kriterId);
+  if (k) k[field] = value;
+  save(); renderMain();
+}
+function ssKriterSil(id, kriterId) {
+  const sn = sorumlulukSinaviById(id);
+  if (!sn) return;
+  sn.kriterler = sn.kriterler.filter(x => x.id !== kriterId);
+  save(); renderMain();
+}
+function ssToplamPuanlar(sn) {
+  let takdir = 0, alinan = 0;
+  sn.kriterler.forEach(k => {
+    const t = parseFloat(String(k.takdirEdilenPuan).replace(",", "."));
+    const a = parseFloat(String(k.alinanPuan).replace(",", "."));
+    if (!isNaN(t)) takdir += t;
+    if (!isNaN(a)) alinan += a;
+  });
+  return { takdir, alinan };
+}
+function renderSorumlulukSinaviDetay(sn) {
+  const k = S.kurumBilgileri;
+  const { takdir, alinan } = ssToplamPuanlar(sn);
+  const kriterRows = sn.kriterler.map(kr => `
+    <tr>
+      <td class="no-print"><input type="text" style="width:100%" value="${escHtml(kr.kriter)}" onchange="ssKriterGuncelle('${sn.id}','${kr.id}','kriter',this.value)"></td>
+      <td class="print-only-cell">${escHtml(kr.kriter)}</td>
+      <td class="no-print"><textarea rows="2" style="width:100%" onchange="ssKriterGuncelle('${sn.id}','${kr.id}','aciklama',this.value)">${escHtml(kr.aciklama)}</textarea></td>
+      <td class="print-only-cell">${escHtml(kr.aciklama)}</td>
+      <td class="no-print"><input type="number" style="width:60px;text-align:center;" value="${escHtml(kr.takdirEdilenPuan)}" onchange="ssKriterGuncelle('${sn.id}','${kr.id}','takdirEdilenPuan',this.value)"></td>
+      <td class="print-only-cell" style="text-align:center;">${escHtml(kr.takdirEdilenPuan)}</td>
+      <td class="no-print"><input type="number" style="width:60px;text-align:center;" value="${escHtml(kr.alinanPuan)}" onchange="ssKriterGuncelle('${sn.id}','${kr.id}','alinanPuan',this.value)"></td>
+      <td class="print-only-cell" style="text-align:center;">${escHtml(kr.alinanPuan)}</td>
+      <td class="no-print"><button class="btn danger" onclick="ssKriterSil('${sn.id}','${kr.id}')">Sil</button></td>
+    </tr>`).join("");
+  const metaSatir = (label, field, value, placeholder) => `
+    <tr><td><b>${label}</b></td><td class="no-print"><input type="text" style="width:100%" value="${escHtml(value)}" placeholder="${placeholder || ''}" onchange="updateSorumlulukSinaviAlan('${sn.id}','${field}',this.value)"></td><td class="print-only-cell">${escHtml(value || '—')}</td></tr>`;
+  return `
+  <div style="text-align:center;margin-bottom:10px;">
+    <div style="font-weight:700;">${escHtml((k.okulAdi || "").toLocaleUpperCase("tr-TR"))} MÜDÜRLÜĞÜ</div>
+    <div style="font-weight:700;">${escHtml(S.akademikTakvim ? S.akademikTakvim.ogretimYili : "")} EĞİTİM-ÖĞRETİM YILI — ${escHtml((k.alanAdi || "").toLocaleUpperCase("tr-TR"))}</div>
+    <div style="font-weight:700;">${escHtml((sn.dersAdi || "").toLocaleUpperCase("tr-TR"))} DERSİ SORUMLULUK SINAVI DEĞERLENDİRME FORMU</div>
+  </div>
+  <table style="margin-bottom:12px;">
+    <tr><td><b>Öğrencinin Adı Soyadı</b></td><td class="no-print"><input type="text" style="width:100%" value="${escHtml(sn.ogrenciAdi)}" onchange="updateSorumlulukSinaviAlan('${sn.id}','ogrenciAdi',this.value)"></td><td class="print-only-cell">${escHtml(sn.ogrenciAdi)}</td></tr>
+    ${metaSatir("Sınıf / Şube", "sinifSube", sn.sinifSube, "örn. AMP - 12 / B")}
+    ${metaSatir("Okul Numarası", "okulNo", sn.okulNo)}
+    ${metaSatir("Sınav Tarihi", "sinavTarihi", sn.sinavTarihi, "gg.aa.yyyy")}
+    ${metaSatir("Sınav Saati", "sinavSaati", sn.sinavSaati)}
+    ${metaSatir("Sınav Konusu", "sinavKonusu", sn.sinavKonusu)}
+    ${metaSatir("Sınav Süresi", "sinavSuresi", sn.sinavSuresi, "örn. 40 Dakika")}
+    ${metaSatir("Öğrenme Birimi", "ogrenmeBirimi", sn.ogrenmeBirimi)}
+    ${metaSatir("Dönem", "donem", sn.donem)}
+    ${metaSatir("Kullanılacak Araç Gereçler", "aracGerecler", sn.aracGerecler)}
+  </table>
+  <h3>İşlem Sırası</h3>
+  <textarea class="no-print" rows="5" style="width:100%;" placeholder="1. ...&#10;2. ...&#10;3. ..." onchange="updateSorumlulukSinaviAlan('${sn.id}','islemSirasi',this.value)">${escHtml(sn.islemSirasi)}</textarea>
+  <div class="print-only" style="white-space:pre-wrap;margin-top:6px;">${escHtml(sn.islemSirasi || '—')}</div>
+  <h3 style="margin-top:14px;">Değerlendirme Çizelgesi</h3>
+  <table><thead><tr><th>Değerlendirme Kriteri</th><th>Açıklama</th><th>Takdir Edilen Puan</th><th>Alınan Puan</th><th class="no-print"></th></tr></thead>
+  <tbody>${kriterRows || `<tr><td colspan="5" class="small">Henüz kriter eklenmedi.</td></tr>`}
+  <tr><td colspan="2" style="text-align:right;font-weight:700;">TOPLAM</td><td style="text-align:center;font-weight:700;">${takdir}</td><td style="text-align:center;font-weight:700;">${alinan}</td><td class="no-print"></td></tr>
+  </tbody></table>
+  <div class="row no-print" style="margin-top:6px;"><button class="btn" onclick="ssKriterEkle('${sn.id}')">Kriter Ekle</button></div>
+  ${takdir > 0 && takdir !== 100 ? `<p class="small no-print" style="color:var(--warn);">Not: Takdir edilen puanların toplamı 100 değil (${takdir}) — gerçek belgelerde her zaman 100 olmalı, kontrol edin.</p>` : ""}
+  <div class="row no-print" style="margin-top:14px;align-items:center;">
+    <label class="small" style="font-weight:600;">Sınav Sonucu:</label>
+    <select onchange="updateSorumlulukSinaviAlan('${sn.id}','sonuc',this.value)">
+      <option value="" ${sn.sonuc === "" ? "selected" : ""}>— seçilmedi —</option>
+      <option value="GEÇTİ" ${sn.sonuc === "GEÇTİ" ? "selected" : ""}>GEÇTİ</option>
+      <option value="KALDI" ${sn.sonuc === "KALDI" ? "selected" : ""}>KALDI</option>
+    </select>
+    <span class="small">(Alınan toplam puan: ${alinan})</span>
+  </div>
+  <p class="print-only" style="margin-top:10px;font-weight:700;">SINAV SONUCU: ${sn.sonuc === "GEÇTİ" ? "GEÇTİ ☑ &nbsp;&nbsp; KALDI ☐" : sn.sonuc === "KALDI" ? "GEÇTİ ☐ &nbsp;&nbsp; KALDI ☑" : "GEÇTİ ☐ &nbsp;&nbsp; KALDI ☐"} &nbsp;&nbsp; Sınav Notu: ${alinan}</p>
+  <h3 style="margin-top:14px;">Cevap Anahtarı</h3>
+  <textarea class="no-print" rows="5" style="width:100%;" placeholder="Sınavın cevap anahtarını/doğru çözüm yolunu buraya yazın." onchange="updateSorumlulukSinaviAlan('${sn.id}','cevapAnahtari',this.value)">${escHtml(sn.cevapAnahtari)}</textarea>
+  <div class="print-only" style="white-space:pre-wrap;margin-top:6px;">${escHtml(sn.cevapAnahtari || '—')}</div>
+  <div style="display:flex;justify-content:space-between;margin-top:24px;flex-wrap:wrap;gap:16px;">
+    <div>
+      <label class="small no-print">Sınav Komisyonu Üyesi</label>
+      <div class="no-print"><input type="text" style="width:160px" value="${escHtml(sn.komisyonUyesi1)}" onchange="updateSorumlulukSinaviAlan('${sn.id}','komisyonUyesi1',this.value)"></div>
+      <div style="margin-top:8px;font-weight:600;">${escHtml(sn.komisyonUyesi1 || '')}</div>
+      <div class="small">Sınav Komisyonu Üyesi</div>
+    </div>
+    <div>
+      <label class="small no-print">Sınav Komisyonu Üyesi</label>
+      <div class="no-print"><input type="text" style="width:160px" value="${escHtml(sn.komisyonUyesi2)}" onchange="updateSorumlulukSinaviAlan('${sn.id}','komisyonUyesi2',this.value)"></div>
+      <div style="margin-top:8px;font-weight:600;">${escHtml(sn.komisyonUyesi2 || '')}</div>
+      <div class="small">Sınav Komisyonu Üyesi</div>
+    </div>
+    <div style="text-align:right;">
+      <div style="margin-top:28px;font-weight:600;">${escHtml(sn.komisyonBaskani || k.mudurAdi || '')}</div>
+      <div class="small">Komisyon Başkanı / Okul Müdürü</div>
+    </div>
+  </div>`;
+}
+function viewSorumlulukSinavi() {
+  const entries = S.sorumlulukSinavlari.slice().sort((a, b) => (a.sinifSube || "").localeCompare(b.sinifSube || "", "tr") || (a.ogrenciAdi || "").localeCompare(b.ogrenciAdi || "", "tr"));
+  if (entries.length && !entries.some(e => e.id === activeSorumlulukSinavId)) activeSorumlulukSinavId = entries[0].id;
+  if (!entries.length) activeSorumlulukSinavId = null;
+  const active = sorumlulukSinaviById(activeSorumlulukSinavId);
+  const listHtml = entries.length === 0 ? "" : `
+    <div class="card no-print">
+      <div class="row" style="flex-wrap:wrap;">
+        ${sekmeDropdown("ss", entries.map(e => ({ value: e.id, label: e.ogrenciAdi + (e.dersAdi ? " · " + e.dersAdi : "") + (e.sinifSube ? " · " + e.sinifSube : "") })), activeSorumlulukSinavId, "selectSorumlulukSinavi('{v}')")}
+      </div>
+    </div>`;
+  const dosyaAdi = active ? "Sorumluluk Sınavı - " + active.ogrenciAdi + (active.dersAdi ? " - " + active.dersAdi : "") : "Sorumluluk Sınavı";
+  const content = active ? renderSorumlulukSinaviDetay(active) : `<div class="card small" style="text-align:center;padding:30px 20px;">Henüz bir sorumluluk sınavı oluşturulmadı. "Yeni Sorumluluk Sınavı" ile başlayın.</div>`;
+  return `
+  <div class="card no-print">
+    <h2>Sorumluluk Sınavı</h2>
+    <p class="small">Herhangi bir ders/konu için, istediğiniz zaman tek bir öğrenciye uygulanan sorumluluk/telafi sınavı değerlendirme formu. Kriterleri siz tanımlarsınız (takdir edilen puanların toplamı 100 olmalı), alınan puanları girdikçe toplam otomatik hesaplanır; cevap anahtarı ve işlem sırası serbest metin olarak yazılır.</p>
+    <div class="row">
+      <button class="btn primary" onclick="addSorumlulukSinaviModal()">Yeni Sorumluluk Sınavı</button>
+      ${active ? `<button class="btn danger" onclick="deleteSorumlulukSinavi('${active.id}')">Bu Kaydı Sil</button>` : ""}
+    </div>
+    ${active ? belgeAracCubugu(dosyaAdi) : ""}
+  </div>
+  ${listHtml}
+  <div class="print-area">
+    ${belgeYazdirmaBasligi(dosyaAdi)}
+    <div class="card" style="overflow-x:auto;">${content}</div>
+  </div>`;
 }
 function beceriKomisyonKararKarti(sinif, dal) {
   const k = S.kurumBilgileri;
