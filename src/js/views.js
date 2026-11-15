@@ -2276,8 +2276,10 @@ function viewOgrenciListesi() {
     <p class="small">Her öğretim yılı başında e-Okul'dan aldığınız "Sınıf Listesi" raporunu (PDF veya Word) buraya yükleyin (birden fazla sınıf/şube aynı dosyada olabilir, hepsi tek seferde işlenir). Beceri Sınavı, Kalfalık/Ustalık Sınavı ve Norm Kadro gibi öğrenci listesine ihtiyaç duyan modüller bu listeyi buradan çeker — yıl değiştiğinde tek yapmanız gereken, yeni dosyayı buradan yüklemek.</p>
     <div class="row">
       <button class="btn primary" onclick="importOgrenciListesiFromPdf()">Sınıf Listesi PDF Yükle</button>
+      <button class="btn" onclick="importOgrenciListesiFromWord()">Sınıf Listesi Word Yükle</button>
     </div>
     ${sinifBar}
+    ${activeOgrenciListesiSinif ? belgeAracCubugu(dosyaAdi) : ''}
   </div>
   ${activeOgrenciListesiSinif ? `
   <div class="print-area">
@@ -6691,6 +6693,10 @@ function viewHavuz() {
       <td class="no-print"><div class="row" style="margin:0;"><button class="btn" onclick="editCourse('${c.id}')">Düzenle</button><button class="btn danger" onclick="deleteCourse('${c.id}')">Sil</button></div></td>
     </tr>`).join("");
   return `
+  <div class="card no-print">
+    <h2>Ders Havuzu</h2>
+    ${belgeAracCubugu("Ders Havuzu")}
+  </div>
   <div class="print-area">
     ${belgeYazdirmaBasligi("Ders Havuzu")}
     <div class="card">
@@ -6799,15 +6805,19 @@ function viewOgretmen() {
     const target = (typeof t.hoursTarget === "number") ? t.hoursTarget : "";
     const mode = t.hoursMode || "min";
     const title = teacherTitleLabel(t.id);
+    const modeLabel = mode === 'exact' ? 'Tam bu kadar (sabit)' : 'En az (asgari)';
     return `<tr>
       <td>${t.name} ${title !== 'Öğretmen' ? `<span class="pill info">${title}</span>` : ''}</td>
       <td>${dersSaat}</td>
-      <td><input type="number" min="0" placeholder="—" value="${target}" style="width:70px" onchange="setTeacherHoursTarget('${t.id}',this.value)"></td>
-      <td><select onchange="setTeacherHoursMode('${t.id}',this.value)">
+      <td class="no-print"><input type="number" min="0" placeholder="—" value="${target}" style="width:70px" onchange="setTeacherHoursTarget('${t.id}',this.value)"></td>
+      <td class="print-only-cell">${target !== "" ? target : "—"}</td>
+      <td class="no-print"><select onchange="setTeacherHoursMode('${t.id}',this.value)">
             <option value="min" ${mode === 'min' ? 'selected' : ''}>En az (asgari)</option>
             <option value="exact" ${mode === 'exact' ? 'selected' : ''}>Tam bu kadar (sabit)</option>
           </select></td>
-      <td><input type="text" placeholder="örn. Alan Şefi" value="${escHtml(t.unvan || '')}" style="width:100%" onchange="setTeacherUnvan('${t.id}',this.value)"></td>
+      <td class="print-only-cell">${modeLabel}</td>
+      <td class="no-print"><input type="text" placeholder="örn. Alan Şefi" value="${escHtml(t.unvan || '')}" style="width:100%" onchange="setTeacherUnvan('${t.id}',this.value)"></td>
+      <td class="print-only-cell">${escHtml(t.unvan || '—')}</td>
       <td class="no-print"><div class="row" style="margin:0;"><button class="btn" onclick="editTeacher('${t.id}')">Düzenle</button><button class="btn danger" onclick="deleteTeacher('${t.id}')">Sil</button></div></td>
     </tr>`;
   }).join("");
@@ -6818,6 +6828,7 @@ function viewOgretmen() {
       <input type="text" id="new-teacher" placeholder="Yeni öğretmen adı">
       <button class="btn primary" onclick="addTeacher()">Ekle</button>
     </div>
+    ${belgeAracCubugu("Öğretmenler")}
   </div>
   <div class="print-area">
     ${belgeYazdirmaBasligi("Öğretmenler")}
