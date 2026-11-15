@@ -5680,7 +5680,9 @@ function sinavSiniflari() {
 function selectSinavSinif(classId) { activeSinavSinifId = classId; activeSinavCourseId = null; activeSinavTab = "havuz"; renderMain(); }
 function selectSinavCourse(courseId) { activeSinavCourseId = courseId; activeSinavTab = "havuz"; renderMain(); }
 function setSinavTab(id) { activeSinavTab = id; renderMain(); }
-function selectKagit(id) { activeSinavKagitId = id; renderMain(); }
+let activeKagitBelge = "soru";
+function selectKagit(id) { activeSinavKagitId = id; activeKagitBelge = "soru"; renderMain(); }
+function setKagitBelge(id) { activeKagitBelge = id; renderMain(); }
 
 function sinavTurDegisti() {
   const tur = document.getElementById("sr-tur").value;
@@ -5963,6 +5965,41 @@ function renderKagitDetay(kagit) {
       <div style="border-bottom:1px solid #ccc;height:22px;margin-top:8px;"></div>
     </div>`;
   }).join("");
+  const cevapBlok = seciliSorular.map((q, i) => {
+    if (q.tur === "test") {
+      const dogru = (q.secenekler || []).find(s => s.dogru);
+      return `<div style="margin-top:10px;"><b>${i + 1}.</b> ${dogru ? `${escHtml(dogru.harf)}) ${escHtml(dogru.metin)}` : '<i>Doğru seçenek işaretlenmemiş</i>'} <span class="small">(${q.puan} puan)</span></div>`;
+    }
+    return `<div style="margin-top:10px;"><b>${i + 1}.</b> ${q.cevapAnahtari ? nlToBr(q.cevapAnahtari) : '<i>Cevap anahtarı girilmedi</i>'} <span class="small">(${q.puan} puan)</span></div>`;
+  }).join("");
+
+  const belgeSeciciBar = `
+  <div class="row no-print" style="margin-top:10px;">
+    <button class="btn ${activeKagitBelge === 'soru' ? 'primary' : ''}" onclick="setKagitBelge('soru')">Sınav Kağıdı</button>
+    <button class="btn ${activeKagitBelge === 'cevap' ? 'primary' : ''}" onclick="setKagitBelge('cevap')">Cevap Anahtarı</button>
+  </div>`;
+
+  const printBelgeIcerik = activeKagitBelge === "cevap"
+    ? `${belgeYazdirmaBasligi(kagit.baslik + " — Cevap Anahtarı")}
+       <div style="text-align:center;margin-bottom:14px;">
+         <div style="font-weight:700;">${classObj ? escHtml(classObj.name) : ''} · ${course ? escHtml(course.name) : ''}</div>
+         <div style="font-weight:700;">${escHtml(kagit.baslik)} — CEVAP ANAHTARI</div>
+       </div>
+       ${cevapBlok || '<div class="small">Henüz soru seçilmedi.</div>'}
+       <div style="margin-top:20px;font-weight:600;">TOPLAM: ${toplamPuan} PUAN</div>`
+    : `${belgeYazdirmaBasligi(kagit.baslik)}
+       <div style="text-align:center;margin-bottom:14px;">
+         <div style="font-weight:700;">${classObj ? escHtml(classObj.name) : ''} · ${course ? escHtml(course.name) : ''}</div>
+         <div style="font-weight:700;">${escHtml(kagit.baslik)}</div>
+       </div>
+       <div class="row small" style="justify-content:space-between;flex-wrap:wrap;">
+         <span>Adı Soyadı: ......................................</span>
+         <span>No: ..........</span>
+         <span>Tarih: ${escHtml(kagit.tarih) || '..../..../........'}</span>
+         <span>Süre: ${kagit.sure || '.....'} dk</span>
+       </div>
+       ${soruBlok || '<div class="small">Henüz soru seçilmedi.</div>'}
+       <div style="margin-top:20px;font-weight:600;">TOPLAM: ${toplamPuan} PUAN</div>`;
 
   return `
   <div class="card no-print">
@@ -5978,21 +6015,11 @@ function renderKagitDetay(kagit) {
   <div class="card no-print">
     <h3 style="margin-top:0;">Soru Seç (${seciliSorular.length} soru seçili, toplam ${toplamPuan} puan)</h3>
     ${secimHtml}
+    <p class="small" style="margin-top:8px;">Seçtiğiniz sorular hem Sınav Kağıdı'nda (öğrenciye verilecek, cevaplar gizli) hem Cevap Anahtarı'nda (doğru cevaplarla) otomatik oluşur — aşağıdan ikisi arasında geçiş yapıp ayrı ayrı yazdırabilir/indirebilirsiniz.</p>
+    ${belgeSeciciBar}
   </div>
   <div class="print-area">
-    ${belgeYazdirmaBasligi(kagit.baslik)}
-    <div style="text-align:center;margin-bottom:14px;">
-      <div style="font-weight:700;">${classObj ? escHtml(classObj.name) : ''} · ${course ? escHtml(course.name) : ''}</div>
-      <div style="font-weight:700;">${escHtml(kagit.baslik)}</div>
-    </div>
-    <div class="row small" style="justify-content:space-between;flex-wrap:wrap;">
-      <span>Adı Soyadı: ......................................</span>
-      <span>No: ..........</span>
-      <span>Tarih: ${escHtml(kagit.tarih) || '..../..../........'}</span>
-      <span>Süre: ${kagit.sure || '.....'} dk</span>
-    </div>
-    ${soruBlok || '<div class="small">Henüz soru seçilmedi.</div>'}
-    <div style="margin-top:20px;font-weight:600;">TOPLAM: ${toplamPuan} PUAN</div>
+    ${printBelgeIcerik}
   </div>`;
 }
 function viewKagitlarBolum(classId, courseId) {
@@ -6008,7 +6035,7 @@ function viewKagitlarBolum(classId, courseId) {
       </div>
     </div>`;
 
-  const dosyaAdi = active ? active.baslik : "Sınav Kağıdı";
+  const dosyaAdi = active ? (active.baslik + (activeKagitBelge === "cevap" ? " - Cevap Anahtarı" : "")) : "Sınav Kağıdı";
   const content = active ? renderKagitDetay(active) : `<div class="card small" style="text-align:center;padding:30px 20px;">Henüz sınav kağıdı oluşturulmadı. "Sınav Kağıdı Hazırla" ile oluşturup soru havuzundan sorularınızı seçebilirsiniz.</div>`;
 
   return `
