@@ -5681,8 +5681,10 @@ function selectSinavSinif(classId) { activeSinavSinifId = classId; activeSinavCo
 function selectSinavCourse(courseId) { activeSinavCourseId = courseId; activeSinavTab = "havuz"; renderMain(); }
 function setSinavTab(id) { activeSinavTab = id; renderMain(); }
 let activeKagitBelge = "soru";
-function selectKagit(id) { activeSinavKagitId = id; activeKagitBelge = "soru"; renderMain(); }
+let activeKagitDonemFiltre = null;
+function selectKagit(id) { activeSinavKagitId = id; activeKagitBelge = "soru"; activeKagitDonemFiltre = null; renderMain(); }
 function setKagitBelge(id) { activeKagitBelge = id; renderMain(); }
+function setKagitDonemFiltre(v) { activeKagitDonemFiltre = v; renderMain(); }
 
 function sinavTurDegisti() {
   const tur = document.getElementById("sr-tur").value;
@@ -5717,7 +5719,13 @@ function soruFormAlanlari(q) {
       <textarea id="sr-cevap" rows="2" style="width:100%">${q ? escHtml(q.cevapAnahtari || '') : ''}</textarea>
     </div>
     <label class="small">Puan</label><input type="number" id="sr-puan" value="${q ? q.puan : 10}" min="0" style="width:100%">
-    <label class="small">Konu (opsiyonel)</label><input type="text" id="sr-konu" value="${q ? escHtml(q.konu || '') : ''}" style="width:100%">`;
+    <label class="small">Konu (opsiyonel)</label><input type="text" id="sr-konu" value="${q ? escHtml(q.konu || '') : ''}" style="width:100%">
+    <label class="small">Dönem</label>
+    <select id="sr-donem" style="width:100%">
+      <option value="" ${!q || !q.donem ? 'selected' : ''}>Belirtilmemiş (her iki dönemde de gösterilir)</option>
+      <option value="1. Dönem" ${q && q.donem === '1. Dönem' ? 'selected' : ''}>1. Dönem</option>
+      <option value="2. Dönem" ${q && q.donem === '2. Dönem' ? 'selected' : ''}>2. Dönem</option>
+    </select>`;
 }
 function addSoru(classId, courseId) {
   const root = document.getElementById("modal-root");
@@ -5770,7 +5778,8 @@ function readSoruForm() {
     secenekler,
     cevapAnahtari: tur !== "test" ? document.getElementById("sr-cevap").value.trim() : "",
     puan: Number(document.getElementById("sr-puan").value) || 0,
-    konu: document.getElementById("sr-konu").value.trim()
+    konu: document.getElementById("sr-konu").value.trim(),
+    donem: document.getElementById("sr-donem").value
   };
 }
 function saveNewSoru() {
@@ -5807,7 +5816,7 @@ function viewSoruHavuzuBolum(classId, courseId) {
     return `
     <div class="card" style="page-break-inside:avoid;">
       <div class="row" style="justify-content:space-between;align-items:flex-start;">
-        <div><b>${i + 1}.</b> ${escHtml(q.soruMetni)} <span class="small">(${turEtiket} · ${q.puan} puan${q.konu ? ' · ' + escHtml(q.konu) : ''})</span></div>
+        <div><b>${i + 1}.</b> ${escHtml(q.soruMetni)} <span class="small">(${turEtiket} · ${q.puan} puan${q.konu ? ' · ' + escHtml(q.konu) : ''}${q.donem ? ' · ' + escHtml(q.donem) : ''})</span></div>
         <div class="row no-print">
           <button class="btn" onclick="editSoru('${q.id}')">Düzenle</button>
           <button class="btn danger" onclick="deleteSoru('${q.id}')">Sil</button>
@@ -5940,12 +5949,25 @@ function toggleKagitSoru(kagitId, soruId) {
 function renderKagitDetay(kagit) {
   const classObj = classById(kagit.classId);
   const course = courseById(kagit.courseId);
-  const havuz = S.sinavHavuzu.sorular.filter(q => q.classId === kagit.classId && q.courseId === kagit.courseId && (kagit.format === "karma" || q.tur === kagit.format));
-  const secimHtml = havuz.length === 0 ? `<div class="small">Bu format için soru havuzunda uygun soru yok. Önce "Soru Havuzu" sekmesinden soru ekleyin.</div>` : havuz.map(q => `
+  // Dönem filtresi: hiçbir şey seçilmemişse (activeKagitDonemFiltre === null)
+  // kağıdın kendi "Dönem" alanına otomatik uyar — kullanıcı her seferinde elle
+  // seçmek zorunda kalmaz. "Dönem belirtilmemiş" sorular HER ZAMAN gösterilir
+  // (hangi filtre seçili olursa olsun) — hiçbir soru sessizce kaybolmaz.
+  const etkinDonemFiltre = activeKagitDonemFiltre || kagit.donem || "ALL";
+  const havuzTumu = S.sinavHavuzu.sorular.filter(q => q.classId === kagit.classId && q.courseId === kagit.courseId && (kagit.format === "karma" || q.tur === kagit.format));
+  const havuz = etkinDonemFiltre === "ALL" ? havuzTumu : havuzTumu.filter(q => !q.donem || q.donem === etkinDonemFiltre);
+  const donemFiltreBar = `
+    <div class="row no-print small" style="margin-bottom:8px;gap:6px;">
+      <span style="align-self:center;">Dönem:</span>
+      <button class="btn ${etkinDonemFiltre === 'ALL' ? 'primary' : ''}" style="padding:4px 9px;font-size:11.5px;" onclick="setKagitDonemFiltre('ALL')">Tümü (${havuzTumu.length})</button>
+      <button class="btn ${etkinDonemFiltre === '1. Dönem' ? 'primary' : ''}" style="padding:4px 9px;font-size:11.5px;" onclick="setKagitDonemFiltre('1. Dönem')">1. Dönem</button>
+      <button class="btn ${etkinDonemFiltre === '2. Dönem' ? 'primary' : ''}" style="padding:4px 9px;font-size:11.5px;" onclick="setKagitDonemFiltre('2. Dönem')">2. Dönem</button>
+    </div>`;
+  const secimHtml = havuzTumu.length === 0 ? `<div class="small">Bu format için soru havuzunda uygun soru yok. Önce "Soru Havuzu" sekmesinden soru ekleyin.</div>` : donemFiltreBar + (havuz.length === 0 ? `<div class="small">Bu dönem için uygun soru yok.</div>` : havuz.map(q => `
     <label class="row small" style="align-items:flex-start;gap:8px;">
       <input type="checkbox" ${kagit.soruIdleri.includes(q.id) ? 'checked' : ''} onchange="toggleKagitSoru('${kagit.id}','${q.id}')">
-      <span>${escHtml(q.soruMetni)} <i>(${q.puan} puan)</i></span>
-    </label>`).join("<br>");
+      <span>${escHtml(q.soruMetni)} <i>(${q.puan} puan${q.donem ? ' · ' + escHtml(q.donem) : ''})</i></span>
+    </label>`).join("<br>"));
 
   const seciliSorular = kagit.soruIdleri.map(soruById).filter(Boolean);
   const toplamPuan = seciliSorular.reduce((a, q) => a + (q.puan || 0), 0);

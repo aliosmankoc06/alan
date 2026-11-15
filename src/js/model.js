@@ -504,6 +504,7 @@ function normalizeState(s) {
     if (!Array.isArray(q.secenekler)) q.secenekler = [];
     q.secenekler.forEach(o => { if (!o.id) o.id = uid("sc"); });
     if (typeof q.puan !== "number") q.puan = Number(q.puan) || 10;
+    if (typeof q.donem !== "string") q.donem = "";
   });
   if (!Array.isArray(s.sinavKagitlari)) s.sinavKagitlari = [];
   s.sinavKagitlari.forEach(k => {
