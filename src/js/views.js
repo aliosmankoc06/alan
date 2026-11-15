@@ -6695,13 +6695,70 @@ function renderDonemArsiviKarti() {
 }
 
 /* ---- Ana Sayfa ---- */
+/* Ana Sayfa'nın gösterdiği "Dikkat Gerektirenler" listesi — her zaman
+   S'teki GERÇEK veriden hesaplanır, sol menüdeki Aktif Dal süzgecinden
+   bağımsızdır (dashboard her zaman alan genelini göstermeli, Excel'e
+   aktarma ile aynı ilkeyle). Spekülatif/varsayımsal bir uyarı yok, sadece
+   doğrudan hesaplanabilen somut durumlar listelenir. */
+function anaSayfaUyarilari() {
+  const uyarilar = [];
+
+  if (S.akademikTakvim && S.akademikTakvim.sinavTarihleri) {
+    const etiketler = { d1s1: "1. Dönem 1. Yazılı Sınavlar", d1s2: "1. Dönem 2. Yazılı Sınavlar", d2s1: "2. Dönem 1. Yazılı Sınavlar", d2s2: "2. Dönem 2. Yazılı Sınavlar" };
+    const bugun = new Date(); bugun.setHours(0, 0, 0, 0);
+    let enYakin = null;
+    Object.keys(etiketler).forEach(key => {
+      const d = parseTrTarih((S.akademikTakvim.sinavTarihleri || {})[key]);
+      if (!d) return;
+      const gun = Math.round((d - bugun) / 86400000);
+      if (gun >= 0 && (!enYakin || gun < enYakin.gun)) enYakin = { etiket: etiketler[key], gun, tarihStr: formatTrTarih(d) };
+    });
+    if (enYakin && enYakin.gun <= 30) {
+      uyarilar.push({ metin: `${escHtml(enYakin.etiket)}: ${enYakin.gun === 0 ? "bugün" : enYakin.gun + " gün sonra"} (${enYakin.tarihStr})`, action: "setModule('sinav-havuzu')" });
+    }
+  }
+
+  const ncIlgiliSiniflar = S.classes.filter(c => c.id !== "cl-idari" && (c.assignments || []).length > 0 && !c.id.startsWith("isletme-"));
+  const ncEksik = ncIlgiliSiniflar.filter(cls => S.normKadro.ogrenciSayilari[cls.id] === undefined);
+  if (ncEksik.length) {
+    uyarilar.push({ metin: `Norm Kadro'da ${ncEksik.length} sınıfın öğrenci sayısı henüz girilmedi`, action: "setModule('norm-kadro')" });
+  }
+
+  const dagitimEksik = S.classes.filter(c => c.grade > 0 && !c.excludeFromDistribution && c.id !== "cl-idari").filter(cls => {
+    const totalHours = (cls.assignments || []).reduce((s, a) => { const crs = courseById(a.courseId); return s + (crs ? crs.hours : 0); }, 0);
+    const dagitilmis = Object.values(S.schedule).filter(x => x.classId === cls.id).length;
+    return totalHours > 0 && dagitilmis !== totalHours;
+  });
+  if (dagitimEksik.length) {
+    uyarilar.push({ metin: `${dagitimEksik.length} sınıfın ders dağıtımı tam değil: ${dagitimEksik.map(c => c.name).join(", ")}`, action: `setModule('ders-programi'); setTab('sinif'); activeClassId='${jsq(dagitimEksik[0].id)}';` });
+  }
+
+  if (!S.donemArsivi.length) {
+    uyarilar.push({ metin: "Henüz bir Dönem Arşivi oluşturulmadı (Ayarlar'dan dönem/yıl sonunda kayıtları dondurabilirsiniz)", action: "setModule('ayarlar')" });
+  }
+
+  const arizaliMakineler = S.envanter.makineler.filter(m => /ar[ıi]z/i.test(m.durum || ""));
+  if (arizaliMakineler.length) {
+    uyarilar.push({ metin: `${arizaliMakineler.length} makine "Arızalı" durumda`, action: "setModule('atolye-envanter')" });
+  }
+
+  return uyarilar;
+}
 function viewAna() {
   const k = S.kurumBilgileri;
+  const uyarilar = anaSayfaUyarilari();
+  const uyariHtml = uyarilar.length
+    ? `<div class="card no-print">
+        <h2>Dikkat Gerektirenler</h2>
+        ${uyarilar.map(u => `<div class="list-item" style="cursor:pointer;" onclick="${u.action}">${escHtml(u.metin)}</div>`).join("")}
+      </div>`
+    : `<div class="card no-print"><p class="small">Şu an dikkat gerektiren bir şey görünmüyor.</p></div>`;
   return `
   <div class="hero-card">
     <h2>Alan Yönetim Sistemi</h2>
     <p class="small">${escHtml(k.okulAdi)} · ${escHtml(k.alanAdi)}</p>
-  </div>`;
+  </div>
+  ${uyariHtml}`;
 }
 function openSavedProgramsModal() {
   const root = document.getElementById("modal-root");
