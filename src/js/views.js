@@ -4955,14 +4955,49 @@ function saveNewPerformansKayit() {
   const ders = document.getElementById("pf-ders").value.trim();
   if (!ders) { alert("Ders adı girin."); return; }
   const tur = document.getElementById("pf-tur").value;
+  // Öğrenci Listesi modülünde bu sınıf kayıtlıysa öğrenciler otomatik
+  // gelir (bkz. sinavNotlariOlusturVeyaGetir ile aynı desen) — elle tek
+  // tek "Öğrenci Ekle" yapmaya gerek kalmaz.
+  const ogrenciler = ogrencilerForSinif(activePerformansSinif).map(o => ({
+    id: uid("og"), sira: "", okulNo: o.okulNo, ad: (o.ad + " " + o.soyad).trim(), puanlar: new Array(8).fill(0)
+  }));
   const k = {
     id: uid("pf"), tur, ders, sinif: activePerformansSinif, donem: activePerformansDonem,
     ogretimYili: S.akademikTakvim ? S.akademikTakvim.ogretimYili : "",
-    ogrenciler: []
+    ogrenciler
   };
   S.performansKayitlari.push(k);
   activePerformansId[tur] = k.id;
   save(); closeModal(); renderMain();
+}
+function performansSenkronizeEt(kayitId) {
+  const k = kayitById(kayitId);
+  if (!k) return;
+  const mevcut = new Set(k.ogrenciler.filter(o => o.okulNo).map(o => o.okulNo));
+  let eklenen = 0;
+  ogrencilerForSinif(k.sinif).forEach(o => {
+    if (o.okulNo && mevcut.has(o.okulNo)) return;
+    k.ogrenciler.push({ id: uid("og"), sira: "", okulNo: o.okulNo, ad: (o.ad + " " + o.soyad).trim(), puanlar: new Array(8).fill(0) });
+    if (o.okulNo) mevcut.add(o.okulNo);
+    eklenen++;
+  });
+  save(); renderMain();
+  alert(eklenen ? eklenen + " öğrenci Öğrenci Listesi'nden eklendi." : "Eklenecek yeni öğrenci yok — liste zaten güncel.");
+}
+function dagitPerformansPuan(kayitId, ogrenciId, deger) {
+  const k = kayitById(kayitId);
+  const o = k && k.ogrenciler.find(x => x.id === ogrenciId);
+  if (!o) return;
+  const toplam = Math.max(0, Math.min(100, Math.round(Number(deger) || 0)));
+  const agirliklar = S.performansAgirliklari[k.tur];
+  const oranlar = agirliklar.map(w => toplam * w / 100);
+  const tabanlar = oranlar.map(v => Math.floor(v));
+  let kalan = toplam - tabanlar.reduce((a, b) => a + b, 0);
+  const kusuratSirasi = oranlar.map((v, i) => [i, v - Math.floor(v)]).sort((a, b) => b[1] - a[1]);
+  const sonuc = tabanlar.slice();
+  for (let i = 0; i < kalan; i++) sonuc[kusuratSirasi[i][0]]++;
+  o.puanlar = sonuc.map((v, i) => Math.min(v, agirliklar[i]));
+  save(); renderMain();
 }
 function editPerformansKayitMeta(id) {
   const k = kayitById(id);
@@ -5082,6 +5117,7 @@ function renderPerformansKayitDetay(k) {
       <td class="print-only-cell">${escHtml(o.okulNo)}</td>
       <td class="no-print"><input type="text" value="${escHtml(o.ad)}" style="width:160px" onchange="updateOgrenci('${k.id}','${o.id}','ad',this.value)"></td>
       <td class="print-only-cell">${escHtml(o.ad)}</td>
+      <td class="no-print"><input type="number" min="0" max="100" placeholder="Toplam gir" style="width:70px;text-align:center;" title="Toplam puanı buraya girin — aşağıdaki kriterlere ağırlıklarına göre otomatik dağıtılır; dağıtımdan sonra istediğiniz kriteri yine de elle değiştirebilirsiniz." onchange="dagitPerformansPuan('${k.id}','${o.id}',this.value); this.value='';"></td>
       ${kriterler.map(([, w], ki) => `<td><input class="no-print" type="number" min="0" max="${w}" value="${o.puanlar[ki]}" style="width:44px;text-align:center;" onchange="updateOgrenciPuan('${k.id}','${o.id}',${ki},this.value)"><span class="print-only-inline">${o.puanlar[ki]}</span></td>`).join("")}
       <td style="font-weight:600;">${toplam}</td>
       <td class="no-print"><button class="btn danger" onclick="removeOgrenci('${k.id}','${o.id}')">Sil</button></td>
@@ -5106,12 +5142,16 @@ function renderPerformansKayitDetay(k) {
     <div style="overflow-x:auto;">
     <table><thead><tr>
       <th>S.N</th><th>Okul No</th><th>Adı ve Soyadı</th>
+      <th class="no-print">Toplamdan<br>Dağıt</th>
       ${kriterler.map(([label, w]) => `<th>${escHtml(label)}<br><span class="small">(Max: ${w})</span></th>`).join("")}
       <th>Toplam Puan<br><span class="small">(100)</span></th><th class="no-print"></th>
     </tr></thead>
-    <tbody>${rows || `<tr><td colspan="${5 + kriterler.length}" class="small">Henüz öğrenci eklenmedi.</td></tr>`}</tbody></table>
+    <tbody>${rows || `<tr><td colspan="${6 + kriterler.length}" class="small">Bu sınıfta Öğrenci Listesi'nde kayıtlı öğrenci bulunamadı. Önce Öğrenci Listesi modülünden bu sınıfın öğrencilerini ekleyin — sonra "Öğrenci Listesinden Senkronize Et"e basın, ya da "Öğrenci Ekle" ile burada elle de girebilirsiniz.</td></tr>`}</tbody></table>
     </div>
-    <div class="row no-print"><button class="btn" onclick="addOgrenci('${k.id}')">Öğrenci Ekle</button></div>
+    <div class="row no-print">
+      <button class="btn" onclick="performansSenkronizeEt('${k.id}')" title="Öğrenci Listesi'ndeki güncel sınıf listesiyle eşitle">Öğrenci Listesinden Senkronize Et</button>
+      <button class="btn" onclick="addOgrenci('${k.id}')">Öğrenci Ekle</button>
+    </div>
   </div>`;
 }
 function viewPerformansBolum(tur) {
