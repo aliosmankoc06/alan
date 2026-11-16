@@ -752,4 +752,54 @@ const MAKINE_ENVANTERI_HAZIR_VERI = [
       acilDurum: "Atölye Sorumlusu : ___________________________\nTelefon : ___________________________\nBakım Birimi : ___________________________\nAcil Durum : 112"
     }
   },
+  {
+    ad: "CNC TORNA TEZGAHI",
+    lab: "B3 - İmalat İşlemleri Atölyesi",
+    marka: "FEELER",
+    model: "FTC-20L",
+    seriNo: "-",
+    durum: "Çalışıyor",
+    satinAlmaTarihi: "",
+    tedarikci: "Adil Makina",
+    garantiSuresi: "2 Yıl FANUC, 1 Yıl Mekanik ve Elektronik",
+    motorGucu: "15 kW (Fener Mili Motoru)",
+    calismaGerilimi: "",
+    agirlik: "3850 kg",
+    sorumluPersonel: "",
+    notlar: "FANUC 0i-TF Plus kontrol ünitesi, 10 istasyonlu hidrolik taret, 10'' hidrolik ayna, maks. tornalama çapı Ø350mm, maks. tornalama boyu 613mm",
+    talimat: {
+      teknik: "Marka: FEELER\nModel: FTC-20L\nSeri No: -\nDurum: Çalışıyor\nNotlar: FANUC 0i-TF Plus kontrol ünitesi, 10 istasyonlu hidrolik taret, 10'' hidrolik ayna, maks. tornalama çapı Ø350mm, maks. tornalama boyu 613mm",
+      hazirlik: "1. Makine çevresinin temiz ve düzenli olduğundan emin olun\n2. Acil durdurma düğmesinin çalıştığını kontrol edin\n3. Kapı emniyet denetleyicisinin düzgün çalıştığını kontrol edin\n4. Soğutma sıvısı (kesme sıvısı) seviyesini kontrol edin\n5. İş parçasını hidrolik aynaya güvenli şekilde sabitleyin\n6. Taretteki takımların sıra ve ölçülerini kontrol edin\n7. Program yüklemesini ve simülasyonunu (grafik modda) kontrol edin\n8. Referans noktalarına (home position) gidin",
+      calistirma: "1. Makineyi ana şalterden çalıştırın, FANUC 0i-TF Plus kontrolünü başlatın\n2. Hidrolik sistemin basınca ulaşmasını bekleyin\n3. Eksen hareketlerini (X/Z) manuel modda kontrol edin\n4. Programı yükleyin, takım ofsetlerini kontrol edin\n5. İlk parça için düşük feed override (%50) ile dry run yapın\n6. Kapıyı kapatıp otomatik moda geçin\n7. İşlem sırasında taret dönüşünü ve talaş konveyörünü takip edin\n8. Parça bitiminde ölçüm alıp gerekirse ofset düzeltmesi yapın",
+      guvenlik: "⚠️ Makineyi kullanmadan önce mutlaka eğitim alın\n⚠️ Kişisel koruyucu donanımları (gözlük, eldiven, iş ayakkabısı) kullanın\n⚠️ Gevşek giysiler, takılar, uzun saçlar tehlike oluşturur - bağlayın/çıkarın\n⚠️ Kapı kapalı değilken fener mili veya taret çalıştırılmaz\n⚠️ Makine çalışırken kesinlikle ölçüm, temizlik veya ayar yapmayın\n⚠️ Acil durdurma düğmesinin yerini bilin ve acil durumda kullanın\n⚠️ Makineyi başkasına devretmeden önce mutlaka durdurun\n⚠️ Arıza durumunda makineyi durdurun ve yetkili personele haber verin\n⚠️ Elektrik, hidrolik veya CNC yazılım arızalarında kendiniz müdahale etmeyin\n⚠️ İş kazalarını derhal amirlerinize bildirin\n⚠️ Alkol, uyuşturucu veya yorgunluk halinde makine kullanmayın",
+      bakim: "• Her gün: Talaş konveyörü ve tezgah içi temizliği yapın\n• Her gün: Kesme sıvısı seviyesini kontrol edin\n• Haftalık: Lineer yataklama ve vidalı millerin otomatik yağlama sistemini kontrol edin\n• Haftalık: Hidrolik taret ve ayna basıncını kontrol edin\n• Aylık: Elektrik dolabı havalandırıcısını ve filtreleri temizleyin\n• Aylık: Kapı emniyet denetleyicisini test edin\n• Yıllık: FANUC servis kontrolü ve profesyonel kalibrasyon",
+      sikSorular: "SORUN: Taret dönmüyor/takım değişimi yapmıyor\nÇÖZÜM: Hidrolik basıncı ve taret sensörlerini kontrol edin, yetkili servise bildirin\n\nSORUN: Program alarm veriyor\nÇÖZÜM: FANUC alarm kodunu not alıp kullanım kılavuzuna/servise danışın\n\nSORUN: Yüzey kalitesi/ölçü hatası var\nÇÖZÜM: Takım ofsetlerini ve aşınmayı kontrol edin, kalibrasyon gerekiyorsa bildirin\n\nSORUN: Kesme sıvısı gelmiyor\nÇÖZÜM: Pompa ve filtre kontrolü yapın, boru tıkanıklığını kontrol edin",
+      acilDurum: "Atölye Sorumlusu : ___________________________\nTelefon : ___________________________\nBakım Birimi : ___________________________\nAcil Durum : 112"
+    }
+  },
+  {
+    ad: "CNC DİK İŞLEME MERKEZİ",
+    lab: "B3 - İmalat İşlemleri Atölyesi",
+    marka: "DEMIX",
+    model: "SED-855",
+    seriNo: "-",
+    durum: "Çalışıyor",
+    satinAlmaTarihi: "",
+    tedarikci: "Adil Makina",
+    garantiSuresi: "",
+    motorGucu: "7.5/11 kW (İş Mili Gücü)",
+    calismaGerilimi: "",
+    agirlik: "4700 kg",
+    sorumluPersonel: "",
+    notlar: "BT40 iş mili konik, maks. iş mili devri 12000 rpm, 24 takımlı magazin, 4 eksen puntalı 200mm divizör, tablo boyutu 500x1000mm",
+    talimat: {
+      teknik: "Marka: DEMIX\nModel: SED-855\nSeri No: -\nDurum: Çalışıyor\nNotlar: BT40 iş mili konik, maks. iş mili devri 12000 rpm, 24 takımlı magazin, 4 eksen puntalı 200mm divizör, tablo boyutu 500x1000mm",
+      hazirlik: "1. Makine çevresinin temiz ve düzenli olduğundan emin olun\n2. Acil durdurma düğmesinin çalıştığını kontrol edin\n3. Dış koruma kabininin ve kapılarının sağlam olduğunu kontrol edin\n4. İş parçasını tablaya (T-slot) veya divizöre güvenli şekilde sabitleyin\n5. Takım magazinindeki takımların sıra ve ölçülerini kontrol edin\n6. Pnömatik (havalı) sistem basıncını kontrol edin\n7. Program yüklemesini ve simülasyonunu kontrol edin\n8. Referans noktalarına (home position) gidin",
+      calistirma: "1. Makineyi ana şalterden çalıştırın, CNC kontrol sistemini başlatın\n2. Eksen hareketlerini (X/Y/Z) manuel/MPG modda kontrol edin\n3. Programı yükleyin, takım ofsetlerini ve iş mili koniğini (BT40) kontrol edin\n4. İlk parça için düşük feed override ile dry run yapın\n5. Kapıyı kapatıp otomatik moda geçin\n6. Takım değiştirme sırasında (magazin, 2.5sn) makineye müdahale etmeyin\n7. İşlem sırasında hava/su tabancası ile talaş temizliğini sadece makine dururken yapın\n8. Parça bitiminde ölçüm alıp gerekirse ofset düzeltmesi yapın",
+      guvenlik: "⚠️ Makineyi kullanmadan önce mutlaka eğitim alın\n⚠️ Kişisel koruyucu donanımları (gözlük, eldiven, iş ayakkabısı) kullanın\n⚠️ Gevşek giysiler, takılar, uzun saçlar tehlike oluşturur - bağlayın/çıkarın\n⚠️ Kapı/kabin kapalı değilken iş mili veya takım değişimi çalıştırılmaz\n⚠️ Makine çalışırken kesinlikle ölçüm, temizlik veya ayar yapmayın\n⚠️ Acil durdurma düğmesinin yerini bilin ve acil durumda kullanın\n⚠️ Makineyi başkasına devretmeden önce mutlaka durdurun\n⚠️ Arıza durumunda makineyi durdurun ve yetkili personele haber verin\n⚠️ Elektrik, pnömatik veya CNC yazılım arızalarında kendiniz müdahale etmeyin\n⚠️ İş kazalarını derhal amirlerinize bildirin\n⚠️ Alkol, uyuşturucu veya yorgunluk halinde makine kullanmayın",
+      bakim: "• Her gün: Talaş yıkama/temizleme sistemini ve tezgah içini temizleyin\n• Her gün: İş mili yağ soğutma seviyesini kontrol edin\n• Haftalık: Lineer kızaklar ve vidalı milin otomatik yağlama sistemini kontrol edin\n• Haftalık: Teleskopik muhafazaları ve P4 sınıfı rulman setini kontrol edin\n• Aylık: Pnömatik sistem basıncını ve hava filtrelerini kontrol edin\n• Aylık: Takım magazini ve değiştirme mekanizmasını kontrol edin\n• Yıllık: Profesyonel servis ve kalibrasyon",
+      sikSorular: "SORUN: Takım değişimi yapmıyor/magazin takılıyor\nÇÖZÜM: Magazin sensörlerini ve takım yuvalarını kontrol edin, yetkili servise bildirin\n\nSORUN: Program alarm veriyor\nÇÖZÜM: Alarm kodunu not alıp kullanım kılavuzuna/servise danışın\n\nSORUN: Yüzey kalitesi/ölçü hatası var\nÇÖZÜM: Takım ofsetlerini ve aşınmayı kontrol edin, kalibrasyon gerekiyorsa bildirin\n\nSORUN: Soğutma/yağlama çalışmıyor\nÇÖZÜM: Pompa, filtre ve seviye kontrolü yapın, boru tıkanıklığını kontrol edin",
+      acilDurum: "Atölye Sorumlusu : ___________________________\nTelefon : ___________________________\nBakım Birimi : ___________________________\nAcil Durum : 112"
+    }
+  },
 ];
