@@ -744,6 +744,16 @@ function normalizeState(s) {
         s.dersProgramiKasim2026Uyarilari.push(`Çakışma (üzerine yazılmadı): ${DAYS[hucre.day]} ${hucre.hour + 1}. saat, sınıf/işletme "${classId}"`);
         return;
       }
+      // Öğretmen çakışması: aynı öğretmen aynı gün/saatte BAŞKA bir sınıf/işletmede
+      // zaten varsa (farklı classId, dolayısıyla yukarıdaki key kontrolüne takılmaz)
+      // bu hücre de yazılmaz — bir öğretmen aynı anda iki yerde olamaz.
+      const ogretmenCakismasiVarMi = ogretmenIdleri.some(tid =>
+        Object.values(s.schedule).some(c => c.day === hucre.day && c.hour === hucre.hour && c.classId !== classId && c.teacherIds.includes(tid))
+      );
+      if (ogretmenCakismasiVarMi) {
+        s.dersProgramiKasim2026Uyarilari.push(`Öğretmen çakışması (yazılmadı): ${DAYS[hucre.day]} ${hucre.hour + 1}. saat, "${hucre.kind === "isletme" ? hucre.isletme : (hucre.ders || "Rehberlik/Planlama")}"`);
+        return;
+      }
       s.schedule[key] = Object.assign({ day: hucre.day, hour: hucre.hour, classId, assignmentId, courseId, teacherIds: ogretmenIdleri, roomIds: [], locked: true }, extra);
     });
   }
