@@ -15,7 +15,7 @@ const MODULES = [
   { id: "staj-takip", label: "Stajda Olan Öğrenciler", icon: "calendarCheck", group: "Staj" },
   { id: "atolye-envanter", label: "Atölye / Envanter", icon: "tool", group: "Atölye" },
   { id: "performans", label: "Performans Kriterleri", icon: "star", group: "Sınav & Değerlendirme" },
-  { id: "sinav-havuzu", label: "Sınav Havuzu", icon: "question", group: "Sınav & Değerlendirme" },
+  { id: "sinav-havuzu", label: "Sınav Havuzu / Çalışma Kağıdı", icon: "question", group: "Sınav & Değerlendirme" },
   { id: "sinav-notlari", label: "Sınav Notları", icon: "penSquare", group: "Sınav & Değerlendirme" },
   { id: "performans-notlari", label: "Performans Notları", icon: "percent", group: "Sınav & Değerlendirme" },
   { id: "sonuc-karnesi", label: "Sonuç Karnesi", icon: "badge", group: "Sınav & Değerlendirme" },
@@ -7801,8 +7801,8 @@ function viewSinavHavuzu() {
 
   const ustBar = `
   <div class="card no-print">
-    <h2>Sınav Havuzu</h2>
-    <p class="small">Önce sınıf, sonra ders seçin — o ders için soru havuzunuzu oluşturup istediğiniz sorularla sınav kağıdı hazırlayabilirsiniz.</p>
+    <h2>Sınav Havuzu / Çalışma Kağıdı</h2>
+    <p class="small">Önce sınıf, sonra ders seçin — o ders için soru havuzunuzu oluşturun; aynı soru havuzundan hem "Sınav Kağıtları" hem de <b>"Çalışma Kağıdı Hazırla"</b> ile çalışma kağıdı hazırlayabilirsiniz — aşağıda sınıf/ders seçtikten sonra üç sekme (Soru Havuzu / Sınav Kağıtları / Çalışma Kağıdı Hazırla) açılır.</p>
   </div>`;
 
   const sinifBar = `
@@ -7835,7 +7835,7 @@ function viewSinavHavuzu() {
   <div class="row no-print" style="flex-wrap:wrap;">
     <button class="btn ${activeSinavTab === 'havuz' ? 'primary' : ''}" onclick="setSinavTab('havuz')">Soru Havuzu</button>
     <button class="btn ${activeSinavTab === 'kagitlar' ? 'primary' : ''}" onclick="setSinavTab('kagitlar')">Sınav Kağıtları</button>
-    <button class="btn ${activeSinavTab === 'calisma' ? 'primary' : ''}" onclick="setSinavTab('calisma')">Çalışma Soruları</button>
+    <button class="btn ${activeSinavTab === 'calisma' ? 'primary' : ''}" onclick="setSinavTab('calisma')">Çalışma Kağıdı Hazırla</button>
   </div>`;
 
   const govde = activeSinavTab === "kagitlar" ? viewKagitlarBolum(activeSinavSinifId, activeSinavCourseId, "sinav")
