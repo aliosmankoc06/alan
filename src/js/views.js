@@ -6975,30 +6975,65 @@ const ALAN_SEFI_AYLIK_GOREV_HAVUZU = {
     "Yıl sonu alan şefleri değerlendirme toplantısına katılım sağlandı."
   ]
 };
-/* Gerçek makine envanterinden türetilen, tezgaha özel öneri şablonları —
-   statik 12x8'lik havuzu, elinizdeki tezgah sayısı kadar genişletir. Elle
-   50 cümle yazmak yerine envanterdeki her makineyle otomatik eşleşiyor;
-   siz makine eklediğinizde/çıkardığınızda ayrıca güncellemenize gerek yok. */
-const SEFLIK_MAKINE_SABLONLARI = [
-  "{makine} tezgahının periyodik bakımı yapıldı; hareketli aksamın temizliği ve yağlanması sağlandı.",
-  "{makine} tezgahında tespit edilen küçük arıza giderildi, tezgah tekrar kullanıma hazır hâle getirildi.",
-  "{makine} tezgahının güvenlik elemanları (acil stop, koruyucu siperlik, topraklama) kontrol edildi.",
-  "{makine} tezgahı için yedek parça ihtiyacı tespit edilerek tedarik süreci başlatıldı.",
-  "{makine} tezgahının hassasiyet/kalibrasyon kontrolü yapıldı.",
-  "{makine} tezgahının kullanma talimatı gözden geçirilerek güncellendi.",
-  "{makine} tezgahında öğrenci kullanımı öncesi genel kontrol ve temizlik yapıldı.",
-  "{lab} atölyesinde genel düzen, temizlik ve iş güvenliği kontrolü yapıldı."
+/* Gerçek makine envanterinden türetilen, tezgaha özel öneri cümleleri —
+   elle onlarca cümle yazmak yerine envanterdeki HER makineyle (hangi
+   atölyede, kaçıncı tezgah olduğu dahil) otomatik eşleşiyor; siz makine
+   eklediğinizde/çıkardığınızda ayrıca güncellemenize gerek yok.
+   Cümle "{oda} — {makine-ve-numarası}: {aksiyon}" kalıbında kuruluyor —
+   aksiyon kısmı bilerek "yapıldı/tamamlandı" gibi iddialı/sorumluluk
+   yükleyen ifadeler DEĞİL; bakım-onarımı fiilen yapan atölye şeflerine
+   verilen destek/bilgilendirme/katkı ifadeleri (kullanıcı talebi) —
+   ama hepsi aynı kalıpta da değil, bilgilendirme/destek/katkı/iletildi
+   gibi onlarca farklı ifade karışık kullanılıyor. */
+function makineOdaKisaAdi(lab) {
+  const eslesme = /^([A-Za-z0-9]+)\s*-\s*/.exec((lab || "").trim());
+  const kod = eslesme ? eslesme[1] : "";
+  const laboratuvarMi = /lab\.?$/i.test((lab || "").trim());
+  return (kod ? kod + " " : "") + (laboratuvarMi ? "Laboratuvarı" : "Atölyesi");
+}
+function makineNumaralandirilmisAdi(m) {
+  const ayniTip = S.envanter.makineler.filter(x => x.ad === m.ad && x.lab === m.lab);
+  if (ayniTip.length <= 1) return m.ad;
+  const sira = ayniTip.findIndex(x => x.id === m.id) + 1;
+  return sira + " numaralı " + m.ad;
+}
+const SEFLIK_MAKINE_AKSIYON_SABLONLARI = [
+  // Bakım
+  "bakım ihtiyacı tespit edilerek atölye şefine bildirildi",
+  "periyodik bakımının yapılmasına destek sağlandı",
+  "bakım sürecinde atölye şefine yardımcı olundu",
+  "bakım planı gözden geçirilerek ilgili birime bilgi verildi",
+  "yağlama ve temizlik ihtiyacı not edilip atölye şefliğine iletildi",
+  // Arıza tespiti
+  "arıza tespiti yapılarak durum atölye şefliğine iletildi",
+  "arızanın tespit edilmesine yardımcı olundu",
+  "arıza kaynağının belirlenmesinde atölye şefine destek verildi",
+  "üzerinde gözlemlenen aksaklık kayıt altına alındı",
+  // Arıza bilgilendirme
+  "arıza durumu hakkında atölye şefliği bilgilendirildi",
+  "arızayla ilgili bilgi teknik servise iletildi",
+  "tespit edilen sorun hakkında atölye şefine bilgi verildi",
+  "arıza bildirimi ilgili birime yapıldı",
+  // Genel çalışma / kontrol
+  "genel kontrolü yapılarak gözlemler not edildi",
+  "üzerinde yürütülen çalışmalara katkı sağlandı",
+  "güvenlik kontrolleri (acil stop, koruyucu siperlik, topraklama) gözden geçirildi",
+  "kullanım talimatının güncellenmesine destek olundu",
+  "yedek parça ihtiyacı belirlenerek ilgili birime bildirildi",
+  "hassasiyet/kalibrasyon kontrolüne yardımcı olundu",
+  "öğrenci kullanımı öncesi genel kontrolüne katkı sağlandı"
 ];
 function seflikMakineTabanliOneriUret(ay) {
   const makineler = S.envanter.makineler;
   if (!makineler || !makineler.length) return [];
   const ayOffset = TR_AYLAR.indexOf(ay) >= 0 ? TR_AYLAR.indexOf(ay) : 0;
-  const ornekSayisi = Math.min(makineler.length, 8);
+  const ornekSayisi = Math.min(makineler.length, 16);
   const sonuc = [];
   for (let i = 0; i < ornekSayisi; i++) {
     const m = makineler[(i * 5 + ayOffset * 3) % makineler.length];
-    const sablon = SEFLIK_MAKINE_SABLONLARI[(i + ayOffset) % SEFLIK_MAKINE_SABLONLARI.length];
-    sonuc.push(sablon.replace("{makine}", m.ad).replace("{lab}", m.lab || "atölye"));
+    const aksiyon = SEFLIK_MAKINE_AKSIYON_SABLONLARI[(i * 3 + ayOffset * 2) % SEFLIK_MAKINE_AKSIYON_SABLONLARI.length];
+    const oda = makineOdaKisaAdi(m.lab);
+    sonuc.push(`${oda} — ${makineNumaralandirilmisAdi(m)}: ${aksiyon}.`);
   }
   return sonuc;
 }
@@ -7058,8 +7093,10 @@ function seflikIslerOneriDegistir(raporId, kayitId) {
   const ay = seflikTarihinAyi(k.tarih);
   const havuz = ay ? seflikAyHavuzu(ay) : [];
   if (!havuz.length) { alert("Bu satır için otomatik öneri havuzu bulunamadı — elle yazabilirsiniz."); return; }
-  const mevcutIdx = havuz.indexOf(k.isler);
-  k.isler = havuz[(mevcutIdx + 1) % havuz.length];
+  // Sırayla değil, gerçekten rastgele seçiyoruz — havuzda birden fazla
+  // seçenek varsa, art arda aynısı gelmesin diye şu anki cümleyi hariç tutuyoruz.
+  const secenekler = havuz.length > 1 ? havuz.filter(c => c !== k.isler) : havuz;
+  k.isler = secenekler[Math.floor(Math.random() * secenekler.length)];
   save(); renderMain();
 }
 /* ---- Ders Programından Otomatik Oluşturma ----
