@@ -580,6 +580,173 @@ function normalizeState(s) {
       });
     });
   }
+  // Kullanıcının yüklediği gerçek haftalık Ders Programı (Kasım 2026,
+  // öğretmen bazlı Excel) — DERS_PROGRAMI_KASIM2026_HUCRELERI (ayrı veri
+  // dosyasında) içindeki her kayıt, öğretmen/sınıf/ders/işletme ADINA göre
+  // eşleştirilerek doğrudan S.schedule'a yazılır. Bir kerelik, tersine
+  // çevrilemez bir işlem olduğu için (mevcut Ders Programı'nın üzerine
+  // yazar) kullanıcı ile açıkça teyitleşildi: "sistemde kayıtlı olan
+  // dersleri oradaki (Excel'deki) sisteme işle" — Excel tek doğru kaynak
+  // kabul edildi. Eşleşmeyen öğretmen/sınıf adları SESSİZCE atlanmaz,
+  // s.dersProgramiKasim2026Uyarilari dizisine kaydedilir (Ayarlar'da
+  // gösterilebilir) — hiçbir zaman tahmini bir eşleşme uydurulmaz.
+  if (!s.dersProgramiKasim2026Islendi && typeof DERS_PROGRAMI_KASIM2026_HUCRELERI !== "undefined") {
+    s.dersProgramiKasim2026Islendi = true;
+    s.dersProgramiKasim2026Uyarilari = [];
+    const normTr = (str) => String(str || "").toLocaleLowerCase("tr-TR").trim().replace(/\s+/g, " ");
+    const bulOgretmenId = (ad) => { const t = s.teachers.find(x => normTr(x.name) === normTr(ad)); return t ? t.id : null; };
+    const bulSinifId = (ad) => {
+      const hedef = normTr(ad).replace(/-/g, "");
+      const c = s.classes.find(x => normTr(x.name).replace(/-/g, "") === hedef);
+      return c ? c.id : null;
+    };
+    const dersSaatSayisiHaritasi = {};
+    DERS_PROGRAMI_KASIM2026_HUCRELERI.forEach(h => {
+      if (h.kind !== "ders") return;
+      const anahtar = h.sinif + "|" + h.ders;
+      dersSaatSayisiHaritasi[anahtar] = (dersSaatSayisiHaritasi[anahtar] || 0) + 1;
+    });
+    const bulDersId = (ad, sinifObj) => {
+      const hedef = normTr(ad);
+      let c = s.courses.find(x => normTr(x.name) === hedef);
+      if (c) return c.id;
+      const saat = dersSaatSayisiHaritasi[(sinifObj ? sinifObj.name : "") + "|" + ad] || 1;
+      c = { id: uid("crs"), code: ad.slice(0, 4).toUpperCase(), name: ad, dal: (sinifObj && sinifObj.dal) || "SERT", grade: (sinifObj && sinifObj.grade) || 0, hours: saat, blocks: [saat] };
+      s.courses.push(c);
+      return c.id;
+    };
+    // Bir sınıfın bir dersi için S.schedule'a kaç hücre yazılırsa yazılsın,
+    // "Sınıflar ve Ders Atama" ekranındaki kart görünümünün (cls.assignments)
+    // doğru görünmesi için TEK bir assignment kaydı paylaşılır — assignment
+    // yoksa oluşturulur, varsa o derse giren yeni öğretmenler eligible
+    // listesine eklenir (var olanlar hiç dokunulmadan).
+    const assignmentOnbellek = {};
+    const bulVeyaOlusturAssignment = (classId, courseId, ogretmenIdleri) => {
+      const anahtar = classId + "|" + courseId;
+      if (assignmentOnbellek[anahtar]) {
+        const a = assignmentOnbellek[anahtar];
+        ogretmenIdleri.forEach(tid => { if (!a.eligibleTeacherIds.includes(tid)) a.eligibleTeacherIds.push(tid); });
+        a.teacherCount = Math.max(a.teacherCount, ogretmenIdleri.length);
+        return a.id;
+      }
+      const cls = s.classes.find(x => x.id === classId);
+      let a = (cls.assignments || []).find(x => x.courseId === courseId);
+      if (!a) {
+        a = { id: uid("asg"), courseId, eligibleTeacherIds: ogretmenIdleri.slice(), teacherCount: ogretmenIdleri.length, roomIds: [] };
+        if (!Array.isArray(cls.assignments)) cls.assignments = [];
+        cls.assignments.push(a);
+      }
+      assignmentOnbellek[anahtar] = a;
+      return a.id;
+    };
+    const bulIsletmeId = (ad) => {
+      const hedef = normTr(ad);
+      let isl = s.isletmeler.find(x => normTr(x.name) === hedef || normTr(x.name).includes(hedef) || hedef.includes(normTr(x.name)));
+      if (isl) return isl.id;
+      isl = { id: uid("isletme"), name: ad, groups: [], kontenjanlar: {}, talep: "", adres: "", talepFormuSayilari: {} };
+      s.isletmeler.push(isl);
+      return isl.id;
+    };
+    const bulOdaId = (ad) => {
+      const hedef = normTr(ad);
+      const r = s.rooms.find(x => normTr(x.name) === hedef || normTr(x.name).includes(hedef) || hedef.includes(normTr(x.name)));
+      return r ? r.id : null;
+    };
+    let rehberlikCourseId = null;
+    const bulRehberlikDersId = () => {
+      if (rehberlikCourseId) return rehberlikCourseId;
+      let c = s.courses.find(x => normTr(x.name) === "rehberlik");
+      if (!c) { c = { id: uid("crs"), code: "REH", name: "Rehberlik", dal: "ORTAK", grade: 0, hours: 1, blocks: [1] }; s.courses.push(c); }
+      rehberlikCourseId = c.id;
+      return rehberlikCourseId;
+    };
+    const planlamaCacheByTeacher = {};
+    const bulPlanlamaDersSinif = (ogretmenId) => {
+      if (planlamaCacheByTeacher[ogretmenId]) return planlamaCacheByTeacher[ogretmenId];
+      for (const cls of s.classes) {
+        for (const a of (cls.assignments || [])) {
+          const crs = s.courses.find(x => x.id === a.courseId);
+          if (crs && /planlama bak.m onar.m/i.test(crs.name) && (a.eligibleTeacherIds || []).includes(ogretmenId)) {
+            const sonuc = { classId: cls.id, courseId: crs.id, assignmentId: a.id };
+            planlamaCacheByTeacher[ogretmenId] = sonuc;
+            return sonuc;
+          }
+        }
+      }
+      let idariCls = s.classes.find(x => x.dal === "IDARI" && /idari/i.test(normTr(x.name)));
+      if (!idariCls) { idariCls = { id: uid("cl"), name: "İdari Görevler (Alan/Atölye Şefliği)", grade: 0, dal: "IDARI", schoolDays: [0, 1, 2, 3, 4], assignments: [] }; s.classes.push(idariCls); }
+      let pboCrs = s.courses.find(x => /planlama bak.m onar.m/i.test(normTr(x.name)));
+      if (!pboCrs) { pboCrs = { id: uid("crs"), code: "PBO", name: "Planlama Bakım Onarım", dal: "IDARI", grade: 0, hours: 1, blocks: [1] }; s.courses.push(pboCrs); }
+      if (!Array.isArray(idariCls.assignments)) idariCls.assignments = [];
+      let yeniA = idariCls.assignments.find(x => x.courseId === pboCrs.id && (x.eligibleTeacherIds || []).includes(ogretmenId));
+      if (!yeniA) {
+        yeniA = { id: uid("asg"), courseId: pboCrs.id, eligibleTeacherIds: [ogretmenId], teacherCount: 1, roomIds: [] };
+        idariCls.assignments.push(yeniA);
+      }
+      const sonuc = { classId: idariCls.id, courseId: pboCrs.id, assignmentId: yeniA.id };
+      planlamaCacheByTeacher[ogretmenId] = sonuc;
+      return sonuc;
+    };
+
+    // Kullanıcı açıkça "Excel tek doğru kaynak, mevcut programın üzerine
+    // bununla yaz" dedi — bu yüzden Excel'de adı geçen 6 öğretmenin
+    // programdaki TÜM mevcut hücreleri (hangi sınıf/işletmeye ait olursa
+    // olsun) önce temizlenir, sonra Excel'den baştan kurulur. Bu 6 kişi
+    // dışındaki hiçbir öğretmenin/sınıfın programına dokunulmaz.
+    const etkilenenOgretmenIdleri = DERS_PROGRAMI_KASIM2026_HUCRELERI
+      .flatMap(h => h.ogretmenler).filter((v, i, a) => a.indexOf(v) === i)
+      .map(bulOgretmenId).filter(Boolean);
+    Object.keys(s.schedule).forEach(key => {
+      const hucreVar = s.schedule[key];
+      if (hucreVar.teacherIds.some(tid => etkilenenOgretmenIdleri.includes(tid))) delete s.schedule[key];
+    });
+
+    DERS_PROGRAMI_KASIM2026_HUCRELERI.forEach(hucre => {
+      const ogretmenIdleri = [];
+      hucre.ogretmenler.forEach(ad => {
+        const id = bulOgretmenId(ad);
+        if (id) ogretmenIdleri.push(id);
+        else s.dersProgramiKasim2026Uyarilari.push(`Öğretmen bulunamadı: "${ad}" (${DAYS[hucre.day]} ${hucre.hour + 1}. saat)`);
+      });
+      if (!ogretmenIdleri.length) return;
+
+      let classId, courseId, assignmentId, extra = {};
+      if (hucre.kind === "ders") {
+        classId = bulSinifId(hucre.sinif);
+        if (!classId) { s.dersProgramiKasim2026Uyarilari.push(`Sınıf bulunamadı: "${hucre.sinif}" (${DAYS[hucre.day]} ${hucre.hour + 1}. saat, ${hucre.ders})`); return; }
+        courseId = bulDersId(hucre.ders, s.classes.find(c => c.id === classId));
+        assignmentId = bulVeyaOlusturAssignment(classId, courseId, ogretmenIdleri);
+        if (hucre.odalar && hucre.odalar.length === 1) {
+          const roomId = bulOdaId(hucre.odalar[0]);
+          if (roomId) extra.roomIds = [roomId];
+        }
+      } else if (hucre.kind === "rehberlik") {
+        classId = bulSinifId(hucre.sinif);
+        if (!classId) { s.dersProgramiKasim2026Uyarilari.push(`Sınıf bulunamadı (rehberlik): "${hucre.sinif}" (${DAYS[hucre.day]} ${hucre.hour + 1}. saat)`); return; }
+        courseId = bulRehberlikDersId();
+        assignmentId = bulVeyaOlusturAssignment(classId, courseId, ogretmenIdleri);
+      } else if (hucre.kind === "planlama") {
+        const sonuc = bulPlanlamaDersSinif(ogretmenIdleri[0]);
+        classId = sonuc.classId; courseId = sonuc.courseId; assignmentId = sonuc.assignmentId;
+      } else if (hucre.kind === "isletme") {
+        const islId = bulIsletmeId(hucre.isletme);
+        classId = "isletme-" + islId;
+        if (!s.classes.some(x => x.id === classId)) s.classes.push({ id: classId, name: hucre.isletme, grade: 0, dal: "KOORD", excludeFromDistribution: true, maxTeachersPerCourse: 1, assignments: [] });
+        courseId = KOORD_COURSE_ID;
+        assignmentId = uid("koord");
+        extra = { locked: true, isletme: hucre.isletme, paid: true };
+      } else {
+        return;
+      }
+
+      const key = classId + "_" + hucre.day + "_" + hucre.hour;
+      if (s.schedule[key]) {
+        s.dersProgramiKasim2026Uyarilari.push(`Çakışma (üzerine yazılmadı): ${DAYS[hucre.day]} ${hucre.hour + 1}. saat, sınıf/işletme "${classId}"`);
+        return;
+      }
+      s.schedule[key] = Object.assign({ day: hucre.day, hour: hucre.hour, classId, assignmentId, courseId, teacherIds: ogretmenIdleri, roomIds: [], locked: true }, extra);
+    });
+  }
   if (!Array.isArray(s.durumTespitFormlari)) s.durumTespitFormlari = [];
   s.durumTespitFormlari.forEach(f => {
     if (!f.id) f.id = uid("dtf");
