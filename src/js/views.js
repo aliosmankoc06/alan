@@ -6952,7 +6952,10 @@ const ALAN_SEFI_AYLIK_GOREV_HAVUZU = {
     "Atölyedeki tüm tezgahların genel teknik kontrolü yapılarak yaz döneminde yapılacak kapsamlı bakım listesi oluşturuldu.",
     "Mezuniyet aşamasına gelen 12. sınıf öğrencilerinin staj/işletme dönem sonu değerlendirmeleri başlatıldı.",
     "Norm kadro ve ders dağıtım çalışmalarına yönelik alan şefliği görüşü okul yönetimine iletildi.",
-    "İş sağlığı ve güvenliği kurulu toplantısına katılım sağlandı, atölyeye ilişkin İSG eksiklikleri raporlandı."
+    "İş sağlığı ve güvenliği kurulu toplantısına katılım sağlandı, atölyeye ilişkin İSG eksiklikleri raporlandı.",
+    "Staj dönemine hazırlık kapsamında çevredeki işletmeler ziyaret edilerek kontenjan ve çalışma koşulları hakkında bilgi alındı.",
+    "İşletmelerde mesleki eğitim görecek öğrenciler için gerekli evrakların (kontenjan formu, öğrenci talep formu) hazırlanmasına destek verildi.",
+    "Staj yerleştirme sürecinde işletme yetkilileriyle görüşülerek uygun pozisyonların belirlenmesine yardımcı olundu."
   ],
   "Mayıs": [
     "12. sınıf öğrencilerinin işletmelerde beceri eğitimi / kalfalık-ustalık beceri sınavlarına yönelik hazırlık ve koordinasyon çalışmaları yürütüldü.",
@@ -6962,7 +6965,10 @@ const ALAN_SEFI_AYLIK_GOREV_HAVUZU = {
     "Mezun olacak öğrencilerin diploma/sertifika süreçleri ile ilgili evrak hazırlığı yapıldı.",
     "Gelecek öğretim yılı için makine-teçhizat ihtiyaç listesi hazırlanarak okul yönetimine sunuldu.",
     "Atölyede yıl sonu temizlik ve düzenleme çalışmalarına başlandı, kullanılmayan/hurda malzemelerin tasnifi yapıldı.",
-    "Staj yapan öğrencilerin işletme değerlendirme formları toplanarak dönem sonu not fişleri tamamlandı."
+    "Staj yapan öğrencilerin işletme değerlendirme formları toplanarak dönem sonu not fişleri tamamlandı.",
+    "Öğrenci-işletme eşleştirmesinde öğrencinin dalı, başarı durumu ve ulaşım imkânı değerlendirilerek karar verildi.",
+    "Yeni eğitim-öğretim yılı staj planlaması kapsamında işletme listesinin güncellenmesine katkı sağlandı.",
+    "Staj yerleştirmesi tamamlanan öğrencilerin işletmelere sevk sürecindeki evrak işlemleri yürütüldü."
   ],
   "Haziran": [
     "Yıl sonu değerlendirmesi yapıldı; atölye/laboratuvar demirbaş ve makine envanteri sayımı tamamlandı.",
@@ -7034,18 +7040,31 @@ const SEFLIK_MAKINE_AKSIYON_SABLONLARI = [
   "vida bağlantılarının sıkılık kontrolüne destek verildi",
   "filtre temizliği ve değişim ihtiyacı atölye şefine bildirildi"
 ];
+/* Havuzun makineden türeyen kısmı tek başına en az HEDEF_MAKINE_CUMLE_SAYISI
+   kadar farklı cümle üretsin istiyoruz (kullanıcı talebi: "Değiştir"e her
+   bastığında 8-10 değil, 60-80+ seçenek arasından gelsin). Elinizdeki her
+   makine için, aksiyon havuzundaki FARKLI aksiyonlarla birden fazla cümle
+   üretiyoruz — makine sayınız azsa kat sayısı otomatik artar, çoksa azalır,
+   hedefin altına düşülmez (aksiyon havuzunun boyutuyla sınırlı — aynı
+   makineye aynı aksiyon iki kez verilmez). */
+const HEDEF_MAKINE_CUMLE_SAYISI = 65;
 function seflikMakineTabanliOneriUret(ay) {
   const makineler = S.envanter.makineler;
   if (!makineler || !makineler.length) return [];
   const ayOffset = TR_AYLAR.indexOf(ay) >= 0 ? TR_AYLAR.indexOf(ay) : 0;
-  const ornekSayisi = Math.min(makineler.length, 16);
+  const aksiyonSayisi = SEFLIK_MAKINE_AKSIYON_SABLONLARI.length;
+  const katSayisi = Math.min(aksiyonSayisi, Math.max(1, Math.ceil(HEDEF_MAKINE_CUMLE_SAYISI / makineler.length)));
   const sonuc = [];
-  for (let i = 0; i < ornekSayisi; i++) {
-    const m = makineler[(i * 5 + ayOffset * 3) % makineler.length];
-    const aksiyon = SEFLIK_MAKINE_AKSIYON_SABLONLARI[(i * 3 + ayOffset * 2) % SEFLIK_MAKINE_AKSIYON_SABLONLARI.length];
+  makineler.forEach((m, mi) => {
     const oda = makineOdaKisaAdi(m.lab);
-    sonuc.push(`${oda} — ${makineNumaralandirilmisAdi(m)}: ${aksiyon}.`);
-  }
+    const ad = makineNumaralandirilmisAdi(m);
+    for (let k = 0; k < katSayisi; k++) {
+      // 13, aksiyonSayisi (şu an 28) ile aralarında asal olduğu için k arttıkça
+      // aynı makine için hep FARKLI bir aksiyon seçilir, tekrar etmez.
+      const aksiyonIdx = (mi * 7 + k * 13 + ayOffset * 3) % aksiyonSayisi;
+      sonuc.push(`${oda} — ${ad}: ${SEFLIK_MAKINE_AKSIYON_SABLONLARI[aksiyonIdx]}.`);
+    }
+  });
   return sonuc;
 }
 function seflikTarihinAyi(tarihStr) {
@@ -7086,8 +7105,18 @@ function seflikGercekBakimMetni(pzt, gunSonIndex) {
   });
   return cumleler.join(" ");
 }
+/* Atölye geneli küçük onarım/bakım ifadeleri — belirli bir makineye bağlı
+   değil, aya da bağlı değil, her ay havuza dahil edilir. */
+const SEFLIK_KUCUK_ONARIM_HAVUZU = [
+  "Atölyedeki priz, anahtar, aydınlatma armatürü gibi küçük elektrik aksaklıkları tespit edilerek ilgili birime bildirildi.",
+  "Masa, sandalye ve çalışma tezgahlarındaki küçük mekanik arızaların (vida gevşemesi, menteşe, ayak dengesizliği vb.) onarımına yardımcı olundu.",
+  "Atölye kapı/pencere, dolap kilidi gibi küçük donanım onarımlarında destek sağlandı.",
+  "El aletleri ve yardımcı ekipmanların (pense, anahtar takımı, matkap ucu vb.) tedarikine katkı sağlandı.",
+  "Atölye içi küçük tamirat ihtiyaçları tespit edilip takip listesine eklendi.",
+  "Atölyedeki aydınlatma ve priz tesisatının genel kontrolüne yardımcı olundu."
+];
 function seflikAyHavuzu(ay) {
-  return (ALAN_SEFI_AYLIK_GOREV_HAVUZU[ay] || []).concat(seflikMakineTabanliOneriUret(ay));
+  return (ALAN_SEFI_AYLIK_GOREV_HAVUZU[ay] || []).concat(SEFLIK_KUCUK_ONARIM_HAVUZU, seflikMakineTabanliOneriUret(ay));
 }
 function seflikOneriMetni(ay, pzt, gunSonIndex) {
   const gercek = seflikGercekBakimMetni(pzt, gunSonIndex);
