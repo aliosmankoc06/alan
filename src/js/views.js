@@ -7021,7 +7021,18 @@ const SEFLIK_MAKINE_AKSIYON_SABLONLARI = [
   "kullanım talimatının güncellenmesine destek olundu",
   "yedek parça ihtiyacı belirlenerek ilgili birime bildirildi",
   "hassasiyet/kalibrasyon kontrolüne yardımcı olundu",
-  "öğrenci kullanımı öncesi genel kontrolüne katkı sağlandı"
+  "öğrenci kullanımı öncesi genel kontrolüne katkı sağlandı",
+  // Daha somut/teknik (Atölye Bakım Formu'ndaki gerçek kontrol maddeleriyle
+  // tutarlı) birkaç örnek — havuzun tamamı bu kadar ayrıntılı değil,
+  // sadece arada biraz daha dolgun bir cümle gelsin diye birkaç tane var.
+  "kılavuz yüzeylerinin temizliği ve yağlanması konusunda atölye şefine destek sağlandı",
+  "rulman ve yatak kontrolü yapılarak gresleme ihtiyacı atölye şefine bildirildi",
+  "elektrik panosu ve bağlantılarının kontrolüne yardımcı olundu",
+  "soğutma sıvısı seviyesi ve hortum bağlantıları kontrol edilerek gözlemler not edildi",
+  "takım tutucu ve mandren temizliğine katkı sağlandı",
+  "hidrolik/pnömatik hortum ve bağlantılarındaki aşınma gözlemlenip atölye şefine iletildi",
+  "vida bağlantılarının sıkılık kontrolüne destek verildi",
+  "filtre temizliği ve değişim ihtiyacı atölye şefine bildirildi"
 ];
 function seflikMakineTabanliOneriUret(ay) {
   const makineler = S.envanter.makineler;
