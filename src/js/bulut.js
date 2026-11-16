@@ -63,26 +63,21 @@ function bulutBaslat() {
     });
 }
 
-// Firebase Authentication e-posta formatı zorunlu kılıyor ("@" ve geçerli
-// bir alan adı istiyor) — ama kullanıcıdan bunu istemek yerine basit bir
-// "Giriş Adı" aldırıp arkada sabit bir alan adı ekleyerek otomatik geçerli
-// bir e-postaya çeviriyoruz; kullanıcı bunu hiç görmüyor/bilmiyor.
-const BULUT_GIRIS_ADI_ALAN_ADI = "@aok-giris.app";
-function bulutGirisAdindanEposta(girisAdi) {
-  const harfCevir = { ç: "c", ğ: "g", ı: "i", ö: "o", ş: "s", ü: "u", İ: "i", I: "i" };
-  const sade = String(girisAdi || "").trim().toLocaleLowerCase("tr-TR")
-    .split("").map(c => harfCevir[c] !== undefined ? harfCevir[c] : c).join("")
-    .replace(/\s+/g, ".").replace(/[^a-z0-9._-]/g, "");
-  return sade + BULUT_GIRIS_ADI_ALAN_ADI;
-}
-function bulutEpostadanGirisAdi(eposta) {
-  return String(eposta || "").replace(BULUT_GIRIS_ADI_ALAN_ADI, "");
-}
+// ÖNEMLİ GÜVENLİK KARARI (kullanıcıyla konuşulup netleştirildi): "Hesap
+// Oluştur" herkese açık bir buton olarak DURMASIN istendi — başkası bu
+// sayfayı bulsa bile kendine hesap açamasın. Bu yüzden buradan hesap
+// oluşturma KALDIRILDI. Yerine: hesap zaten var olduğunda gerçek Gmail
+// adresine Firebase'in kendi "şifre sıfırlama" e-postasını gönderen
+// "Şifremi Unuttum" eklendi — bu hem şifre değiştirmeyi hem de sahibin
+// Gmail'ine bilgi gelmesini (Firebase'in kendi gönderdiği e-posta)
+// sağlıyor. Giriş adı yerine tekrar GERÇEK e-posta isteniyor — aksi
+// halde şifre sıfırlama e-postası hiçbir yere gidemez (uydurma bir alan
+// adına e-posta gönderilemez).
 function bulutDurumGoster(eposta) {
   const el = document.getElementById("bulut-durum");
   if (!el) return;
   el.innerHTML = eposta
-    ? `☁️ ${escHtml(bulutEpostadanGirisAdi(eposta))} · <a href="#" onclick="bulutCikisYap();return false;">Çıkış</a>`
+    ? `☁️ ${escHtml(eposta)} · <a href="#" onclick="bulutCikisYap();return false;">Çıkış</a>`
     : `☁️ Bulut girişi yok · <a href="#" onclick="bulutGirisEkraniniGoster();return false;">Giriş yap</a>`;
 }
 
@@ -94,16 +89,16 @@ function bulutGirisEkraniniGoster() {
     <div class="modal" style="width:340px;">
       <h3>Giriş Yap</h3>
       <p class="small">Programı kullanmak ve değişikliklerin buluta otomatik kaydedilmesi için giriş yapman gerekiyor.</p>
-      <label class="small">Giriş Adı</label>
-      <input type="text" id="bulut-eposta" style="width:100%" autocomplete="username" placeholder="örn. alansefi">
+      <label class="small">E-posta</label>
+      <input type="email" id="bulut-eposta" style="width:100%" autocomplete="username">
       <label class="small">Şifre</label>
       <input type="password" id="bulut-sifre" style="width:100%" autocomplete="current-password" onkeydown="if(event.key==='Enter'){event.preventDefault();bulutGirisYap();}">
       <div id="bulut-giris-hata" class="small" style="color:var(--warn);margin-top:6px;"></div>
       <div class="row">
         <button class="btn primary" id="bulut-giris-btn" onclick="bulutGirisYap()">Giriş Yap</button>
-        <button class="btn" id="bulut-kayit-btn" onclick="bulutHesapOlustur()">Hesap Oluştur</button>
       </div>
-      <p class="small" style="margin-top:8px;color:var(--ink-soft);">Hesabın yoksa bir giriş adı/şifre belirleyip "Hesap Oluştur"a bas — aynı giriş adı/şifreyle bilgisayar ve telefonda giriş yaparsan veriler otomatik senkronize olur.</p>
+      <p class="small" style="margin-top:8px;"><a href="#" onclick="bulutSifremiUnuttum();return false;">Şifremi unuttum</a></p>
+      <div id="bulut-sifirla-mesaj" class="small" style="color:var(--teal-ink);margin-top:4px;"></div>
     </div>
   </div>`;
 }
@@ -112,30 +107,42 @@ function bulutGirisEkraniniGizle() {
   if (root) root.innerHTML = "";
 }
 function bulutGirisYap() {
-  const girisAdi = ((document.getElementById("bulut-eposta") || {}).value || "").trim();
+  const eposta = ((document.getElementById("bulut-eposta") || {}).value || "").trim();
   const sifre = (document.getElementById("bulut-sifre") || {}).value || "";
   const hataEl = document.getElementById("bulut-giris-hata");
   const btn = document.getElementById("bulut-giris-btn");
-  if (!girisAdi || !sifre) { if (hataEl) hataEl.textContent = "Giriş adı ve şifre girin."; return; }
+  if (!eposta || !sifre) { if (hataEl) hataEl.textContent = "E-posta ve şifre girin."; return; }
   if (hataEl) hataEl.textContent = "";
   if (btn) { btn.disabled = true; btn.textContent = "Giriş yapılıyor..."; }
-  firebase.auth().signInWithEmailAndPassword(bulutGirisAdindanEposta(girisAdi), sifre).catch(err => {
+  firebase.auth().signInWithEmailAndPassword(eposta, sifre).catch(err => {
     if (hataEl) hataEl.textContent = "Giriş başarısız: " + (err && err.message ? err.message : "bilinmeyen hata");
     if (btn) { btn.disabled = false; btn.textContent = "Giriş Yap"; }
   });
 }
-function bulutHesapOlustur() {
-  const girisAdi = ((document.getElementById("bulut-eposta") || {}).value || "").trim();
-  const sifre = (document.getElementById("bulut-sifre") || {}).value || "";
+function bulutSifremiUnuttum() {
+  const eposta = ((document.getElementById("bulut-eposta") || {}).value || "").trim();
   const hataEl = document.getElementById("bulut-giris-hata");
-  const btn = document.getElementById("bulut-kayit-btn");
-  if (!girisAdi || !sifre) { if (hataEl) hataEl.textContent = "Giriş adı ve şifre girin."; return; }
-  if (sifre.length < 6) { if (hataEl) hataEl.textContent = "Şifre en az 6 karakter olmalı."; return; }
+  const mesajEl = document.getElementById("bulut-sifirla-mesaj");
+  if (!eposta) { if (hataEl) hataEl.textContent = "Önce e-posta adresini yaz."; return; }
   if (hataEl) hataEl.textContent = "";
-  if (btn) { btn.disabled = true; btn.textContent = "Hesap oluşturuluyor..."; }
-  firebase.auth().createUserWithEmailAndPassword(bulutGirisAdindanEposta(girisAdi), sifre).catch(err => {
-    if (hataEl) hataEl.textContent = "Hesap oluşturulamadı: " + (err && err.message ? err.message : "bilinmeyen hata");
-    if (btn) { btn.disabled = false; btn.textContent = "Hesap Oluştur"; }
+  firebase.auth().sendPasswordResetEmail(eposta).then(() => {
+    if (mesajEl) mesajEl.textContent = "Şifre sıfırlama bağlantısı " + eposta + " adresine gönderildi, gelen kutunu kontrol et.";
+  }).catch(err => {
+    if (hataEl) hataEl.textContent = "Gönderilemedi: " + (err && err.message ? err.message : "bilinmeyen hata");
+  });
+}
+// Hesap oluşturma artık arayüzde YOK (bkz. yukarıdaki not) — ama ilk
+// hesabın bir kere kurulması gerekiyor ve bunu buradan (bu oturumdan)
+// Firebase'e ağ erişimi olmadığı için ben kuramıyorum. Bu fonksiyon SADECE
+// tarayıcının geliştirici konsoluna yazılıp tek seferlik çalıştırılmak
+// üzere burada bırakıldı — arayüzde hiçbir düğmeye bağlı değil, o yüzden
+// sayfayı bulan biri bunu göremez/tıklayamaz.
+function bulutIlkHesabiKurKonsoldanCalistir(eposta, sifre) {
+  if (!eposta || !sifre) { console.error("Kullanım: bulutIlkHesabiKurKonsoldanCalistir('gercek@gmail.com','sifre')"); return; }
+  firebase.auth().createUserWithEmailAndPassword(eposta, sifre).then(() => {
+    console.log("Hesap oluşturuldu:", eposta);
+  }).catch(err => {
+    console.error("Hesap oluşturulamadı:", err.message);
   });
 }
 function bulutCikisYap() {
