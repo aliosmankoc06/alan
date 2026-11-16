@@ -11,7 +11,6 @@
 
 const LS_KEY = "aok-sistem-v31";
 const VERSIONS_KEY = "aok-versions-v1";
-const AKTIF_SURUM_KEY = "aok-aktif-surum-v1";
 const DAYS = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"];
 
 const KOORD_COURSE_ID = "crs-koordinatorluk";
@@ -721,6 +720,11 @@ function normalizeState(s) {
     if (typeof a.etiket !== "string") a.etiket = "";
     if (typeof a.tarih !== "string") a.tarih = "";
     if (!a.veri || typeof a.veri !== "object") a.veri = {};
+    // Eski bir hata yüzünden bazı arşivler kendinden önceki TÜM arşivleri
+    // iç içe taşıyor olabilir (bkz. donemArsiviKaydet'teki düzeltme) —
+    // bu birikmiş şişkinliği bir kerelik temizliyoruz, veri kaybı yok,
+    // sadece gereksiz iç içe kopyalar budanıyor.
+    if (Array.isArray(a.veri.donemArsivi) && a.veri.donemArsivi.length) a.veri.donemArsivi = [];
   });
   if (!Array.isArray(s.sinavTutanaklari)) s.sinavTutanaklari = [];
   s.sinavTutanaklari.forEach(t => {
@@ -1027,7 +1031,6 @@ function save() {
   window.__lastActionWasDelete = false;
   S.__senkronZamani = new Date().toISOString();
   localStorage.setItem(LS_KEY, JSON.stringify(S));
-  surumSenkronizeEt();
   scheduleProgramSenkronizeEt();
   bulutaSenkronEt();
   if (typeof bulutaFirestoreSenkronEt === "function") bulutaFirestoreSenkronEt();
@@ -1069,34 +1072,6 @@ function scheduleProgramSenkronizeEt() {
   if (p) p.schedule = JSON.parse(JSON.stringify(S.schedule));
 }
 
-/* ============ İsimli Kayıtlar (Öğretim Yılı vb. Sürümler) ============
-   "Kaydet" her zaman anlık çalışmayı localStorage'a yazar (yukarıdaki
-   LS_KEY). Kullanıcı isterse çalışmasının o anki hâlini isimli bir
-   "sürüm" olarak da saklayabilir (ör. "2026-2027 Eğitim-Öğretim Yılı").
-   Bir sürüm "aktif" olarak işaretlendiğinde, o andan sonraki her
-   save() çağrısı otomatik olarak o sürümün içeriğini de günceller —
-   böylece kullanıcı hangi isimli kayıtla çalıştığını bilir ve normal
-   "Kaydet" ile çalışmaya devam ettiğinde o isimli kayıt da güncel
-   kalır, aksi hâlde sürümler arasında kaybolan değişiklik olmaz. */
-function getAktifSurumId() {
-  try { return localStorage.getItem(AKTIF_SURUM_KEY) || null; } catch (e) { return null; }
-}
-function setAktifSurumId(id) {
-  try {
-    if (id) localStorage.setItem(AKTIF_SURUM_KEY, id);
-    else localStorage.removeItem(AKTIF_SURUM_KEY);
-  } catch (e) {}
-}
-function surumSenkronizeEt() {
-  const aktifId = getAktifSurumId();
-  if (!aktifId) return;
-  const versions = loadVersions();
-  const v = versions.find(x => x.id === aktifId);
-  if (!v) return;
-  v.data = JSON.parse(JSON.stringify(S));
-  v.savedAt = new Date().toISOString();
-  saveVersionsList(versions);
-}
 function undoLastChange() {
   if (!lastSnapshot) return;
   let restored;

@@ -327,7 +327,6 @@ function openSavedProgram(id) {
     const v = versions.find(x => x.id === id);
     if (!v) return;
     S = normalizeState(JSON.parse(JSON.stringify(v.data)));
-    setAktifSurumId(id);
     save();
     activeModule = "ders-programi";
     activeTab = "programlar";
@@ -8399,7 +8398,14 @@ function donemArsiviOzet(veri) {
    (ogrenciListesi vb.) okuduğu için eski 4-koleksiyonlu arşivlerle de,
    yeni tam-kopya arşivlerle de sorunsuz çalışır. */
 function donemArsiviKaydet(etiket) {
-  const arsiv = { id: uid("da"), etiket: etiket.trim(), tarih: new Date().toLocaleDateString("tr-TR"), veri: JSON.parse(JSON.stringify(S)) };
+  // Arşivlenen kopyanın İÇİNE önceki arşivleri de almıyoruz — yoksa her yeni
+  // arşiv, kendinden önceki TÜM arşivleri iç içe taşır (1. arşiv 0 kopya
+  // içerir, 2. arşiv 1. arşivi içerir, 3. arşiv hem 1.'yi hem 2.'yi içerir...)
+  // ve depolama yıllar içinde üstel olarak büyür. Her arşiv sadece KENDİ
+  // anındaki canlı veriyi temsil etsin yeterli.
+  const veriKopyasi = JSON.parse(JSON.stringify(S));
+  veriKopyasi.donemArsivi = [];
+  const arsiv = { id: uid("da"), etiket: etiket.trim(), tarih: new Date().toLocaleDateString("tr-TR"), veri: veriKopyasi };
   S.donemArsivi.push(arsiv);
   return arsiv;
 }
@@ -9452,7 +9458,6 @@ function resetAll() {
 function deleteVersion(id) {
   if (!confirm("Bu kayıtlı sürüm kalıcı olarak silinsin mi?")) return;
   saveVersionsList(loadVersions().filter(x => x.id !== id));
-  if (getAktifSurumId() === id) setAktifSurumId(null);
   renderMain();
 }
 function surumAdiniDuzenle(id) {
@@ -9481,7 +9486,6 @@ function farkliKaydetSurum() {
     const yeni = { id: uid("ver"), name: name.trim(), savedAt: new Date().toISOString(), data: JSON.parse(JSON.stringify(S)) };
     versions.push(yeni);
     saveVersionsList(versions);
-    setAktifSurumId(yeni.id);
     save();
     renderMain();
   });
