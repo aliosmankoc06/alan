@@ -86,7 +86,9 @@ function bulutGirisEkraniniGoster() {
       <div id="bulut-giris-hata" class="small" style="color:var(--warn);margin-top:6px;"></div>
       <div class="row">
         <button class="btn primary" id="bulut-giris-btn" onclick="bulutGirisYap()">Giriş Yap</button>
+        <button class="btn" id="bulut-kayit-btn" onclick="bulutHesapOlustur()">Hesap Oluştur</button>
       </div>
+      <p class="small" style="margin-top:8px;color:var(--ink-soft);">Hesabın yoksa e-posta/şifre girip "Hesap Oluştur"a bas — aynı e-posta/şifreyle bilgisayar ve telefonda giriş yaparsan veriler otomatik senkronize olur.</p>
     </div>
   </div>`;
 }
@@ -105,6 +107,20 @@ function bulutGirisYap() {
   firebase.auth().signInWithEmailAndPassword(eposta, sifre).catch(err => {
     if (hataEl) hataEl.textContent = "Giriş başarısız: " + (err && err.message ? err.message : "bilinmeyen hata");
     if (btn) { btn.disabled = false; btn.textContent = "Giriş Yap"; }
+  });
+}
+function bulutHesapOlustur() {
+  const eposta = ((document.getElementById("bulut-eposta") || {}).value || "").trim();
+  const sifre = (document.getElementById("bulut-sifre") || {}).value || "";
+  const hataEl = document.getElementById("bulut-giris-hata");
+  const btn = document.getElementById("bulut-kayit-btn");
+  if (!eposta || !sifre) { if (hataEl) hataEl.textContent = "E-posta ve şifre girin."; return; }
+  if (sifre.length < 6) { if (hataEl) hataEl.textContent = "Şifre en az 6 karakter olmalı."; return; }
+  if (hataEl) hataEl.textContent = "";
+  if (btn) { btn.disabled = true; btn.textContent = "Hesap oluşturuluyor..."; }
+  firebase.auth().createUserWithEmailAndPassword(eposta, sifre).catch(err => {
+    if (hataEl) hataEl.textContent = "Hesap oluşturulamadı: " + (err && err.message ? err.message : "bilinmeyen hata");
+    if (btn) { btn.disabled = false; btn.textContent = "Hesap Oluştur"; }
   });
 }
 function bulutCikisYap() {
