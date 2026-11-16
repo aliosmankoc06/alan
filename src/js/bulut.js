@@ -155,6 +155,29 @@ function bulutDinlemeyeBasla(uid) {
     const bulutZaman = bulutState.__senkronZamani || "";
     const yerelZaman = (typeof S !== "undefined" && S.__senkronZamani) || "";
     if (!bulutZaman || bulutZaman <= yerelZaman) return;
+    // GÜVENLİK: sadece zaman damgasına güvenmek tehlikeli — ör. yeni/boş bir
+    // cihaz ilk kez giriş yapıp bulutu kendi (boş) hâliyle ezerse, zaman
+    // damgası ondan "daha yeni" görünür ve gerçek veriyi barındıran bu
+    // bilgisayar bu bulut kopyasını indirip üzerine yazar. Bunu önlemek için,
+    // gelen bulut verisi bu bilgisayardaki veriden BELİRGİN ÖLÇÜDE daha "boş"
+    // görünüyorsa inip ezmek yerine, bu bilgisayarın kendi (daha zengin)
+    // verisini buluta tekrar göndeririz — veri kaybı yerine zararsız bir
+    // "hiçbir şey olmadı" sonucu.
+    const zenginlik = (st) => {
+      if (!st) return 0;
+      return (Array.isArray(st.ogrenciListesi) ? st.ogrenciListesi.length : 0) * 10
+        + (Array.isArray(st.students) ? st.students.length : 0) * 5
+        + (Array.isArray(st.stajdakiOgrenciler) ? st.stajdakiOgrenciler.length : 0) * 5
+        + (Array.isArray(st.isletmeler) ? st.isletmeler.length : 0)
+        + (st.schedule ? Object.keys(st.schedule).length : 0);
+    };
+    const yerelZenginlik = zenginlik(typeof S !== "undefined" ? S : null);
+    const bulutZenginlik = zenginlik(bulutState);
+    if (yerelZenginlik > 0 && bulutZenginlik < yerelZenginlik / 2) {
+      bulutaFirestoreSenkronEt();
+      if (typeof showSaveToast === "function") showSaveToast(false, "Buluttaki veri bu bilgisayardakinden daha az görünüyordu, üzerine yazılmadı — bu bilgisayarın verisi buluta gönderildi");
+      return;
+    }
     S = normalizeState(bulutState);
     localStorage.setItem(LS_KEY, JSON.stringify(Object.assign({}, S, { donemArsivi: [] })));
     Promise.resolve(typeof arsivSenkronEt === "function" ? arsivSenkronEt() : null).then(() => {
