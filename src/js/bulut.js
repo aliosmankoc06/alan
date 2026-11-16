@@ -38,16 +38,11 @@ function bulutBaslat() {
     // dışı kalır, normal senkronizasyon yine çalışır.
     bulutDb.enablePersistence().catch(() => {});
   } catch (e) { return; }
-  // Oturum, program kapatılınca kendiliğinden kapansın istendi — yani
-  // her açılışta şifre sorulsun, "beni hatırla" olmasın. Bunun için
-  // kalıcılığı NONE'a çekip (bundan sonraki girişler hiç saklanmaz) ve
-  // olası eski, önceden kalıcı kaydedilmiş bir oturumu bir kerelik zorla
-  // kapatıyoruz — onAuthStateChanged'i ancak bu işlem bitince
-  // dinlemeye başlıyoruz, böylece "önce girmiş gibi görünüp sonra
-  // aniden çıkış" görüntüsü (flash) oluşmaz.
-  firebase.auth().setPersistence(firebase.auth.Auth.Persistence.NONE)
-    .catch(() => {})
-    .then(() => firebase.auth().signOut())
+  // Kullanıcı kararı: oturum kendiliğinden kapanmasın — "Çıkış" yapılana
+  // kadar sistem açık kalsın, her açılışta şifre sorulmasın. Bunun için
+  // kalıcılık LOCAL'e çekildi (tarayıcı kapatılıp açılsa bile oturum
+  // sürer); artık eski oturumu zorla kapatan bir signOut() de yok.
+  firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL)
     .catch(() => {})
     .then(() => {
       firebase.auth().onAuthStateChanged(kullanici => {
