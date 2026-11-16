@@ -330,9 +330,11 @@ function openSavedProgram(id) {
     save();
     activeModule = "ders-programi";
     activeTab = "programlar";
-    renderTabbar();
-    renderMain();
-    renderYilWidget();
+    arsivSenkronEt().then(() => {
+      renderTabbar();
+      renderMain();
+      renderYilWidget();
+    });
   });
 }
 function exportDataFile() {
@@ -368,8 +370,11 @@ function applyImportedPayload(raw) {
         saveVersionsList(payload.versions);
       }
       setModule("ana");
-      renderYilWidget();
-      alert("Yedek başarıyla yüklendi.");
+      arsivSenkronEt().then(() => {
+        renderMain();
+        renderYilWidget();
+        alert("Yedek başarıyla yüklendi.");
+      });
     });
   } catch (err) {
     alert("Bu dosya okunamadı — geçerli bir yedek dosyası olduğundan emin olun.");
@@ -8407,6 +8412,7 @@ function donemArsiviKaydet(etiket) {
   veriKopyasi.donemArsivi = [];
   const arsiv = { id: uid("da"), etiket: etiket.trim(), tarih: new Date().toLocaleDateString("tr-TR"), veri: veriKopyasi };
   S.donemArsivi.push(arsiv);
+  arsivKaydetIDB(arsiv); // IndexedDB'ye kalıcı yazım (fire-and-forget)
   return arsiv;
 }
 function donemArsiviOlustur() {
@@ -8421,6 +8427,7 @@ function donemArsiviOlustur() {
 function donemArsiviSil(id) {
   if (!confirm("Bu arşiv silinsin mi? Bu işlem geri alınamaz — arşivlenen kayıtlar bir daha geri gelmez.")) return;
   S.donemArsivi = S.donemArsivi.filter(x => x.id !== id);
+  arsivSilIDB(id);
   save(); renderMain();
 }
 function donemArsiviGoster(id) {
@@ -9483,7 +9490,10 @@ function farkliKaydetSurum() {
   promptModal("Şu anki hâlin tamamını (bütün modülleriyle) hangi isimle kaydedeyim?\n\nÇalışma alanınız silinmez — bu isimle ayrı bir kopya saklanır.", varsayilan, (name) => {
     if (!name || !name.trim()) return;
     const versions = loadVersions();
-    const yeni = { id: uid("ver"), name: name.trim(), savedAt: new Date().toISOString(), data: JSON.parse(JSON.stringify(S)) };
+    // Dönem Arşivi bu kopyanın içine alınmıyor — o zaten hangi isimli
+    // kopyada olduğunuzdan bağımsız, kalıcı ve tek bir kayıt (IndexedDB'de);
+    // her "Farklı Kaydet"te onu da tekrar tekrar kopyalamaya gerek yok.
+    const yeni = { id: uid("ver"), name: name.trim(), savedAt: new Date().toISOString(), data: Object.assign({}, S, { donemArsivi: [] }) };
     versions.push(yeni);
     saveVersionsList(versions);
     save();

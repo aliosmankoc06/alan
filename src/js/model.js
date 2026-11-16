@@ -715,17 +715,7 @@ function normalizeState(s) {
     });
   });
   if (!Array.isArray(s.donemArsivi)) s.donemArsivi = [];
-  s.donemArsivi.forEach(a => {
-    if (!a.id) a.id = uid("da");
-    if (typeof a.etiket !== "string") a.etiket = "";
-    if (typeof a.tarih !== "string") a.tarih = "";
-    if (!a.veri || typeof a.veri !== "object") a.veri = {};
-    // Eski bir hata yüzünden bazı arşivler kendinden önceki TÜM arşivleri
-    // iç içe taşıyor olabilir (bkz. donemArsiviKaydet'teki düzeltme) —
-    // bu birikmiş şişkinliği bir kerelik temizliyoruz, veri kaybı yok,
-    // sadece gereksiz iç içe kopyalar budanıyor.
-    if (Array.isArray(a.veri.donemArsivi) && a.veri.donemArsivi.length) a.veri.donemArsivi = [];
-  });
+  s.donemArsivi.forEach(donemArsiviKaydiOnar);
   if (!Array.isArray(s.sinavTutanaklari)) s.sinavTutanaklari = [];
   s.sinavTutanaklari.forEach(t => {
     if (!t.id) t.id = uid("st");
@@ -1018,6 +1008,81 @@ function loadState() {
   } catch (e) { return normalizeState(defaultState()); }
 }
 
+/* ============ Dönem Arşivi — IndexedDB ============
+   Dönem Arşivi kayıtlarının HER BİRİ o anki TÜM sistemin dondurulmuş
+   kopyasıdır — yıllar içinde birikince localStorage'ın küçük (tipik
+   5-10 MB) kotasına takılmaması için bunları ayrı, çok daha büyük
+   kapasiteli IndexedDB'de tutuyoruz. Ana çalışma verisi (S'nin geri
+   kalanı) hâlâ localStorage'da (bkz. save()), değişmedi — sadece
+   donemArsivi oradan çıkarıldı. IndexedDB yoksa/başarısız olursa
+   sessizce atlanır, program yine de çalışmaya devam eder (sadece o
+   oturumda arşivleme kalıcı olmaz). */
+const ARSIV_DB_ADI = "aok-arsiv-db";
+const ARSIV_DEPO_ADI = "kayitlar";
+let arsivDbSozu = null;
+function arsivDbAc() {
+  if (arsivDbSozu) return arsivDbSozu;
+  arsivDbSozu = new Promise((resolve, reject) => {
+    if (!window.indexedDB) { reject(new Error("IndexedDB desteklenmiyor")); return; }
+    const istek = indexedDB.open(ARSIV_DB_ADI, 1);
+    istek.onupgradeneeded = () => {
+      const db = istek.result;
+      if (!db.objectStoreNames.contains(ARSIV_DEPO_ADI)) db.createObjectStore(ARSIV_DEPO_ADI, { keyPath: "id" });
+    };
+    istek.onsuccess = () => resolve(istek.result);
+    istek.onerror = () => reject(istek.error);
+  });
+  return arsivDbSozu;
+}
+function arsivTumunuYukle() {
+  return arsivDbAc().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(ARSIV_DEPO_ADI, "readonly");
+    const istek = tx.objectStore(ARSIV_DEPO_ADI).getAll();
+    istek.onsuccess = () => resolve(istek.result || []);
+    istek.onerror = () => reject(istek.error);
+  })).catch(() => []);
+}
+function arsivKaydetIDB(kayit) {
+  return arsivDbAc().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(ARSIV_DEPO_ADI, "readwrite");
+    tx.objectStore(ARSIV_DEPO_ADI).put(kayit);
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+  })).catch(() => false);
+}
+function arsivSilIDB(id) {
+  return arsivDbAc().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(ARSIV_DEPO_ADI, "readwrite");
+    tx.objectStore(ARSIV_DEPO_ADI).delete(id);
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+  })).catch(() => false);
+}
+function donemArsiviKaydiOnar(a) {
+  if (!a.id) a.id = uid("da");
+  if (typeof a.etiket !== "string") a.etiket = "";
+  if (typeof a.tarih !== "string") a.tarih = "";
+  if (!a.veri || typeof a.veri !== "object") a.veri = {};
+  if (Array.isArray(a.veri.donemArsivi) && a.veri.donemArsivi.length) a.veri.donemArsivi = [];
+  return a;
+}
+/* S.donemArsivi o an ne taşıyorsa (ör. bu güncellemeden ÖNCE kaydedilmiş,
+   hâlâ eski usul gömülü arşivler içeren bir yedek dosyası ya da isimli
+   sürüm yeni açıldıysa) IndexedDB'ye bir kerelik aktarılır, sonra
+   IndexedDB'deki GÜNCEL TAM liste S.donemArsivi'ye yazılır. Böylece
+   Dönem Arşivi; hangi isimli sürümde/yedekte olduğunuzdan bağımsız,
+   kalıcı, tek ve her zaman eksiksiz bir kayıt olarak kalır — sürüm
+   değiştirmek ya da yedek yüklemek onu asla sıfırlamaz/üzerine yazmaz. */
+async function arsivSenkronEt() {
+  const eldeki = Array.isArray(S.donemArsivi) ? S.donemArsivi : [];
+  for (const a of eldeki) {
+    if (a && a.id) await arsivKaydetIDB(donemArsiviKaydiOnar(JSON.parse(JSON.stringify(a))));
+  }
+  const tum = await arsivTumunuYukle();
+  tum.forEach(donemArsiviKaydiOnar);
+  S.donemArsivi = tum;
+}
+
 let S = loadState();
 let lastSnapshot = null;
 let lastSnapshotWasDelete = false;
@@ -1030,7 +1095,10 @@ function save() {
   }
   window.__lastActionWasDelete = false;
   S.__senkronZamani = new Date().toISOString();
-  localStorage.setItem(LS_KEY, JSON.stringify(S));
+  // Dönem Arşivi artık burada DEĞİL, IndexedDB'de tutuluyor (bkz. yukarıdaki
+  // arsivSenkronEt/arsivKaydetIDB) — ana kayıt küçük ve hızlı kalsın diye
+  // her save()'de buraya yeniden gömülmüyor.
+  localStorage.setItem(LS_KEY, JSON.stringify(Object.assign({}, S, { donemArsivi: [] })));
   scheduleProgramSenkronizeEt();
   bulutaSenkronEt();
   if (typeof bulutaFirestoreSenkronEt === "function") bulutaFirestoreSenkronEt();
@@ -1047,7 +1115,9 @@ function save() {
    atlanır, uygulama eskisi gibi sadece yerel çalışır. */
 function bulutaSenkronEt() {
   if (!(window.desktop && window.desktop.isElectron && window.desktop.syncWrite)) return;
-  try { window.desktop.syncWrite(JSON.stringify(S)); } catch (e) {}
+  // Dönem Arşivi burada da taşınmıyor — her kayıtta büyüyen arşivi bulut
+  // dosyasına tekrar tekrar yazmaya gerek yok, IndexedDB zaten kalıcı.
+  try { window.desktop.syncWrite(JSON.stringify(Object.assign({}, S, { donemArsivi: [] }))); } catch (e) {}
 }
 async function bulutSenkronunuKontrolEt() {
   if (!(window.desktop && window.desktop.isElectron && window.desktop.syncRead)) return;
@@ -1060,7 +1130,8 @@ async function bulutSenkronunuKontrolEt() {
   const yerelZaman = S.__senkronZamani || "";
   if (!bulutZaman || bulutZaman <= yerelZaman) return;
   S = normalizeState(bulutState);
-  localStorage.setItem(LS_KEY, JSON.stringify(S));
+  localStorage.setItem(LS_KEY, JSON.stringify(Object.assign({}, S, { donemArsivi: [] })));
+  if (typeof arsivSenkronEt === "function") await arsivSenkronEt();
   if (typeof renderTabbar === "function") renderTabbar();
   if (typeof renderMain === "function") renderMain();
   if (typeof renderYilWidget === "function") renderYilWidget();
@@ -1076,6 +1147,9 @@ function undoLastChange() {
   if (!lastSnapshot) return;
   let restored;
   try { restored = normalizeState(JSON.parse(lastSnapshot)); } catch (e) { return; }
+  // Dönem Arşivi artık ayrı (IndexedDB) ve dondurulmuş/kalıcıdır — geri al
+  // bunu hiç etkilememeli, canlı listeyi olduğu gibi koru.
+  restored.donemArsivi = S.donemArsivi;
   S = restored;
   lastSnapshot = null;
   undoing = true;

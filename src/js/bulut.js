@@ -125,22 +125,27 @@ function bulutDinlemeyeBasla(uid) {
     const yerelZaman = (typeof S !== "undefined" && S.__senkronZamani) || "";
     if (!bulutZaman || bulutZaman <= yerelZaman) return;
     S = normalizeState(bulutState);
-    localStorage.setItem(LS_KEY, JSON.stringify(S));
-    if (typeof renderTabbar === "function") renderTabbar();
-    if (typeof renderMain === "function") renderMain();
-    if (typeof renderYilWidget === "function") renderYilWidget();
-    if (typeof showSaveToast === "function") showSaveToast(false, "Veriler başka bir bilgisayardan senkronize edildi");
+    localStorage.setItem(LS_KEY, JSON.stringify(Object.assign({}, S, { donemArsivi: [] })));
+    Promise.resolve(typeof arsivSenkronEt === "function" ? arsivSenkronEt() : null).then(() => {
+      if (typeof renderTabbar === "function") renderTabbar();
+      if (typeof renderMain === "function") renderMain();
+      if (typeof renderYilWidget === "function") renderYilWidget();
+      if (typeof showSaveToast === "function") showSaveToast(false, "Veriler başka bir bilgisayardan senkronize edildi");
+    });
   }, () => {});
 }
 
 /* model.js'teki save() bu fonksiyonu çağırır — OneDrive'a yazan
    bulutaSenkronEt'ten kasıtlı olarak farklı isimli: aynı anda iki ayrı
    bulut mekanizması (OneDrive dosyası + Firestore) birbirinden habersiz,
-   bağımsız çalışabilsin diye. */
+   bağımsız çalışabilsin diye. Dönem Arşivi burada da taşınmıyor —
+   hem Firestore'un 1 MB'lık belge sınırına takılmamak, hem de her
+   kayıtta büyüyen arşivi gereksiz yere tekrar tekrar yüklememek için
+   (arşiv zaten her bilgisayarda kendi IndexedDB'sinde kalıcı). */
 function bulutaFirestoreSenkronEt() {
   if (!(bulutDb && typeof firebase !== "undefined" && firebase.auth().currentUser)) return;
   const uid = firebase.auth().currentUser.uid;
   bulutDb.collection("users").doc(uid).collection("data").doc("state")
-    .set({ json: JSON.stringify(S), updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
+    .set({ json: JSON.stringify(Object.assign({}, S, { donemArsivi: [] })), updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
     .catch(() => {});
 }

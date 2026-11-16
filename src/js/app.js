@@ -27,5 +27,12 @@ applyTheme(currentTheme());
 sonKayitBaslangicDurumunuGoster();
 renderYilWidget();
 
+// Dönem Arşivi, localStorage'ın küçük kotasına takılmamak için IndexedDB'de
+// tutuluyor (bkz. model.js) — açılışta oradan asenkron yüklenip (varsa eski
+// usul gömülü kayıtlar bir kerelik oraya taşınıp) ekrana yansıtılıyor.
+if (typeof arsivSenkronEt === "function") {
+  arsivSenkronEt().then(() => { if (typeof renderMain === "function") renderMain(); });
+}
+
 if (typeof bulutSenkronunuKontrolEt === "function") bulutSenkronunuKontrolEt();
 if (typeof bulutBaslat === "function") bulutBaslat();
