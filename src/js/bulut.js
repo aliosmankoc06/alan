@@ -17,9 +17,10 @@ const BULUT_FIREBASE_CONFIG = {
   measurementId: "G-8X2ELT4260"
 };
 
-// TEMP: tüm düzenlemeler bitene kadar giriş zorunlu değil — test kolaylığı
-// için geçici olarak kapatıldı. En son true yapılacak.
-const BULUT_GIRIS_ZORUNLU = false;
+// Kullanıcı açıkça "arkadaki asıl ekran hiç görünmesin, sadece giriş
+// ekranı olsun, şifre doğru girilince açılsın" istedi — bu yüzden giriş
+// artık zorunlu ve tam ekran (bkz. bulutGirisEkraniniGoster).
+const BULUT_GIRIS_ZORUNLU = true;
 
 let bulutDb = null;
 let bulutDinleyiciDurdur = null;
@@ -81,24 +82,27 @@ function bulutDurumGoster(eposta) {
     : `☁️ Bulut girişi yok · <a href="#" onclick="bulutGirisEkraniniGoster();return false;">Giriş yap</a>`;
 }
 
+// Tam ekran, ARKADAKİ sistemi hiç göstermeyen (yarı saydam modal değil,
+// tamamen opak) bir giriş kapısı — şifre doğru girilmeden sistemin kendisi
+// görünmez/kullanılamaz.
 function bulutGirisEkraniniGoster() {
   const root = document.getElementById("bulut-giris-root");
   if (!root) return;
   root.innerHTML = `
-  <div class="modal-bg" style="z-index:200;">
-    <div class="modal" style="width:340px;">
-      <h3>Giriş Yap</h3>
-      <p class="small">Programı kullanmak ve değişikliklerin buluta otomatik kaydedilmesi için giriş yapman gerekiyor.</p>
-      <label class="small">E-posta</label>
-      <input type="email" id="bulut-eposta" style="width:100%" autocomplete="username">
-      <label class="small">Şifre</label>
-      <input type="password" id="bulut-sifre" style="width:100%" autocomplete="current-password" onkeydown="if(event.key==='Enter'){event.preventDefault();bulutGirisYap();}">
-      <div id="bulut-giris-hata" class="small" style="color:var(--warn);margin-top:6px;"></div>
-      <div class="row">
-        <button class="btn primary" id="bulut-giris-btn" onclick="bulutGirisYap()">Giriş Yap</button>
+  <div id="bulut-giris-tam-ekran" style="position:fixed;inset:0;z-index:999999;background:var(--bg);display:flex;align-items:center;justify-content:center;">
+    <div style="width:380px;max-width:92vw;text-align:center;">
+      <div style="font-size:15px;font-weight:700;letter-spacing:.01em;color:var(--ink);line-height:1.35;margin-bottom:4px;">Makine ve Tasarım Teknolojisi Alanı<br>Yönetim Sistemi</div>
+      <div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:22px;">Devam etmek için giriş yapın</div>
+      <div style="background:var(--panel);border:1px solid var(--line);border-radius:var(--radius, 10px);box-shadow:var(--shadow-lg);padding:26px 24px;text-align:left;">
+        <label class="small">E-posta</label>
+        <input type="email" id="bulut-eposta" style="width:100%" autocomplete="username">
+        <label class="small" style="margin-top:10px;display:block;">Şifre</label>
+        <input type="password" id="bulut-sifre" style="width:100%" autocomplete="current-password" onkeydown="if(event.key==='Enter'){event.preventDefault();bulutGirisYap();}">
+        <div id="bulut-giris-hata" class="small" style="color:var(--warn);margin-top:8px;min-height:1px;"></div>
+        <button class="btn primary" id="bulut-giris-btn" onclick="bulutGirisYap()" style="width:100%;margin-top:14px;">Giriş Yap</button>
+        <p class="small" style="margin-top:10px;text-align:center;"><a href="#" onclick="bulutSifremiUnuttum();return false;">Şifremi unuttum</a></p>
+        <div id="bulut-sifirla-mesaj" class="small" style="color:var(--teal-ink);margin-top:4px;text-align:center;"></div>
       </div>
-      <p class="small" style="margin-top:8px;"><a href="#" onclick="bulutSifremiUnuttum();return false;">Şifremi unuttum</a></p>
-      <div id="bulut-sifirla-mesaj" class="small" style="color:var(--teal-ink);margin-top:4px;"></div>
     </div>
   </div>`;
 }
