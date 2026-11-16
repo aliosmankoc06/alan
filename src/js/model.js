@@ -537,6 +537,49 @@ function normalizeState(s) {
       });
     }
   }
+  // Adil Makina'dan alınan 2 yeni CNC tezgahı (FEELER CNC Torna FTC-20L,
+  // DEMIX SED-855 CNC Dik İşleme Merkezi) — yukarıdaki blok SADECE envanter
+  // tamamen boşken çalıştığı için (gerçek kullanıcının envanteri zaten 30
+  // makineyle dolu), bu ikisi marka+model eşleşmesiyle ayrıca, mevcut
+  // envantere dokunmadan bir kerelik eklenir.
+  if (!s.adilMakinaMakineleriEklendi2026) {
+    s.adilMakinaMakineleriEklendi2026 = true;
+    const adilYeni = (typeof MAKINE_ENVANTERI_HAZIR_VERI !== "undefined" ? MAKINE_ENVANTERI_HAZIR_VERI : []).filter(hm => hm.tedarikci === "Adil Makina");
+    adilYeni.forEach(hm => {
+      const zatenVar = s.envanter.makineler.some(m => m.marka === hm.marka && m.model === hm.model);
+      if (!zatenVar) {
+        s.envanter.makineler.push(Object.assign({ id: uid("mk"), arizaKayitlari: [], onarimKayitlari: [], bakimKayitlari: [], yedekParcalar: [] }, hm));
+      }
+    });
+  }
+  // Bu 2 yeni tezgah için başlangıç bakım kartları (Günlük/Haftalık/6 Aylık)
+  // — her biri boş açılır: henüz gerçekten yapılmış bir kontrol yokken
+  // "yapıldı" işaretlemek sahte kayıt oluşturur, bu yüzden tarih/durum
+  // alanları kasıtlı olarak boş bırakılıp gerçek kontroller yapıldıkça
+  // doldurulmak üzere sadece kart iskeleti hazırlanır.
+  if (!s.adilMakinaBakimKartlariAcildi2026) {
+    s.adilMakinaBakimKartlariAcildi2026 = true;
+    // NOT: TR_AYLAR/formatTrTarih (views.js) bu satır çalıştığında henüz
+    // tanımlı DEĞİL — model.js, index.html'de views.js'den önce yüklenip
+    // S = loadState() en üst seviyede hemen çalışıyor. Bu yüzden ay/tarih
+    // burada kendi başına, bağımsız olarak hesaplanır.
+    const AY_ADLARI_YEREL = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+    const simdi = new Date();
+    const guncelAy = AY_ADLARI_YEREL[simdi.getMonth()] + " " + simdi.getFullYear();
+    const guncelTarih = String(simdi.getDate()).padStart(2, "0") + "." + String(simdi.getMonth() + 1).padStart(2, "0") + "." + simdi.getFullYear();
+    s.envanter.makineler.filter(m => m.tedarikci === "Adil Makina").forEach(m => {
+      ["gunluk", "haftalik", "altiAylik"].forEach(tur => {
+        const zatenVar = s.bakimKartlari.some(k => k.makineId === m.id && k.tur === tur);
+        if (zatenVar) return;
+        s.bakimKartlari.push({
+          id: uid("bk"), makineId: m.id, tur,
+          ay: tur === "altiAylik" ? "" : guncelAy,
+          olusturmaTarihi: guncelTarih,
+          imzaOgretmeni: "", durumlar: {}, tarihler: {}, aciklama: ""
+        });
+      });
+    });
+  }
   if (!Array.isArray(s.durumTespitFormlari)) s.durumTespitFormlari = [];
   s.durumTespitFormlari.forEach(f => {
     if (!f.id) f.id = uid("dtf");
