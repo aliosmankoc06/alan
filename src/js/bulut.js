@@ -89,19 +89,19 @@ function bulutGirisEkraniniGoster() {
   const root = document.getElementById("bulut-giris-root");
   if (!root) return;
   root.innerHTML = `
-  <div id="bulut-giris-tam-ekran" style="position:fixed;inset:0;z-index:999999;background:var(--bg);display:flex;align-items:center;justify-content:center;">
+  <div id="bulut-giris-tam-ekran" style="position:fixed;inset:0;z-index:999999;background:radial-gradient(circle at 20% 15%, rgba(217,138,58,.16), transparent 45%), radial-gradient(circle at 85% 85%, rgba(196,118,43,.12), transparent 50%), linear-gradient(160deg, #0F1522 0%, #182034 48%, #0F1522 100%);display:flex;align-items:center;justify-content:center;">
     <div style="width:380px;max-width:92vw;text-align:center;">
-      <div style="font-size:15px;font-weight:700;letter-spacing:.01em;color:var(--ink);line-height:1.35;margin-bottom:4px;">Makine ve Tasarım Teknolojisi Alanı<br>Yönetim Sistemi</div>
-      <div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:22px;">Devam etmek için giriş yapın</div>
-      <div style="background:var(--panel);border:1px solid var(--line);border-radius:var(--radius, 10px);box-shadow:var(--shadow-lg);padding:26px 24px;text-align:left;">
-        <label class="small">E-posta</label>
+      <div style="font-size:15px;font-weight:700;letter-spacing:.01em;color:#E7EBF5;line-height:1.35;margin-bottom:4px;">Makine ve Tasarım Teknolojisi Alanı<br>Yönetim Sistemi</div>
+      <div style="font-size:12.5px;color:#9AA5C0;margin-bottom:22px;">Devam etmek için giriş yapın</div>
+      <div style="background:#182034;border:1px solid #2C3752;border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.4);padding:26px 24px;text-align:left;">
+        <label style="font-size:11px;color:#9AA5C0;display:block;margin:0 0 3px;">E-posta</label>
         <input type="email" id="bulut-eposta" style="width:100%" autocomplete="username">
-        <label class="small" style="margin-top:10px;display:block;">Şifre</label>
+        <label style="font-size:11px;color:#9AA5C0;display:block;margin:10px 0 3px;">Şifre</label>
         <input type="password" id="bulut-sifre" style="width:100%" autocomplete="current-password" onkeydown="if(event.key==='Enter'){event.preventDefault();bulutGirisYap();}">
-        <div id="bulut-giris-hata" class="small" style="color:var(--warn);margin-top:8px;min-height:1px;"></div>
+        <div id="bulut-giris-hata" style="font-size:11px;color:#E8927F;margin-top:8px;min-height:1px;"></div>
         <button class="btn primary" id="bulut-giris-btn" onclick="bulutGirisYap()" style="width:100%;margin-top:14px;">Giriş Yap</button>
-        <p class="small" style="margin-top:10px;text-align:center;"><a href="#" onclick="bulutSifremiUnuttum();return false;">Şifremi unuttum</a></p>
-        <div id="bulut-sifirla-mesaj" class="small" style="color:var(--teal-ink);margin-top:4px;text-align:center;"></div>
+        <p style="font-size:11px;margin-top:10px;text-align:center;"><a href="#" onclick="bulutSifremiUnuttum();return false;" style="color:#D4A572;">Şifremi unuttum</a></p>
+        <div id="bulut-sifirla-mesaj" style="font-size:11px;color:#7FC9BD;margin-top:4px;text-align:center;"></div>
       </div>
     </div>
   </div>`;
