@@ -593,6 +593,14 @@ function normalizeState(s) {
   if (!s.dersProgramiKasim2026Islendi && typeof DERS_PROGRAMI_KASIM2026_HUCRELERI !== "undefined") {
     s.dersProgramiKasim2026Islendi = true;
     s.dersProgramiKasim2026Uyarilari = [];
+    // KRİTİK GÜVENLİK: bu blok kullanıcının GERÇEK, yıllardır birikmiş
+    // verisi üzerinde bir kerelik çalışıyor — o veride beklenmeyen/eski bir
+    // şekil (ör. teacherIds alanı olmayan eski bir hücre) varsa bu try/catch
+    // OLMADAN atılan bir hata normalizeState()'i tamamen çökertip
+    // loadState()'in catch'ine düşürür ve TÜM gerçek veri (öğrenci listesi
+    // dahil) sessizce boş varsayılan durumla değiştirilir. Bu yüzden bu
+    // bloktaki HİÇBİR hata asla dışarı sızmamalı.
+    try {
     const normTr = (str) => String(str || "").toLocaleLowerCase("tr-TR").trim().replace(/\s+/g, " ");
     const bulOgretmenId = (ad) => { const t = s.teachers.find(x => normTr(x.name) === normTr(ad)); return t ? t.id : null; };
     const bulSinifId = (ad) => {
@@ -698,7 +706,7 @@ function normalizeState(s) {
       .map(bulOgretmenId).filter(Boolean);
     Object.keys(s.schedule).forEach(key => {
       const hucreVar = s.schedule[key];
-      if (hucreVar.teacherIds.some(tid => etkilenenOgretmenIdleri.includes(tid))) delete s.schedule[key];
+      if ((hucreVar.teacherIds || []).some(tid => etkilenenOgretmenIdleri.includes(tid))) delete s.schedule[key];
     });
 
     DERS_PROGRAMI_KASIM2026_HUCRELERI.forEach(hucre => {
@@ -748,7 +756,7 @@ function normalizeState(s) {
       // zaten varsa (farklı classId, dolayısıyla yukarıdaki key kontrolüne takılmaz)
       // bu hücre de yazılmaz — bir öğretmen aynı anda iki yerde olamaz.
       const ogretmenCakismasiVarMi = ogretmenIdleri.some(tid =>
-        Object.values(s.schedule).some(c => c.day === hucre.day && c.hour === hucre.hour && c.classId !== classId && c.teacherIds.includes(tid))
+        Object.values(s.schedule).some(c => c.day === hucre.day && c.hour === hucre.hour && c.classId !== classId && (c.teacherIds || []).includes(tid))
       );
       if (ogretmenCakismasiVarMi) {
         s.dersProgramiKasim2026Uyarilari.push(`Öğretmen çakışması (yazılmadı): ${DAYS[hucre.day]} ${hucre.hour + 1}. saat, "${hucre.kind === "isletme" ? hucre.isletme : (hucre.ders || "Rehberlik/Planlama")}"`);
@@ -756,6 +764,9 @@ function normalizeState(s) {
       }
       s.schedule[key] = Object.assign({ day: hucre.day, hour: hucre.hour, classId, assignmentId, courseId, teacherIds: ogretmenIdleri, roomIds: [], locked: true }, extra);
     });
+    } catch (e) {
+      s.dersProgramiKasim2026Uyarilari.push("Beklenmeyen hata, içe aktarım yarıda kesildi: " + e.message);
+    }
   }
   if (!Array.isArray(s.durumTespitFormlari)) s.durumTespitFormlari = [];
   s.durumTespitFormlari.forEach(f => {
