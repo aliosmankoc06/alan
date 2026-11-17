@@ -208,7 +208,13 @@ function tryPlaceAssignmentWithTeam(cls, assignment, blocks, team, commit) {
 
 function teacherMaxHours(teacherId) {
   const t = teacherById(teacherId);
-  return (t && t.hoursMode === "exact" && typeof t.hoursTarget === "number") ? t.hoursTarget : null;
+  if (!t) return null;
+  const exactCap = (t.hoursMode === "exact" && typeof t.hoursTarget === "number") ? t.hoursTarget : null;
+  const elleCap = (typeof t.hoursMax === "number") ? t.hoursMax : null;
+  // İkisi de girilmişse daha sıkı (küçük) olan geçerli olur — "exact" zaten
+  // kendi başına bir tavan, elle girilen hoursMax bunu gevşetemez.
+  if (exactCap !== null && elleCap !== null) return Math.min(exactCap, elleCap);
+  return exactCap !== null ? exactCap : elleCap;
 }
 function teacherDersLoad(teacherId) {
   return teacherLoad(teacherId) - teacherCoordHours(teacherId);

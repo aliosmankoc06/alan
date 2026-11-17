@@ -9176,6 +9176,8 @@ function viewOgretmen() {
             <option value="exact" ${mode === 'exact' ? 'selected' : ''}>Tam bu kadar (sabit)</option>
           </select></td>
       <td class="print-only-cell">${modeLabel}</td>
+      <td class="no-print"><input type="number" min="0" placeholder="sınırsız" title="Otomatik dağıtımın bu öğretmene (koordinatörlük hariç) en fazla kaç ders saati verebileceği — boş bırakılırsa sınır yok" value="${typeof t.hoursMax === 'number' ? t.hoursMax : ''}" style="width:70px" onchange="setTeacherHoursMax('${t.id}',this.value)"></td>
+      <td class="print-only-cell">${typeof t.hoursMax === 'number' ? t.hoursMax : '—'}</td>
       <td class="no-print"><input type="text" placeholder="örn. Alan Şefi" value="${escHtml(t.unvan || '')}" style="width:100%" onchange="setTeacherUnvan('${t.id}',this.value)"></td>
       <td class="print-only-cell">${escHtml(t.unvan || '—')}</td>
       <td class="no-print"><div class="row" style="margin:0;"><button class="btn" onclick="editTeacher('${t.id}')">Düzenle</button><button class="btn danger" onclick="deleteTeacher('${t.id}')">Sil</button></div></td>
@@ -9194,7 +9196,7 @@ function viewOgretmen() {
     ${belgeYazdirmaBasligi("Öğretmenler")}
     <div class="card">
       <p class="small no-print">"Ünvan" sütunu Yıllık Plan'ın imza bloğunda kullanılır (ör. Alan Şefi, Atölye Şefi, Laboratuvar Şefi) — istediğiniz zaman değiştirebilirsiniz.</p>
-      <table><tr><th>Ad Soyad</th><th>Ders Saati</th><th>Saat Hedefi</th><th>Tür</th><th>Ünvan (İmza)</th><th class="no-print"></th></tr>${rows}</table>
+      <table><tr><th>Ad Soyad</th><th>Ders Saati</th><th>Saat Hedefi</th><th>Tür</th><th title="Dağıtım algoritmasının uygulayacağı azami ders saati">Azami Saat</th><th>Ünvan (İmza)</th><th class="no-print"></th></tr>${rows}</table>
     </div>
   </div>`;
 }
@@ -9213,6 +9215,11 @@ function setTeacherHoursTarget(teacherId, value) {
 function setTeacherHoursMode(teacherId, mode) {
   const t = teacherById(teacherId);
   t.hoursMode = mode;
+  save(); renderMain();
+}
+function setTeacherHoursMax(teacherId, value) {
+  const t = teacherById(teacherId);
+  t.hoursMax = value === "" ? null : Math.max(0, parseInt(value) || 0);
   save(); renderMain();
 }
 function setTeacherTimeOff(teacherId, day, value) {

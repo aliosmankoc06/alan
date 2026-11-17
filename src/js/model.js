@@ -1127,6 +1127,13 @@ function normalizeState(s) {
     }
     if (typeof t.coordEligible !== "boolean") t.coordEligible = true;
     if (typeof t.unvan !== "string") t.unvan = "";
+    // "min" modunda hoursTarget sadece ASGARİ'dir — otomatik dağıtım
+    // algoritması "exact" modu dışında hiçbir üst sınır uygulamıyordu,
+    // havuz küçükse bir öğretmene günün tamamına kadar ders yığabilirdi.
+    // hoursMax, moddan bağımsız, isteğe bağlı (varsayılan boş = sınırsız,
+    // mevcut davranış değişmez) bir azami ders saati — bkz. scheduler.js
+    // teacherMaxHours().
+    if (typeof t.hoursMax !== "number") t.hoursMax = null;
   });
   // Yıllık Plan imza bloğu — S.teachers'dan (ders programı öğretmen listesi)
   // BAĞIMSIZ ayrı bir liste: alandaki öğretmen sayısı zamanla artıp
