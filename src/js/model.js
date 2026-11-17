@@ -157,6 +157,7 @@ function defaultState() {
       { id: "dal-bmi", ad: "Bilgisayarlı Makine İmalatı Dalı", subeler: ["B"], renkKey: "teal" }
     ],
     seflikHaftalikSaatOverride: null,
+    stajDevamsizlikEsigi: null,
     bakimKartlari: [],
     isletmeBelirlemeTutanaklari: [],
     rehberlikFaaliyetRaporlari: [],
@@ -215,6 +216,7 @@ function emptyState() {
     },
     dalTanimlari: [],
     seflikHaftalikSaatOverride: null,
+    stajDevamsizlikEsigi: null,
     bakimKartlari: [],
     isletmeBelirlemeTutanaklari: [],
     rehberlikFaaliyetRaporlari: [],
@@ -334,6 +336,7 @@ function normalizeState(s) {
     if (typeof k.olusturmaTarihi !== "string") k.olusturmaTarihi = "";
   });
   if (typeof s.eskiSistemKaldirildi !== "boolean") s.eskiSistemKaldirildi = false;
+  if (s.stajDevamsizlikEsigi === undefined) s.stajDevamsizlikEsigi = null;
   if (s.akademikTakvim === undefined) s.akademikTakvim = null;
   if (s.akademikTakvim && (!s.akademikTakvim.sinavTarihleri || typeof s.akademikTakvim.sinavTarihleri !== "object")) {
     s.akademikTakvim.sinavTarihleri = { d1s1: "", d1s2: "", d2s1: "", d2s2: "" };

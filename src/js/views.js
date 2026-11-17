@@ -1195,6 +1195,28 @@ function stajTakipDevamsizlikOzet(st, yil, ay) {
   });
   return { tamYok, yarimYok };
 }
+// Aylık özetten farklı olarak TÜM dönemi (seçili aya bakmadan) toplar —
+// resmi devamsızlık eşiği aya göre değil dönem/yıl geneline göre
+// değerlendirilir. Yarım gün 0.5 tam gün sayılır.
+function stajTakipDevamsizlikDonemToplam(st) {
+  let tamYok = 0, yarimYok = 0;
+  Object.values(st.devamsizlik || {}).forEach(durum => {
+    if (durum === "tamYok") tamYok++;
+    else if (durum === "sabahYok" || durum === "ogledenSonraYok") yarimYok++;
+  });
+  return { tamYok, yarimYok, esdeger: tamYok + yarimYok * 0.5 };
+}
+function setStajDevamsizlikEsigi(value) {
+  const n = parseFloat(String(value).replace(",", "."));
+  S.stajDevamsizlikEsigi = Number.isFinite(n) && n > 0 ? n : null;
+  save(); renderMain();
+}
+// Eşiği aşan öğrencileri hem bu ekranda hem Ana Sayfa'da işaretlemek için
+// paylaşılan tek kaynak — eşik girilmemişse (null) kimse işaretlenmez.
+function stajTakipDevamsizlikEsikAsanOgrenciler() {
+  if (!S.stajDevamsizlikEsigi) return [];
+  return S.stajdakiOgrenciler.filter(st => stajTakipDevamsizlikDonemToplam(st).esdeger >= S.stajDevamsizlikEsigi);
+}
 function viewStajTakipDevamsizlik() {
   const yil = stajTakipDevamYil, ay = stajTakipDevamAy;
   const gunSayisi = ayGunSayisi(yil, ay);
@@ -1206,10 +1228,12 @@ function viewStajTakipDevamsizlik() {
   const baslikAciklama = stajTakipDevamOgretmenFiltre !== "ALL" ? ` — ${escHtml((teacherById(stajTakipDevamOgretmenFiltre) || {}).name || "")} öğretmenin öğrencileri` : "";
   const headerGunler = Array.from({ length: gunSayisi }, (_, i) => i + 1)
     .map(g => `<th style="${haftaSonuMu(yil, ay, g) ? "background:var(--panel-2);color:var(--ink-soft);" : ""}min-width:36px;">${g}</th>`).join("");
-  const colCount = 5 + gunSayisi;
+  const colCount = 6 + gunSayisi;
   const rows = liste.length ? liste.map(st => {
     const ogretmenAdi = st.sorumluOgretmenId ? ((teacherById(st.sorumluOgretmenId) || {}).name || "—") : "—";
     const { tamYok, yarimYok } = stajTakipDevamsizlikOzet(st, yil, ay);
+    const donemToplam = stajTakipDevamsizlikDonemToplam(st);
+    const esikAsildi = S.stajDevamsizlikEsigi && donemToplam.esdeger >= S.stajDevamsizlikEsigi;
     const gunler = Array.from({ length: gunSayisi }, (_, i) => i + 1).map(g => {
       if (haftaSonuMu(yil, ay, g)) {
         return `<td class="small" style="text-align:center;background:var(--panel-2);color:var(--ink-soft);" title="Hafta Sonu">—</td>`;
@@ -1222,7 +1246,7 @@ function viewStajTakipDevamsizlik() {
         : durum === "resmiTatil" ? "color:var(--teal-ink);" : "";
       return `<td class="small" style="text-align:center;cursor:pointer;${renk}" title="${escHtml(etiket.ad)} — tıklayınca değişir" onclick="stajTakipDevamsizlikDurumIlerlet('${st.id}','${tarih}')">${etiket.kisa}</td>`;
     }).join("");
-    return `<tr><td>${escHtml(st.sinif || "")}</td><td>${escHtml(st.ad)}</td><td>${escHtml(st.isletme || "—")}</td><td>${escHtml(ogretmenAdi)}</td>${gunler}<td class="small" style="text-align:center;">${tamYok} tam<br>${yarimYok} yarım</td></tr>`;
+    return `<tr><td>${escHtml(st.sinif || "")}</td><td>${escHtml(st.ad)}</td><td>${escHtml(st.isletme || "—")}</td><td>${escHtml(ogretmenAdi)}</td>${gunler}<td class="small" style="text-align:center;">${tamYok} tam<br>${yarimYok} yarım</td><td class="small" style="text-align:center;">${esikAsildi ? `<span class="pill warn" title="Dönem eşiği aşıldı">${donemToplam.esdeger}</span>` : donemToplam.esdeger}</td></tr>`;
   }).join("") : `<tr><td colspan="${colCount}" class="small">Önce Öğrenciler sekmesinden öğrenci ekleyin.</td></tr>`;
   return `
   <div class="card no-print">
@@ -1232,13 +1256,14 @@ function viewStajTakipDevamsizlik() {
       <div><label class="small">Ay</label><select onchange="setStajTakipDevamDonem(${yil}, this.value)">${aySecenekleri}</select></div>
       <div><label class="small">Yıl</label><input type="number" value="${yil}" style="width:90px" onchange="setStajTakipDevamDonem(this.value, ${ay})"></div>
       <div><label class="small">Sorumlu Öğretmen</label><select onchange="setStajTakipDevamOgretmenFiltre(this.value)"><option value="ALL" ${stajTakipDevamOgretmenFiltre === "ALL" ? "selected" : ""}>Tüm Öğretmenler</option>${ogretmenSecenekleri}</select></div>
+      <div><label class="small" title="Dönem toplamında (yarım gün = 0.5) bu sayıya ulaşan/geçen öğrenci kırmızı işaretlenir ve Ana Sayfa'da uyarı verir. Boş bırakılırsa uyarı kapalı kalır.">Devamsızlık Uyarı Eşiği (tam gün)</label><input type="number" min="0" step="0.5" placeholder="kapalı" value="${S.stajDevamsizlikEsigi || ''}" style="width:110px" onchange="setStajDevamsizlikEsigi(this.value)"></div>
     </div>
     ${belgeAracCubugu("Devamsızlık - " + ayAdlari[ay - 1] + " " + yil)}
   </div>
   <div class="print-area">
     ${belgeYazdirmaBasligi("Staj Devamsızlık Çizelgesi — " + ayAdlari[ay - 1] + " " + yil + baslikAciklama)}
     <div class="card" style="overflow-x:auto;">
-      <table><thead><tr><th>Sınıf</th><th>Ad Soyad</th><th>İşletme</th><th>Sorumlu Öğretmen</th>${headerGunler}<th>Toplam</th></tr></thead>
+      <table><thead><tr><th>Sınıf</th><th>Ad Soyad</th><th>İşletme</th><th>Sorumlu Öğretmen</th>${headerGunler}<th>Toplam</th><th title="Tüm dönem, tam gün eşdeğeri">Dönem Toplam</th></tr></thead>
       <tbody>${rows}</tbody></table>
       <p class="small" style="margin-top:8px;">YOK: Tam Gün Yok · S.Yok: Sabah Yok · ÖS.Yok: Öğleden Sonra Yok · Okul: Okulda (işletme günü değil) · Tatil: Resmi Tatil · — : Hafta Sonu · · : Tam Gün Var</p>
     </div>
@@ -8757,6 +8782,11 @@ function anaSayfaUyarilari() {
   const isletmesiBosOgrenci = S.students.filter(s => !s.isletme).length;
   if (isletmesiBosOgrenci) {
     uyarilar.push({ metin: `${isletmesiBosOgrenci} staj öğrencisinin işletmesi henüz atanmadı`, action: "setModule('staj-yerlestirme')" });
+  }
+
+  const devamsizlikEsikAsan = stajTakipDevamsizlikEsikAsanOgrenciler();
+  if (devamsizlikEsikAsan.length) {
+    uyarilar.push({ metin: `${devamsizlikEsikAsan.length} staj öğrencisi devamsızlık uyarı eşiğini aştı`, action: "setModule('staj-takip'); activeStajTakipTab='devamsizlik';" });
   }
 
   // Bakım kartı açıldıktan sonra hiç işlenmeden unutulabiliyor — her
