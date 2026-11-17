@@ -7513,9 +7513,13 @@ function selectSinavCourse(courseId) { activeSinavCourseId = courseId; activeSin
 function setSinavTab(id) { activeSinavTab = id; renderMain(); }
 let activeKagitBelge = "soru";
 let activeKagitDonemFiltre = null;
-function selectKagit(kind, id) { activeKagitId[kind] = id; activeKagitBelge = "soru"; activeKagitDonemFiltre = null; renderMain(); }
+let activeKagitKonuFiltre = "ALL";
+let soruHavuzuKonuFiltre = "ALL";
+function selectKagit(kind, id) { activeKagitId[kind] = id; activeKagitBelge = "soru"; activeKagitDonemFiltre = null; activeKagitKonuFiltre = "ALL"; renderMain(); }
 function setKagitBelge(id) { activeKagitBelge = id; renderMain(); }
 function setKagitDonemFiltre(v) { activeKagitDonemFiltre = v; renderMain(); }
+function setKagitKonuFiltre(v) { activeKagitKonuFiltre = v; renderMain(); }
+function setSoruHavuzuKonuFiltre(v) { soruHavuzuKonuFiltre = v; renderMain(); }
 
 function sinavTurDegisti() {
   const tur = document.getElementById("sr-tur").value;
@@ -7640,7 +7644,19 @@ function deleteSoru(id) {
 function viewSoruHavuzuBolum(classId, courseId) {
   const course = courseById(courseId);
   const cls = classById(classId);
-  const sorular = S.sinavHavuzu.sorular.filter(q => q.classId === classId && q.courseId === courseId);
+  const sorularTumu = S.sinavHavuzu.sorular.filter(q => q.classId === classId && q.courseId === courseId);
+  // Bir ders için 20-40 soru birikince konudan arama context'siz manuel
+  // okuma gerektiriyordu — konusu olmayan sorular her filtrede gösterilir,
+  // hiçbir soru sessizce kaybolmaz.
+  const konular = [...new Set(sorularTumu.map(q => q.konu).filter(Boolean))].sort((a, b) => a.localeCompare(b, "tr"));
+  if (soruHavuzuKonuFiltre !== "ALL" && !konular.includes(soruHavuzuKonuFiltre)) soruHavuzuKonuFiltre = "ALL";
+  const sorular = soruHavuzuKonuFiltre === "ALL" ? sorularTumu : sorularTumu.filter(q => !q.konu || q.konu === soruHavuzuKonuFiltre);
+  const konuFiltreBar = konular.length ? `
+    <div class="row no-print small" style="margin-bottom:8px;gap:6px;flex-wrap:wrap;">
+      <span style="align-self:center;">Konu:</span>
+      <button class="btn ${soruHavuzuKonuFiltre === 'ALL' ? 'primary' : ''}" style="padding:4px 9px;font-size:11.5px;" onclick="setSoruHavuzuKonuFiltre('ALL')">Tümü (${sorularTumu.length})</button>
+      ${konular.map(k => `<button class="btn ${soruHavuzuKonuFiltre === k ? 'primary' : ''}" style="padding:4px 9px;font-size:11.5px;" onclick="setSoruHavuzuKonuFiltre('${jsq(k)}')">${escHtml(k)}</button>`).join("")}
+    </div>` : "";
   const dosyaAdi = (cls ? cls.name + " " : "") + (course ? course.name : "") + " Soru Havuzu";
   const cards = sorular.map((q, i) => {
     const turEtiket = TUR_ETIKETLERI[q.tur] || q.tur;
@@ -7661,11 +7677,12 @@ function viewSoruHavuzuBolum(classId, courseId) {
   return `
   <div class="card no-print">
     <div class="row"><button class="btn primary" onclick="addSoru('${classId}','${courseId}')">Soru Ekle</button></div>
+    ${konuFiltreBar}
     ${belgeAracCubugu(dosyaAdi)}
   </div>
   <div class="print-area">
     ${belgeYazdirmaBasligi(dosyaAdi)}
-    ${cards || `<div class="card small" style="text-align:center;padding:30px 20px;">Bu ders için henüz soru eklenmedi.</div>`}
+    ${cards || `<div class="card small" style="text-align:center;padding:30px 20px;">${sorularTumu.length ? "Bu konuda soru yok." : "Bu ders için henüz soru eklenmedi."}</div>`}
   </div>`;
 }
 function addKagit(classId, courseId, kind) {
@@ -7798,15 +7815,23 @@ function renderKagitDetay(kagit, kind) {
   // (hangi filtre seçili olursa olsun) — hiçbir soru sessizce kaybolmaz.
   const etkinDonemFiltre = activeKagitDonemFiltre || kagit.donem || "ALL";
   const havuzTumu = S.sinavHavuzu.sorular.filter(q => q.classId === kagit.classId && q.courseId === kagit.courseId && (kagit.format === "karma" || q.tur === kagit.format));
-  const havuz = etkinDonemFiltre === "ALL" ? havuzTumu : havuzTumu.filter(q => !q.donem || q.donem === etkinDonemFiltre);
+  const havuzDonem = etkinDonemFiltre === "ALL" ? havuzTumu : havuzTumu.filter(q => !q.donem || q.donem === etkinDonemFiltre);
+  const konular = [...new Set(havuzDonem.map(q => q.konu).filter(Boolean))].sort((a, b) => a.localeCompare(b, "tr"));
+  if (activeKagitKonuFiltre !== "ALL" && !konular.includes(activeKagitKonuFiltre)) activeKagitKonuFiltre = "ALL";
+  const havuz = activeKagitKonuFiltre === "ALL" ? havuzDonem : havuzDonem.filter(q => !q.konu || q.konu === activeKagitKonuFiltre);
   const donemFiltreBar = `
     <div class="row no-print small" style="margin-bottom:8px;gap:6px;">
       <span style="align-self:center;">Dönem:</span>
       <button class="btn ${etkinDonemFiltre === 'ALL' ? 'primary' : ''}" style="padding:4px 9px;font-size:11.5px;" onclick="setKagitDonemFiltre('ALL')">Tümü (${havuzTumu.length})</button>
       <button class="btn ${etkinDonemFiltre === '1. Dönem' ? 'primary' : ''}" style="padding:4px 9px;font-size:11.5px;" onclick="setKagitDonemFiltre('1. Dönem')">1. Dönem</button>
       <button class="btn ${etkinDonemFiltre === '2. Dönem' ? 'primary' : ''}" style="padding:4px 9px;font-size:11.5px;" onclick="setKagitDonemFiltre('2. Dönem')">2. Dönem</button>
-    </div>`;
-  const secimHtml = havuzTumu.length === 0 ? `<div class="small">Bu format için soru havuzunda uygun soru yok. Önce "Soru Havuzu" sekmesinden soru ekleyin.</div>` : donemFiltreBar + (havuz.length === 0 ? `<div class="small">Bu dönem için uygun soru yok.</div>` : havuz.map(q => `
+    </div>` + (konular.length ? `
+    <div class="row no-print small" style="margin-bottom:8px;gap:6px;flex-wrap:wrap;">
+      <span style="align-self:center;">Konu:</span>
+      <button class="btn ${activeKagitKonuFiltre === 'ALL' ? 'primary' : ''}" style="padding:4px 9px;font-size:11.5px;" onclick="setKagitKonuFiltre('ALL')">Tümü (${havuzDonem.length})</button>
+      ${konular.map(k => `<button class="btn ${activeKagitKonuFiltre === k ? 'primary' : ''}" style="padding:4px 9px;font-size:11.5px;" onclick="setKagitKonuFiltre('${jsq(k)}')">${escHtml(k)}</button>`).join("")}
+    </div>` : "");
+  const secimHtml = havuzTumu.length === 0 ? `<div class="small">Bu format için soru havuzunda uygun soru yok. Önce "Soru Havuzu" sekmesinden soru ekleyin.</div>` : donemFiltreBar + (havuz.length === 0 ? `<div class="small">Bu seçimde uygun soru yok.</div>` : havuz.map(q => `
     <label class="row small" style="align-items:flex-start;gap:8px;">
       <input type="checkbox" ${kagit.soruIdleri.includes(q.id) ? 'checked' : ''} onchange="toggleKagitSoru('${kagit.id}','${q.id}','${kind}')">
       <span>${escHtml(q.soruMetni)} <i>(${q.puan} puan${q.donem ? ' · ' + escHtml(q.donem) : ''})</i></span>
