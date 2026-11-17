@@ -23,6 +23,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Yerel script etiketlerine önbellek-kırıcı sürüm ekle
+        # GitHub Pages ve tarayıcılar js/*.js dosyalarını agresif
+        # önbelleğe alıyor — index.html'deki script src'leri her commit'te
+        # değişmediği için kullanıcı bazen güncellemeyi hiç görmeden eski
+        # (önbellekteki) kodu çalıştırmaya devam edebiliyordu. Her
+        # deploy'da gerçek commit SHA'sını ?v= olarak ekleyerek bu
+        # dosyaları tarayıcıya "bu farklı bir dosya" dedirtiyoruz — repo
+        # içindeki index.html'e dokunmuyor, sadece yayınlanan kopyada.
+        run: sed -i -E 's#(src="js/[A-Za-z0-9_.-]+\.js)(")#\1?v=${{ github.sha }}\2#g' src/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
