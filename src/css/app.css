@@ -313,7 +313,17 @@ label.small{font-size:11px;color:var(--ink-soft);display:block;margin:8px 0 3px;
   .print-only-cell{display:table-cell;}
   .print-only-inline{display:inline;}
   .print-only-row{display:table-row;}
-  .card{box-shadow:none;border:1px solid #999;border-radius:0;page-break-inside:avoid;margin-bottom:10px;}
+  /* page-break-inside:avoid TÜM .card'lara uygulanıyordu — kısa bir kart
+     için zararsız, ama Norm Kadro/Devamsızlık/Sınav Notları gibi bir
+     sayfadan UZUN tablo içeren kartlarda felaketti: tarayıcı "kartı
+     bölme" kuralına uymak için koca tabloyu BAŞTAN SONA bir sonraki
+     sayfaya itiyor, önceki sayfa neredeyse tamamen boş kalıyordu. Satır
+     bütünlüğü zaten aşağıdaki tr{page-break-inside:avoid} ile korunuyor
+     — kartın kendisinin bölünmesine izin vermek (auto) tabloların sayfa
+     sınırında doğal/sürekli akmasını sağlıyor. Gerçekten kısa, tek
+     parça kalması istenen bir kart için .print-no-break eklenebilir. */
+  .card{box-shadow:none;border:1px solid #999;border-radius:0;margin-bottom:10px;}
+  .print-no-break{page-break-inside:avoid;}
   /* Sınıf seviyesi renkleri (Ders Programı ızgarası) koyu temadayken bile
      kağıtta her zaman okunaklı açık tonlarla basılsın — ekrandaki koyu
      tema değişkenlerine bağlı kalmasın. */
