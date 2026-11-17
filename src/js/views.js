@@ -5277,14 +5277,22 @@ function importPerformansFromExcel() {
 }
 function renderPerformansKayitDetay(k) {
   const kriterler = performansKriterleri(k.tur);
+  // Bir öğrenci başka sınıfa taşındığında (ogrenciSinifiDegistir) bu
+  // kayıttaki satırı otomatik silinmiyor/taşınmıyor (not kaybolmasın) —
+  // ama departman şefi fark etmeden "eski/yanlış sınıfta" not girmiş gibi
+  // durabiliyordu. Artık o öğrenci artık bu sınıfın güncel listesinde
+  // yoksa görünür bir uyarı rozeti gösteriliyor.
+  const guncelOkulNolari = new Set(ogrencilerForSinif(k.sinif).map(o => o.okulNo).filter(Boolean));
   const rows = k.ogrenciler.map((o, i) => {
     const toplam = o.puanlar.reduce((a, b) => a + b, 0);
+    const sinifindanAyrilmis = o.okulNo && !guncelOkulNolari.has(o.okulNo);
+    const ayrilmaRozeti = sinifindanAyrilmis ? ` <span class="pill warn no-print" title="Bu öğrenci artık ${escHtml(k.sinif)} güncel listesinde görünmüyor — başka sınıfa taşınmış olabilir">⚠ sınıftan ayrıldı</span>` : "";
     return `
     <tr>
       <td>${i + 1}</td>
       <td class="no-print"><input type="text" value="${escHtml(o.okulNo)}" style="width:70px" onchange="updateOgrenci('${k.id}','${o.id}','okulNo',this.value)"></td>
       <td class="print-only-cell">${escHtml(o.okulNo)}</td>
-      <td class="no-print"><input type="text" value="${escHtml(o.ad)}" style="width:160px" onchange="updateOgrenci('${k.id}','${o.id}','ad',this.value)"></td>
+      <td class="no-print"><input type="text" value="${escHtml(o.ad)}" style="width:160px" onchange="updateOgrenci('${k.id}','${o.id}','ad',this.value)">${ayrilmaRozeti}</td>
       <td class="print-only-cell">${escHtml(o.ad)}</td>
       <td class="no-print"><input type="number" min="0" max="100" placeholder="Toplam gir" style="width:70px;text-align:center;" title="Toplam puanı buraya girin — aşağıdaki kriterlere ağırlıklarına göre otomatik dağıtılır; dağıtımdan sonra istediğiniz kriteri yine de elle değiştirebilirsiniz." onchange="dagitPerformansPuan('${k.id}','${o.id}',this.value); this.value='';"></td>
       ${kriterler.map(([, w], ki) => `<td><input class="no-print" type="number" min="0" max="${w}" value="${o.puanlar[ki]}" style="width:44px;text-align:center;" onchange="updateOgrenciPuan('${k.id}','${o.id}',${ki},this.value)"><span class="print-only-inline">${o.puanlar[ki]}</span></td>`).join("")}
@@ -5515,12 +5523,16 @@ function grupBasligiSatiri(grup, kolonSayisi) {
 function renderSinavNotlariDetay(n) {
   let siraNo = 0;
   const kolonSayisi = n.uygulamaSinaviVarMi ? 7 : 6;
+  // bkz. renderPerformansKayitDetay — sınıf değiştiren öğrenci bu listede
+  // sessizce "yetim" kalmasın diye görünür bir uyarı rozeti.
+  const guncelOkulNolari = new Set(ogrencilerForSinif(n.sinif).map(o => o.okulNo).filter(Boolean));
   const satirlar = grupluKayitlar(n.kayitlar).map(blok => grupBasligiSatiri(blok.grup, kolonSayisi) + blok.kayitlar.map(k => {
     siraNo++;
+    const ayrilmaRozeti = (k.okulNo && !guncelOkulNolari.has(k.okulNo)) ? ` <span class="pill warn no-print" title="Bu öğrenci artık ${escHtml(n.sinif)} güncel listesinde görünmüyor">⚠</span>` : "";
     return `<tr>
       <td>${siraNo}</td>
       <td><input class="no-print" type="text" value="${escHtml(k.okulNo)}" style="width:56px;" onchange="updateSinavNotuAlan('${n.id}','${k.id}','okulNo',this.value)"><span class="print-only-inline">${escHtml(k.okulNo)}</span></td>
-      <td><input class="no-print" type="text" value="${escHtml(k.ad)}" style="width:180px;" onchange="updateSinavNotuAlan('${n.id}','${k.id}','ad',this.value)"><span class="print-only-inline">${escHtml(k.ad)}</span></td>
+      <td><input class="no-print" type="text" value="${escHtml(k.ad)}" style="width:180px;" onchange="updateSinavNotuAlan('${n.id}','${k.id}','ad',this.value)">${ayrilmaRozeti}<span class="print-only-inline">${escHtml(k.ad)}</span></td>
       <td><input class="no-print" type="text" value="${escHtml(k.sinav1)}" style="width:50px;text-align:center;" onchange="updateSinavNotuAlan('${n.id}','${k.id}','sinav1',this.value)"><span class="print-only-inline">${escHtml(k.sinav1)}</span></td>
       <td><input class="no-print" type="text" value="${escHtml(k.sinav2)}" style="width:50px;text-align:center;" onchange="updateSinavNotuAlan('${n.id}','${k.id}','sinav2',this.value)"><span class="print-only-inline">${escHtml(k.sinav2)}</span></td>
       ${n.uygulamaSinaviVarMi ? `<td><input class="no-print" type="text" value="${escHtml(k.uygulama)}" style="width:50px;text-align:center;" onchange="updateSinavNotuAlan('${n.id}','${k.id}','uygulama',this.value)"><span class="print-only-inline">${escHtml(k.uygulama)}</span></td>` : ""}
@@ -5637,8 +5649,10 @@ function renderPerformansNotlariDetay(n) {
   const perfBaslik = sayi => new Array(sayi).fill(0).map((_, i) => `<th style="width:30px;">${i + 1}</th>`).join("") + `<th style="width:56px;">Ort. /<br>Girildi</th>`;
   const kolonSayisi = 3 + (n.perf1Sayisi + 1) + (n.perf2Sayisi + 1) + 1;
   let siraNo = 0;
+  const guncelOkulNolari = new Set(ogrencilerForSinif(n.sinif).map(o => o.okulNo).filter(Boolean));
   const satirlar = grupluKayitlar(n.kayitlar).map(blok => grupBasligiSatiri(blok.grup, kolonSayisi) + blok.kayitlar.map(k => {
     siraNo++;
+    const ayrilmaRozeti = (k.okulNo && !guncelOkulNolari.has(k.okulNo)) ? ` <span class="pill warn no-print" title="Bu öğrenci artık ${escHtml(n.sinif)} güncel listesinde görünmüyor">⚠</span>` : "";
     const perf1Dolu = k.perf1.filter(v => v !== "").length;
     const perf2Dolu = k.perf2.filter(v => v !== "").length;
     const perf1Cells = k.perf1.map((v, i) => `<td><input class="no-print" type="text" value="${escHtml(v)}" style="width:28px;text-align:center;" onchange="updatePerformansPerf('${n.id}','${k.id}','perf1',${i},this.value)"><span class="print-only-inline">${escHtml(v)}</span></td>`).join("");
@@ -5646,7 +5660,7 @@ function renderPerformansNotlariDetay(n) {
     return `<tr>
       <td>${siraNo}</td>
       <td><input class="no-print" type="text" value="${escHtml(k.okulNo)}" style="width:56px;" onchange="updatePerformansAlan('${n.id}','${k.id}','okulNo',this.value)"><span class="print-only-inline">${escHtml(k.okulNo)}</span></td>
-      <td><input class="no-print" type="text" value="${escHtml(k.ad)}" style="width:160px;" onchange="updatePerformansAlan('${n.id}','${k.id}','ad',this.value)"><span class="print-only-inline">${escHtml(k.ad)}</span></td>
+      <td><input class="no-print" type="text" value="${escHtml(k.ad)}" style="width:160px;" onchange="updatePerformansAlan('${n.id}','${k.id}','ad',this.value)">${ayrilmaRozeti}<span class="print-only-inline">${escHtml(k.ad)}</span></td>
       ${perf1Cells}<td><b>${performansOrt(k.perf1)}</b><div class="small">${perf1Dolu}/${n.perf1Sayisi} girildi</div></td>
       ${perf2Cells}<td><b>${performansOrt(k.perf2)}</b><div class="small">${perf2Dolu}/${n.perf2Sayisi} girildi</div></td>
       <td class="no-print"><input type="text" value="${escHtml(k.grup)}" style="width:32px;text-align:center;" title="Grup" onchange="updatePerformansAlan('${n.id}','${k.id}','grup',this.value)"><button class="btn danger" onclick="removePerformansKayit('${n.id}','${k.id}')">Sil</button></td>
