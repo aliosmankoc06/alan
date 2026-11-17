@@ -8751,6 +8751,38 @@ function anaSayfaUyarilari() {
     uyarilar.push({ metin: `${arizaliMakineler.length} makine "Arızalı" durumda`, action: "setModule('atolye-envanter')" });
   }
 
+  // Staj Yerleştirme'de otomatik/elle yerleştirme hiç çalıştırılmamışsa ya
+  // da bazı öğrenciler atlanmışsa, işletmesi boş kalan öğrenci kimse fark
+  // etmeden duruyor olabilir.
+  const isletmesiBosOgrenci = S.students.filter(s => !s.isletme).length;
+  if (isletmesiBosOgrenci) {
+    uyarilar.push({ metin: `${isletmesiBosOgrenci} staj öğrencisinin işletmesi henüz atanmadı`, action: "setModule('staj-yerlestirme')" });
+  }
+
+  // Bakım kartı açıldıktan sonra hiç işlenmeden unutulabiliyor — her
+  // makine+tür için en son açılan kartı (eskiler "Dönemi Tamamla" ile
+  // kapatılmış arşiv kartlarıdır) kontrol ediyoruz; altı aylık kartlar
+  // doğası gereği seyrek işaretlendiği için bu uyarıya dahil edilmiyor.
+  const BAKIM_GECIKME_ESIK_GUN = { gunluk: 10, haftalik: 20 };
+  const enSonBakimKartlari = {};
+  S.bakimKartlari.forEach(k => {
+    if (!BAKIM_GECIKME_ESIK_GUN[k.tur]) return;
+    const key = k.makineId + "|" + k.tur;
+    const kTarih = parseTrTarih(k.olusturmaTarihi);
+    const mevcutTarih = enSonBakimKartlari[key] ? parseTrTarih(enSonBakimKartlari[key].olusturmaTarihi) : null;
+    if (!enSonBakimKartlari[key] || (kTarih && (!mevcutTarih || kTarih > mevcutTarih))) enSonBakimKartlari[key] = k;
+  });
+  const bugunGun = new Date(); bugunGun.setHours(0, 0, 0, 0);
+  const gecikenBakimKartlari = Object.values(enSonBakimKartlari).filter(k => {
+    const isaretliTarihler = Object.values(k.tarihler || {}).map(parseTrTarih).filter(Boolean);
+    const enSon = isaretliTarihler.length ? new Date(Math.max(...isaretliTarihler)) : parseTrTarih(k.olusturmaTarihi);
+    if (!enSon) return false;
+    return Math.round((bugunGun - enSon) / 86400000) > BAKIM_GECIKME_ESIK_GUN[k.tur];
+  });
+  if (gecikenBakimKartlari.length) {
+    uyarilar.push({ metin: `${gecikenBakimKartlari.length} bakım kartı uzun süredir güncellenmedi`, action: "setModule('atolye-envanter')" });
+  }
+
   return uyarilar;
 }
 function viewAna() {
