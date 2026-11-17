@@ -86,15 +86,7 @@ function bulutDurumunuKontrolEt() {
     return;
   }
   const uid = firebase.auth().currentUser.uid;
-  const zenginlik = (st) => {
-    if (!st) return 0;
-    return (Array.isArray(st.ogrenciListesi) ? st.ogrenciListesi.length : 0) * 10
-      + (Array.isArray(st.students) ? st.students.length : 0) * 5
-      + (Array.isArray(st.stajdakiOgrenciler) ? st.stajdakiOgrenciler.length : 0) * 5
-      + (Array.isArray(st.isletmeler) ? st.isletmeler.length : 0)
-      + (st.schedule ? Object.keys(st.schedule).length : 0);
-  };
-  const yerelZenginlik = zenginlik(S);
+  const yerelZenginlik = bulutZenginlikHesapla(S);
   const yerelOgrenci = Array.isArray(S.ogrenciListesi) ? S.ogrenciListesi.length : "?";
   bulutDb.collection("users").doc(uid).collection("data").doc("state").get()
     .then(snap => {
@@ -105,7 +97,7 @@ function bulutDurumunuKontrolEt() {
       const veri = snap.data();
       let bulutState = null, parseHatasi = "";
       try { bulutState = JSON.parse(veri.json); } catch (e) { parseHatasi = e.message; }
-      const bulutZenginlik = zenginlik(bulutState);
+      const bulutZenginlik = bulutZenginlikHesapla(bulutState);
       const bulutOgrenci = bulutState && Array.isArray(bulutState.ogrenciListesi) ? bulutState.ogrenciListesi.length : "?";
       const boyutKB = Math.round((veri.json ? veri.json.length : 0) / 1024);
       let karar;
@@ -242,6 +234,23 @@ function bulutSenkronPayloadiHazirla(state) {
 // bulutDinlemeyeBasla), ta ki her iki taraf da aynı liste üzerinden
 // tutarlı kalsın.
 const BULUT_SENKRON_DISINDA_TUTULAN_ALANLAR = ["yillikPlanlar", "gunlukPlanlar", "sinavHavuzu"];
+// "Zenginlik" ölçüsü eskiden sadece öğrenci/staj/işletme/program sayısına
+// bakıyordu — Dal tanımları, öğretmenler, sınıflar, odalar, makine
+// envanteri/bakım kartları, toplantılar, performans/not kayıtları gibi
+// alanlar hiç sayılmıyordu. Sonuç: iki cihaz AYNI ANDA farklı alanlarda
+// (biri bir dal eklerken, diğeri bir bakım kartı girerken) değişiklik
+// yaparsa, "zenginlik" bu değişiklikleri görmediği için eşit çıkıyor ve
+// zaman damgasına düşülüyordu — SON yazan kazanıyor, öbür cihazın
+// değişikliği sessizce kaybolabiliyordu. Artık ölçü, buluta gönderilen
+// payload'ın (Yıllık/Günlük Plan/Soru Havuzu hariç — bkz. yukarısı, bu
+// üçü kasıtlı olarak hiç senkronize edilmiyor) serileştirilmiş boyutu —
+// yani hangi alan olursa olsun, hangisinde daha FAZLA/gerçek içerik
+// varsa o kazanır; yeni bir alan eklendiğinde kod değişikliği gerekmez.
+function bulutZenginlikHesapla(st) {
+  if (!st) return 0;
+  try { return JSON.stringify(bulutSenkronPayloadiHazirla(st)).length; }
+  catch (e) { return 0; }
+}
 function bulutDinlemeyeBasla(uid) {
   if (bulutDinleyiciDurdur) bulutDinleyiciDurdur();
   const belge = bulutDb.collection("users").doc(uid).collection("data").doc("state");
@@ -258,19 +267,12 @@ function bulutDinlemeyeBasla(uid) {
     // sırasında tekrar bir değişiklik olursa gönderiliyordu). Bu yüzden
     // "bilgisayardan giriş yaptım ama telefon hâlâ eski/boş görüyor" sorunu
     // oluşuyordu. Artık karar ÖNCE İÇERİK ZENGİNLİĞİNE göre veriliyor:
-    // hangi taraf daha "doluysa" (öğrenci listesi, staj, işletme, program
-    // hücre sayılarına bakan basit bir ölçü) o taraf kazanır — zaman damgası
+    // hangi tarafta daha FAZLA/gerçek içerik varsa (bulutZenginlikHesapla —
+    // tüm alanları kapsayan, senkronlanan payload'ın serileştirilmiş
+    // boyutuna bakan genel bir ölçü) o taraf kazanır — zaman damgası
     // sadece ikisi de eşit derecede doluyken kullanılan bir yardımcı ölçü.
-    const zenginlik = (st) => {
-      if (!st) return 0;
-      return (Array.isArray(st.ogrenciListesi) ? st.ogrenciListesi.length : 0) * 10
-        + (Array.isArray(st.students) ? st.students.length : 0) * 5
-        + (Array.isArray(st.stajdakiOgrenciler) ? st.stajdakiOgrenciler.length : 0) * 5
-        + (Array.isArray(st.isletmeler) ? st.isletmeler.length : 0)
-        + (st.schedule ? Object.keys(st.schedule).length : 0);
-    };
-    const yerelZenginlik = zenginlik(typeof S !== "undefined" ? S : null);
-    const bulutZenginlik = zenginlik(bulutState);
+    const yerelZenginlik = bulutZenginlikHesapla(typeof S !== "undefined" ? S : null);
+    const bulutZenginlik = bulutZenginlikHesapla(bulutState);
     if (yerelZenginlik > bulutZenginlik) {
       // Bu bilgisayarın verisi daha zengin/gerçek — bulutu bu veriyle
       // güncelle (üzerine yazılmasını BEKLEMEDEN, her onSnapshot'ta kontrol
