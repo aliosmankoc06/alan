@@ -178,17 +178,16 @@ function bulutDinlemeyeBasla(uid) {
     if (!veri || typeof veri.json !== "string") return;
     let bulutState;
     try { bulutState = JSON.parse(veri.json); } catch (e) { return; }
-    const bulutZaman = bulutState.__senkronZamani || "";
-    const yerelZaman = (typeof S !== "undefined" && S.__senkronZamani) || "";
-    if (!bulutZaman || bulutZaman <= yerelZaman) return;
-    // GÜVENLİK: sadece zaman damgasına güvenmek tehlikeli — ör. yeni/boş bir
-    // cihaz ilk kez giriş yapıp bulutu kendi (boş) hâliyle ezerse, zaman
-    // damgası ondan "daha yeni" görünür ve gerçek veriyi barındıran bu
-    // bilgisayar bu bulut kopyasını indirip üzerine yazar. Bunu önlemek için,
-    // gelen bulut verisi bu bilgisayardaki veriden BELİRGİN ÖLÇÜDE daha "boş"
-    // görünüyorsa inip ezmek yerine, bu bilgisayarın kendi (daha zengin)
-    // verisini buluta tekrar göndeririz — veri kaybı yerine zararsız bir
-    // "hiçbir şey olmadı" sonucu.
+    // ÖNEMLİ DÜZELTME: eskiden önce zaman damgasına bakılıp, bulut zaten
+    // "eski/eşit" görünüyorsa fonksiyon burada tamamen DURUYORDU — yani bu
+    // bilgisayarın daha zengin/gerçek verisi bulutta eski/boş bir kopya
+    // dururken bile BİR DAHA ASLA buluta gönderilmiyordu (sadece save()
+    // sırasında tekrar bir değişiklik olursa gönderiliyordu). Bu yüzden
+    // "bilgisayardan giriş yaptım ama telefon hâlâ eski/boş görüyor" sorunu
+    // oluşuyordu. Artık karar ÖNCE İÇERİK ZENGİNLİĞİNE göre veriliyor:
+    // hangi taraf daha "doluysa" (öğrenci listesi, staj, işletme, program
+    // hücre sayılarına bakan basit bir ölçü) o taraf kazanır — zaman damgası
+    // sadece ikisi de eşit derecede doluyken kullanılan bir yardımcı ölçü.
     const zenginlik = (st) => {
       if (!st) return 0;
       return (Array.isArray(st.ogrenciListesi) ? st.ogrenciListesi.length : 0) * 10
@@ -199,11 +198,18 @@ function bulutDinlemeyeBasla(uid) {
     };
     const yerelZenginlik = zenginlik(typeof S !== "undefined" ? S : null);
     const bulutZenginlik = zenginlik(bulutState);
-    if (yerelZenginlik > 0 && bulutZenginlik < yerelZenginlik / 2) {
+    if (yerelZenginlik > bulutZenginlik) {
+      // Bu bilgisayarın verisi daha zengin/gerçek — bulutu bu veriyle
+      // güncelle (üzerine yazılmasını BEKLEMEDEN, her onSnapshot'ta kontrol
+      // ederek), diğer cihazlar bir sonraki senkronda bunu alacak.
       bulutaFirestoreSenkronEt();
-      if (typeof showSaveToast === "function") showSaveToast(false, "Buluttaki veri bu bilgisayardakinden daha az görünüyordu, üzerine yazılmadı — bu bilgisayarın verisi buluta gönderildi");
       return;
     }
+    const bulutZaman = bulutState.__senkronZamani || "";
+    const yerelZaman = (typeof S !== "undefined" && S.__senkronZamani) || "";
+    if (bulutZenginlik === yerelZenginlik && (!bulutZaman || bulutZaman <= yerelZaman)) return;
+    // Bulut en az bu bilgisayar kadar zengin VE (daha zenginse ya da eşit
+    // zenginlikte daha yeniyse) — indirip uygula.
     S = normalizeState(bulutState);
     localStorage.setItem(LS_KEY, JSON.stringify(Object.assign({}, S, { donemArsivi: [] })));
     Promise.resolve(typeof arsivSenkronEt === "function" ? arsivSenkronEt() : null).then(() => {
