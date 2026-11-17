@@ -3028,8 +3028,11 @@ function normKadroToplamSatiri(etiket, saat) {
 /* Not: bu filtre SADECE ekran görünümü içindir — extractNormKadroForExcel()
    kasıtlı olarak buna dokunmaz, çünkü resmî Norm Kadro belgesi her zaman
    alan genelini (tüm dallar birden) göstermek zorunda. */
+function normKadroBaseClasses() {
+  return S.classes.filter(c => c.id !== "cl-idari" && c.assignments.length > 0 && !c.id.startsWith("isletme-"));
+}
 function normKadroRelevantClasses() {
-  let list = S.classes.filter(c => c.id !== "cl-idari" && c.assignments.length > 0 && !c.id.startsWith("isletme-"));
+  let list = normKadroBaseClasses();
   if (dalFiltresi !== "ALL") {
     list = list.filter(c => {
       const sube = sinifAdindanSubeAyikla(c.name);
@@ -3157,7 +3160,7 @@ function viewNormKadro() {
 // verileri doğrudan S üzerinden derleyip ana sürece gönderiyoruz.
 function extractNormKadroForExcel() {
   const kb = S.kurumBilgileri;
-  const relevantClasses = S.classes.filter(c => c.id !== "cl-idari" && c.assignments.length > 0 && !c.id.startsWith("isletme-"));
+  const relevantClasses = normKadroBaseClasses();
   let siraNo = 0;
   let ampToplam = 0;
   const siniflar = relevantClasses.map(cls => {
