@@ -9522,11 +9522,17 @@ function viewKoordinatorluk() {
     <input type="checkbox" ${isl.groups.includes(key) ? "checked" : ""} onchange="toggleIsletmeGrubu('${isl.id}','${key}',this.checked)"> ${KOORD_GRUP_KISA_ETIKET[key]}
   </label>`;
 
+  // İşletme silmeden/düzenlemeden önce kaç öğrencinin ona atanmış olduğunu
+  // görmek (silIsletmeTamamen zaten uyarıyor, ama burada önceden görünmesi
+  // yanlışlıkla silmeyi engeller) — isim eşleşmesi her iki staj listesini
+  // de kapsıyor.
+  const isletmeOgrenciSayisi = isl => S.students.filter(s => s.isletme === isl.name).length + S.stajdakiOgrenciler.filter(s => s.isletme === isl.name).length;
   const rows = gosterilecek.map(isl => `
     <tr>
       <td>${escHtml(isl.name)}</td>
       <td>${grupCheckbox(isl, "psc")}${grupCheckbox(isl, "cpc")}${grupCheckbox(isl, "mesem")}</td>
       <td style="text-align:center;"><input type="number" min="1" placeholder="${KOORD_BLOCK_LEN}" value="${isl.koordSaat !== undefined ? isl.koordSaat : ''}" style="width:56px;text-align:center;" onchange="updateIsletmeSaat('${isl.id}',this.value)" title="Bu işletmeye ders programında kaç saat koordinatörlük yazılacağı (boş bırakılırsa varsayılan ${KOORD_BLOCK_LEN} saat kullanılır)"></td>
+      <td style="text-align:center;">${isletmeOgrenciSayisi(isl) || "—"}</td>
       <td><button class="btn" onclick="editIsletme('${isl.id}')">Düzenle</button> <button class="btn danger" onclick="silIsletmeTamamen('${isl.id}')">Sil</button></td>
     </tr>`).join("");
 
@@ -9552,8 +9558,8 @@ function viewKoordinatorluk() {
   <div class="card no-print">
     ${filtreBar}
     <div style="overflow-x:auto;margin-top:10px;">
-    <table><thead><tr><th>İşletme Adı</th><th>Gün Grupları</th><th>Koord. Saati</th><th></th></tr></thead>
-    <tbody>${rows || `<tr><td colspan="4" class="small">${koordGrupFiltresi === "ALL" ? "Henüz işletme eklenmedi." : "Bu grupta işletme yok."}</td></tr>`}</tbody></table>
+    <table><thead><tr><th>İşletme Adı</th><th>Gün Grupları</th><th>Koord. Saati</th><th title="Staj Yerleştirme + Staj Takip toplamı">Öğrenci</th><th></th></tr></thead>
+    <tbody>${rows || `<tr><td colspan="5" class="small">${koordGrupFiltresi === "ALL" ? "Henüz işletme eklenmedi." : "Bu grupta işletme yok."}</td></tr>`}</tbody></table>
     </div>
   </div>
   <div class="card no-print" style="background:var(--panel-2);">
