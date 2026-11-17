@@ -103,7 +103,7 @@ function defaultState() {
         { id: "a-12b-1", courseId: "sec-3", eligibleTeacherIds: ["t3"], teacherCount: 1, roomIds: [] },
         { id: "a-12b-2", courseId: "sec-4", eligibleTeacherIds: ["t3"], teacherCount: 1, roomIds: [] }
       ] },
-      { id: "cl-idari", name: "İdari Görevler (Alan/Atölye Şefliği)", grade: 0, dal: "IDARI", schoolDays: [0, 1, 2, 3, 4], assignments: [
+      { id: "cl-idari", name: "İdari Görevler (Alan/Atölye Şefliği)", grade: 0, dal: "IDARI", schoolDays: [0, 1, 2, 3, 4], excludeFromDistribution: true, assignments: [
         { id: "a-idari-1", courseId: "pbo-10", eligibleTeacherIds: ["t1"], teacherCount: 1, roomIds: [] },
         { id: "a-idari-2", courseId: "pbo-6", eligibleTeacherIds: ["t2"], teacherCount: 1, roomIds: [] },
         { id: "a-idari-3", courseId: "pbo-6", eligibleTeacherIds: ["t4"], teacherCount: 1, roomIds: [] },
@@ -1135,6 +1135,18 @@ function normalizeState(s) {
     // teacherMaxHours().
     if (typeof t.hoursMax !== "number") t.hoursMax = null;
   });
+  // Kullanıcı "Planlama Bakım Onarım" (İdari Görevler) saatlerini de
+  // Koordinatörlük gibi kendi eliyle (Programlar ekranında boş hücreye
+  // tıklayarak) atamak istiyor — otomatik dağıtım artık bu sınıfa hiç
+  // dokunmuyor. Bir kerelik: zaten var olan gerçek kayıtlı veride bu
+  // sınıfı geriye dönük olarak hariç tutar; var olan hücreler (kilitli
+  // olmasalar da) distributeAllBestAsync'in frozenSnapshot mantığıyla
+  // artık olduğu gibi korunur, silinmez.
+  if (!s.idariOtomatikDagitimdanCikarildi2026) {
+    s.idariOtomatikDagitimdanCikarildi2026 = true;
+    const idariCls = s.classes.find(c => c.id === "cl-idari");
+    if (idariCls) idariCls.excludeFromDistribution = true;
+  }
   // Yıllık Plan imza bloğu — S.teachers'dan (ders programı öğretmen listesi)
   // BAĞIMSIZ ayrı bir liste: alandaki öğretmen sayısı zamanla artıp
   // azalabiliyor ama imza sirkülerini (kurumun onay/imza yetkilileri)

@@ -143,6 +143,21 @@ function combinations(arr, k) {
   return result;
 }
 function sumLoad(combo) { return combo.reduce((s, id) => s + teacherLoad(id), 0); }
+// "min" modundaki bir öğretmenin hedefine ne kadar UZAK olduğu (0 = hedefe
+// zaten ulaşmış/aşmış ya da hedefi yok). findBestTeamForAssignment'taki
+// takım seçimi eskiden SADECE en düşük toplam yükü (sumLoad) tercih
+// ediyordu — bu doğal olarak yükü öğretmenler arasında eşitlemeye
+// çalışıyordu, ama kullanıcı "asgari hedefi her şekilde doldursun"
+// istediği için bu, hedefi olan bir öğretmenin aleyhine işleyebiliyordu
+// (herkese biraz biraz dağıtılır, kimse hedefine ulaşamaz). Artık takım
+// seçimi ÖNCE "kimin hedefe daha çok ihtiyacı var"a bakıyor, eşitlik
+// ancak hiç kimsenin eksik hedefi kalmadığında devreye giriyor.
+function teacherUnmetMinNeed(teacherId) {
+  const t = teacherById(teacherId);
+  if (!t || t.hoursMode !== "min" || typeof t.hoursTarget !== "number") return 0;
+  return Math.max(0, t.hoursTarget - teacherDersLoad(teacherId));
+}
+function comboUnmetMinNeed(combo) { return combo.reduce((s, id) => s + teacherUnmetMinNeed(id), 0); }
 
 function tryPlaceAssignmentWithTeam(cls, assignment, blocks, team, commit) {
   const reservations = [];
@@ -336,7 +351,14 @@ function scheduleQualityScore() {
     if (t.hoursMode === "exact" && typeof t.hoursTarget === "number") {
       capPenalty += Math.abs(dersSaat - t.hoursTarget) * 800;
     } else if (t.hoursMode === "min" && typeof t.hoursTarget === "number") {
-      capPenalty += Math.max(0, t.hoursTarget - dersSaat) * 30;
+      // Kullanıcı açıkça "asgari ders saatini her şekilde yerleştirsin,
+      // başka bir şey istemiyorum" dedi — bu yüzden bir öğretmenin asgari
+      // hedefinin altında kalması, gap/spread/çalışma günü gibi diğer tüm
+      // kalite tercihlerinden EZİCİ ÖLÇÜDE daha ağır cezalandırılır (900/saat
+      // — fiilen yerleştirilemeyen bir saate (1000/saat) çok yakın), böylece
+      // matematiksel olarak mümkün olduğu her durumda asgari hedef dolmadan
+      // "en iyi" sonuç asla seçilmez.
+      capPenalty += Math.max(0, t.hoursTarget - dersSaat) * 900;
     }
   });
   const spreadPenalty = spread <= 3 ? spread : (spread - 3) * 120 + 3;
@@ -395,7 +417,7 @@ function findBestTeamForAssignment(cls, assignment, blocks) {
   for (let size = Math.min(maxT, pool.length); size >= 1; size--) {
     let combos = combinations(pool, size);
     combos = shuffle(combos);
-    combos.sort((a, b) => sumLoad(a) - sumLoad(b));
+    combos.sort((a, b) => comboUnmetMinNeed(b) - comboUnmetMinNeed(a) || sumLoad(a) - sumLoad(b));
     for (const combo of combos) {
       if (tryPlaceAssignmentWithTeam(cls, assignment, blocks, combo, false)) {
         return combo;
