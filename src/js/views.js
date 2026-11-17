@@ -633,7 +633,12 @@ function isletmeBelgeSeciciBar() {
 function viewStajKontenjanlar() {
   if (activeIsletmeBelge === "komisyon-tutanak") return isletmeBelgeSeciciBar() + renderIsletmeBelirlemeKarti();
   if (activeIsletmeBelge === "talep-formu") return isletmeBelgeSeciciBar() + renderIsletmeTalepFormuKarti();
-  const dallar = [...new Set(S.students.map(s => s.dal).filter(Boolean))];
+  // Kontenjan sütunları Ayarlar > Dallar'da TANIMLI olan tüm dalları gösterir
+  // (bu yıl o dalda staj öğrencisi olmasa da) — böylece gelecek yıl o dalda
+  // öğrenci çıkarsa kontenjan zaten girilmiş olur. Öğrenci kayıtlarında
+  // (eski dönemlerden) hâlâ geçen ama artık tanımlı dal olmayan kodlar da
+  // kaybolmasın diye ek olarak eklenir.
+  const dallar = [...new Set([...kuDalSecenekleri().map(d => d.id), ...S.students.map(s => s.dal).filter(Boolean)])];
   const kontenjanRows = S.isletmeler.map(isl => `
     <tr>
       <td>${escHtml(isl.name)}</td>
@@ -650,7 +655,7 @@ function viewStajKontenjanlar() {
   <div class="print-area">
     ${belgeYazdirmaBasligi("Staj Yerleştirme — İşletme Kontenjanları")}
     <div class="card">
-      <table><thead><tr><th>İşletme</th>${dallar.map(d => `<th>${escHtml(d)} Kontenjanı</th>`).join("")}<th>Talep Ettiği Öğrenciler</th></tr></thead>
+      <table><thead><tr><th>İşletme</th>${dallar.map(d => `<th>${escHtml(eskiDalKoduEtiketi(d))} Kontenjanı</th>`).join("")}<th>Talep Ettiği Öğrenciler</th></tr></thead>
       <tbody>${kontenjanRows}</tbody></table>
     </div>
   </div>`;
