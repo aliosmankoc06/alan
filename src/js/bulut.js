@@ -212,7 +212,10 @@ function bulutDinlemeyeBasla(uid) {
       if (typeof renderYilWidget === "function") renderYilWidget();
       if (typeof showSaveToast === "function") showSaveToast(false, "Veriler başka bir bilgisayardan senkronize edildi");
     });
-  }, () => {});
+  }, err => {
+    console.error("Buluttan dinleme hatası:", err);
+    alert("Bulut verisi okunamadı: " + (err && err.message ? err.message : "bilinmeyen hata"));
+  });
 }
 
 /* model.js'teki save() bu fonksiyonu çağırır — OneDrive'a yazan
@@ -222,10 +225,22 @@ function bulutDinlemeyeBasla(uid) {
    hem Firestore'un 1 MB'lık belge sınırına takılmamak, hem de her
    kayıtta büyüyen arşivi gereksiz yere tekrar tekrar yüklememek için
    (arşiv zaten her bilgisayarda kendi IndexedDB'sinde kalıcı). */
+// Hata, kullanıcının "bilgisayarda giriş yaptım ama telefonda hâlâ boş
+// görünüyor" diye bildirdiği, buluta hiç yazılamamış olma ihtimalini
+// araştırmak için artık GÖRÜNÜR hale getirildi — önceden sessizce
+// yutuluyordu, bu yüzden yazma başarısız olsa bile kimse fark edemezdi.
+let bulutSonYazmaHatasiGosterildi = false;
 function bulutaFirestoreSenkronEt() {
   if (!(bulutDb && typeof firebase !== "undefined" && firebase.auth().currentUser)) return;
   const uid = firebase.auth().currentUser.uid;
   bulutDb.collection("users").doc(uid).collection("data").doc("state")
     .set({ json: JSON.stringify(Object.assign({}, S, { donemArsivi: [] })), updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
-    .catch(() => {});
+    .then(() => { bulutSonYazmaHatasiGosterildi = false; })
+    .catch(err => {
+      console.error("Buluta yazılamadı:", err);
+      if (!bulutSonYazmaHatasiGosterildi) {
+        bulutSonYazmaHatasiGosterildi = true;
+        alert("Veriler buluta kaydedilemedi: " + (err && err.message ? err.message : "bilinmeyen hata") + "\n\nBu bilgisayardaki verileriniz güvende (yerelde duruyor), ama diğer cihaza henüz gitmedi.");
+      }
+    });
 }
