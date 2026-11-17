@@ -8765,6 +8765,16 @@ function eskiDalKoduEtiketi(kod) {
 function havuzDalSecenekleri() {
   return ["ORTAK9", "MBO", "BMI", "SERT", "HERDAL"].map(kod => ({ value: kod, label: eskiDalKoduEtiketi(kod) }));
 }
+/* Sınıf Dal alanı course.dal'ın aksine serbest metin kalmıştı — geçmişte
+   tam bu yüzden "BMİ" (noktalı İ) gibi bir yazım hatası gerçekten
+   yaşanmış ve kalıcı bir migrasyon (model.js) gerektirmişti. İdari
+   Görevler sınıfı (dal:"IDARI") dahil, sınıflarda görülebilen TÜM
+   DAL_LABELS kategorilerini kapsar (KOORD hariç — o sadece otomatik
+   oluşturulan işletme satırlarında kullanılır, sınıf listesinde hiç
+   görünmez). */
+function sinifDalSecenekleri() {
+  return Object.keys(DAL_LABELS).map(kod => ({ value: kod, label: eskiDalKoduEtiketi(kod) }));
+}
 function viewHavuz() {
   const rows = S.courses.filter(c => c.id !== KOORD_COURSE_ID).map(c => `
     <tr>
@@ -9272,7 +9282,10 @@ function viewSinif() {
         <input type="text" id="new-class-name" placeholder="Sınıf adı (örn. 10-A)" style="width:100%">
       </div>
       <div class="row">
-        <input type="text" id="new-class-dal" placeholder="Dal / Bölüm adı" style="width:100%">
+        <select id="new-class-dal" style="width:100%">
+          <option value="">— Dal / Bölüm seçin —</option>
+          ${sinifDalSecenekleri().map(d => `<option value="${d.value}">${escHtml(d.label)}</option>`).join("")}
+        </select>
       </div>
       <div class="row"><button class="btn primary" onclick="addClass()">Sınıf Ekle</button></div>
     </div>
@@ -9382,7 +9395,10 @@ function editClass(id) {
         <h3>Sınıfı Düzenle</h3>
         <label class="small">Sınıf Adı</label><input type="text" id="ecl-name" value="${escHtml(cls.name)}" style="width:100%">
         <label class="small">Dal</label>
-        <input type="text" id="ecl-dal" value="${escHtml(cls.dal)}" style="width:100%">
+        <select id="ecl-dal" style="width:100%">
+          <option value="" ${!cls.dal ? 'selected' : ''}>— Dal / Bölüm seçin —</option>
+          ${sinifDalSecenekleri().map(d => `<option value="${d.value}" ${cls.dal === d.value ? 'selected' : ''}>${escHtml(d.label)}</option>`).join("")}
+        </select>
         <div class="row">
           <button class="btn primary" onclick="saveClassEdit('${id}')">Kaydet</button>
           <button class="btn" onclick="closeModal()">İptal</button>
