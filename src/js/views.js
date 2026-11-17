@@ -1876,6 +1876,38 @@ function updateGunlukHaftaIcerik(id, haftaNo, field, value) {
   if (!p.haftaIcerik[haftaNo]) p.haftaIcerik[haftaNo] = { konu: "", kazanim: "", giris: "", gelisme: "", sonuc: "", yontem: "", arac: "", olcme: "" };
   p.haftaIcerik[haftaNo][field] = value;
 }
+// Yıllık Plan ve Günlük Plan aynı haftanın konusunu/kazanımını/yöntemini
+// ayrı ayrı elle yazdırıyordu — gerçek bir zaman kaybı. Eşleştirme,
+// mergePlanImportResult'ın (Excel içe aktarımı) kullandığı AYNI ders+sınıf
+// (büyük/küçük harf duyarsız) anahtarıyla yapılır.
+function yillikPlanEslesenBul(gunlukPlan) {
+  const dersNorm = (gunlukPlan.ders || "").toLocaleLowerCase("tr-TR").trim();
+  const sinifNorm = (gunlukPlan.sinif || "").toLocaleLowerCase("tr-TR").trim();
+  return S.yillikPlanlar.find(x => (x.ders || "").toLocaleLowerCase("tr-TR").trim() === dersNorm && (x.sinif || "").toLocaleLowerCase("tr-TR").trim() === sinifNorm) || null;
+}
+// Tek yönlü (Yıllık → Günlük), her hafta için elle tetiklenen bir kopyalama
+// — otomatik/sessiz bir senkron DEĞİL, bu yüzden geri senkron yok ve
+// kullanıcı her zaman üzerine elle düzenleme yapabilir.
+function gunlukHaftayiYilliktanKopyala(gunlukId, haftaNo) {
+  const gp = S.gunlukPlanlar.find(x => x.id === gunlukId);
+  if (!gp) return;
+  const yp = yillikPlanEslesenBul(gp);
+  if (!yp) { alert('Bu ders + sınıf için eşleşen bir Yıllık Plan bulunamadı — önce Yıllık Plan\'da aynı ders ve sınıfı oluşturun.'); return; }
+  const yic = yp.haftaIcerik[haftaNo];
+  if (!yic || !(yic.konular || yic.kazanimlar || yic.yontem || yic.arac || yic.degerlendirme)) {
+    alert("Yıllık Plan'da bu haftaya ait içerik henüz girilmemiş.");
+    return;
+  }
+  if (!confirm("Bu haftanın Konu/Kazanım/Yöntem/Araç/Ölçme-Değerlendirme alanları Yıllık Plan'dakiyle değiştirilecek (Giriş/Gelişme/Sonuç etkilenmez). Devam edilsin mi?")) return;
+  if (!gp.haftaIcerik[haftaNo]) gp.haftaIcerik[haftaNo] = { konu: "", kazanim: "", giris: "", gelisme: "", sonuc: "", yontem: "", arac: "", olcme: "" };
+  const gic = gp.haftaIcerik[haftaNo];
+  gic.konu = yic.konular || "";
+  gic.kazanim = yic.kazanimlar || "";
+  gic.yontem = yic.yontem || "";
+  gic.arac = yic.arac || "";
+  gic.olcme = yic.degerlendirme || "";
+  save(); renderMain();
+}
 function setGunlukDersGunu(id, value) {
   const p = S.gunlukPlanlar.find(x => x.id === id);
   if (!p) return;
@@ -2440,6 +2472,7 @@ function renderGunlukHaftaTablosu(p) {
     ["konu", "Konu"], ["kazanim", "Kazanım"], ["giris", "Giriş"], ["gelisme", "Gelişme"],
     ["sonuc", "Sonuç"], ["yontem", "Yöntem ve Teknikler"], ["arac", "Araç ve Gereçler"], ["olcme", "Ölçme-Değerlendirme"]
   ];
+  const eslesenYillik = yillikPlanEslesenBul(p);
   const alan = (h, field) => {
     const ic = p.haftaIcerik[h.no] || {};
     return `<td><textarea class="no-print" rows="3" style="width:100%;border:none;resize:vertical;font-family:inherit;font-size:11.5px;" oninput="updateGunlukHaftaIcerik('${p.id}',${h.no},'${field}',this.value)" onblur="save()">${escHtml(ic[field] || "")}</textarea><div class="print-only">${nlToBr(ic[field] || "")}</div></td>`;
@@ -2448,16 +2481,17 @@ function renderGunlukHaftaTablosu(p) {
     if (h.tatilMi) {
       return `<tr>
         <td style="white-space:nowrap;">${escHtml(h.tarihAraligi)}</td>
-        <td colspan="${alanlar.length}" style="text-align:center;font-weight:600;background:var(--panel-2);">${escHtml(h.tatilAdi || "TATİL")}</td>
+        <td colspan="${alanlar.length + (eslesenYillik ? 1 : 0)}" style="text-align:center;font-weight:600;background:var(--panel-2);">${escHtml(h.tatilAdi || "TATİL")}</td>
       </tr>`;
     }
     return `<tr>
       <td style="white-space:nowrap;">${escHtml(gunlukTarihHesapla(h.pazartesi, efektifDersGunu(p)))}</td>
+      ${eslesenYillik ? `<td class="no-print" style="white-space:nowrap;"><button class="btn" style="font-size:10.5px;padding:3px 6px;" title="Konu/Kazanım/Yöntem/Araç/Ölçme'yi Yıllık Plan'ın bu haftasından kopyala" onclick="gunlukHaftayiYilliktanKopyala('${p.id}',${h.no})">↺ Yıllıktan Kopyala</button></td>` : ""}
       ${alanlar.map(([field]) => alan(h, field)).join("")}
     </tr>`;
   }).join("");
   return `<div class="card" style="overflow-x:auto;">
-    <table style="width:100%;"><thead><tr><th style="width:110px;">Tarih</th>${alanlar.map(([, label]) => `<th>${label}</th>`).join("")}</tr></thead>
+    <table style="width:100%;"><thead><tr><th style="width:110px;">Tarih</th>${eslesenYillik ? "<th></th>" : ""}${alanlar.map(([, label]) => `<th>${label}</th>`).join("")}</tr></thead>
     <tbody>${rows}</tbody></table>
   </div>`;
 }
