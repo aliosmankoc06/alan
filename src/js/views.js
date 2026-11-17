@@ -1028,6 +1028,30 @@ function addStajTakipOgrenci() {
   S.stajdakiOgrenciler.push({ id: uid("sdo"), sinif, okulNo, ad, dal, isletme, sorumluOgretmenId: "", devamsizlik: {}, notFisi: {} });
   save(); renderMain();
 }
+// Staj Yerleştirme'de (gelecek/planlama listesi) otomatik ya da elle
+// işletmesi atanmış bir öğrenci, staj gerçekten başlayınca Staj Takip'e
+// sıfırdan elle yeniden giriliyordu — zaten hesaplanmış veri tekrar
+// yazılıyordu. okulNo varsa ona, yoksa sınıf+ad'a göre (tekrar tıklanırsa
+// mükerrer eklemeyi önlemek için) eşleştirilir; Staj Takip'te zaten var
+// olan bir kayda dokunulmaz (sorumlu öğretmen/devamsızlık gibi kendine
+// özgü alanları ezilmesin diye) — sadece EKSİK olanlar eklenir.
+function stajTakipEslesmeAnahtari(s) {
+  const no = String(s.okulNo || "").trim();
+  if (no) return "no:" + no;
+  return "ad:" + String(s.sinif || "").trim().toLocaleLowerCase("tr-TR") + "|" + String(s.ad || "").trim().toLocaleLowerCase("tr-TR");
+}
+function stajYerlestirmedenAktarUygula() {
+  const mevcutAnahtarlar = new Set(S.stajdakiOgrenciler.map(stajTakipEslesmeAnahtari));
+  let eklenen = 0;
+  S.students.filter(s => s.isletme).forEach(s => {
+    if (mevcutAnahtarlar.has(stajTakipEslesmeAnahtari(s))) return;
+    S.stajdakiOgrenciler.push({ id: uid("sdo"), sinif: s.sinif || "", okulNo: s.okulNo || "", ad: s.ad, dal: s.dal || "", isletme: s.isletme || "", sorumluOgretmenId: "", devamsizlik: {}, notFisi: {} });
+    mevcutAnahtarlar.add(stajTakipEslesmeAnahtari(s));
+    eklenen++;
+  });
+  save(); renderMain();
+  alert(eklenen ? `${eklenen} öğrenci Staj Yerleştirme'den aktarıldı (işletmesi atanmış olanlar arasından, burada zaten olanlar hariç).` : "Aktarılacak yeni öğrenci bulunamadı — Staj Yerleştirme'de işletmesi atanmış ve burada henüz kaydı olmayan kimse yok.");
+}
 function stajTakipListedenTopluEkleModal() {
   const siniflar = ogrenciListesiSiniflariDalaGore();
   const root = document.getElementById("modal-root");
@@ -1094,6 +1118,11 @@ function viewStajTakipOgrenciler() {
     <h2>Öğrenci Listesinden Ekle</h2>
     <p class="small">Öğrenci Listesi modülüne aktardığınız e-Okul listesinden bu sınıfın tüm öğrencilerini tek seferde ekleyin.</p>
     <div class="row" style="max-width:260px"><button class="btn primary" onclick="stajTakipListedenTopluEkleModal()">Öğrenci Listesinden Toplu Ekle</button></div>
+  </div>
+  <div class="card no-print">
+    <h2>Staj Yerleştirme'den Aktar</h2>
+    <p class="small">Staj Yerleştirme'de (Otomatik Yerleştirme ile) işletmesi zaten atanmış öğrencileri, buraya işletme bilgisiyle birlikte tek tıkla aktarır — burada zaten kaydı olanlara dokunmaz.</p>
+    <div class="row" style="max-width:260px"><button class="btn primary" onclick="stajYerlestirmedenAktarUygula()">Staj Yerleştirme'den Aktar</button></div>
   </div>
   <div class="card no-print">
     <h2>Öğrenci Ekle</h2>
