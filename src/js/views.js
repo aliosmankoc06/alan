@@ -9077,7 +9077,14 @@ function saveTeacherEdit(id) {
   if (!t) return;
   const name = document.getElementById("et-name").value.trim();
   if (!name) { alert("Ad soyad girin."); return; }
+  const eskiAd = t.name;
   t.name = name;
+  // Makine Envanteri'ndeki "Sorumlu Personel" alanı öğretmen id'si değil,
+  // isim metni tutuyor (ogretmenSecenekleriHtml) — isim değişince bu
+  // kayıtlar güncellenmezse artık var olmayan bir isme işaret eder.
+  if (eskiAd !== name) {
+    S.envanter.makineler.forEach(m => { if (m.sorumluPersonel === eskiAd) m.sorumluPersonel = name; });
+  }
   save(); closeModal(); renderMain();
 }
 function deleteTeacher(id) {
@@ -9094,12 +9101,19 @@ function deleteTeacher(id) {
       etkilenenDersler.push(cl.name + " — " + (course ? course.name : "?"));
     }
   }));
+  // Makine Envanteri'ndeki "Sorumlu Personel" alanı (isim metni) bu
+  // öğretmenin silindiğinden haberdar olmaz — artık var olmayan birine
+  // ait görünse de kimse fark etmez. Silmeden önce tespit edip bildiriyoruz.
+  const etkilenenMakineler = t ? S.envanter.makineler.filter(m => m.sorumluPersonel === t.name).map(m => m.ad) : [];
   S.teachers = S.teachers.filter(x => x.id !== id);
   S.classes.forEach(cl => cl.assignments.forEach(a => { if (a.eligibleTeacherIds) a.eligibleTeacherIds = a.eligibleTeacherIds.filter(x => x !== id); }));
   Object.keys(S.schedule).forEach(k => { S.schedule[k].teacherIds = S.schedule[k].teacherIds.filter(x => x !== id); });
   save(); renderMain();
   if (etkilenenDersler.length) {
     alert(`"${t ? t.name : 'Öğretmen'}" silindi.\n\nŞu ders(ler) bu öğretmene özel kilitliydi, artık hiçbir öğretmene atanmamış durumda — Sınıflar ve Ders Atama'dan yeniden öğretmen seçmeniz gerekiyor, yoksa dağıtımda bu dersler atlanır:\n\n` + etkilenenDersler.join("\n"));
+  }
+  if (etkilenenMakineler.length) {
+    alert(`"${t ? t.name : 'Öğretmen'}" silindi.\n\nŞu makine(ler)de "Sorumlu Personel" olarak bu öğretmen yazılıydı, artık var olmayan bir isme işaret ediyor — Atölye/Envanter'den yeni bir sorumlu seçmeniz gerekiyor:\n\n` + etkilenenMakineler.join("\n"));
   }
 }
 
