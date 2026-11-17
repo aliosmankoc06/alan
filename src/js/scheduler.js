@@ -497,7 +497,18 @@ function toggleIsletmeGrubu(id, groupKey, checked) {
 function silIsletmeTamamen(id) {
   const isl = isletmeById(id);
   if (!isl) return;
-  if (!confirm(`"${isl.name}" işletmesi tamamen silinsin mi? Bu işlem geri alınamaz.`)) return;
+  // İşletme adı S.students/S.stajdakiOgrenciler'de serbest metin olarak
+  // (id ile değil) tutuluyor — silmeden önce kaç öğrencinin bu işletmeye
+  // atanmış olduğunu göstermeden sessizce silmek, deleteTeacher/deleteCourse
+  // gibi diğer silme işlemlerindeki "N kayıt etkilenecek" uyarısıyla
+  // tutarsız olurdu.
+  const yerlestirmeSayisi = S.students.filter(s => s.isletme === isl.name).length;
+  const takipSayisi = S.stajdakiOgrenciler.filter(s => s.isletme === isl.name).length;
+  let mesaj = `"${isl.name}" işletmesi tamamen silinsin mi? Bu işlem geri alınamaz.`;
+  if (yerlestirmeSayisi || takipSayisi) {
+    mesaj += `\n\nUYARI: Staj Yerleştirme'de ${yerlestirmeSayisi}, Staj Takip'te ${takipSayisi} öğrenci bu işletmeye atanmış görünüyor. İşletme silinince bu öğrencilerin kaydındaki işletme adı (geçmiş bilgi olarak) olduğu gibi kalır, ama bu işletme bundan sonra kontenjan/koordinatörlük listelerinde görünmez.`;
+  }
+  if (!confirm(mesaj)) return;
   S.isletmeler = S.isletmeler.filter(i => i.id !== id);
   delete S.isletmeTeacherAssign[id];
   save(); renderMain();
@@ -532,9 +543,18 @@ function saveIsletmeEdit(id) {
   if (!name) { alert("İşletme adı girin."); return; }
   const groups = ["psc", "cpc", "mesem"].filter(k => document.getElementById("ei-g-" + k).checked);
   if (groups.length === 0) { alert("En az bir gün grubu seçili olmalı."); return; }
+  const eskiAd = isl.name;
   isl.name = name;
   isl.adres = document.getElementById("ei-adres").value.trim();
   isl.groups = groups;
+  // S.students/S.stajdakiOgrenciler'deki işletme bağı id değil, isim
+  // string'i üzerinden kuruluydu — isim değişince bu kayıtlar güncellen-
+  // miyor, bağ sessizce kopuyordu. Ad değiştiyse eski adı taşıyan tüm
+  // kayıtları yeni adla eşleştiriyoruz.
+  if (eskiAd !== name) {
+    S.students.forEach(st => { if (st.isletme === eskiAd) st.isletme = name; });
+    S.stajdakiOgrenciler.forEach(st => { if (st.isletme === eskiAd) st.isletme = name; });
+  }
   save(); closeModal(); renderMain();
 }
 function tumIsletmeleriSil() {
