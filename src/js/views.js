@@ -8109,6 +8109,23 @@ function globalSearch(query) {
       results.push({ tip: "Dönem Arşivi", ad: a.etiket, action: () => setModule("ayarlar") });
     }
   });
+  S.toplantilar.forEach(t => {
+    if (trLower(t.baslik).includes(q)) {
+      results.push({ tip: "Toplantı Tutanağı", ad: t.baslik + (t.ogretimYili ? " · " + t.ogretimYili : ""), action: () => { setModule("toplantilar"); activeToplantiTab = "okul"; selectToplanti(t.id); } });
+    }
+  });
+  S.rehberlikFaaliyetRaporlari.forEach(r => {
+    const cls = classById(r.classId);
+    const ad = (cls ? cls.name : "?") + " · " + r.donem + ". Dönem" + (r.ogretimYili ? " · " + r.ogretimYili : "");
+    if (trLower(ad).includes(q)) {
+      results.push({ tip: "Rehberlik Faaliyet Raporu", ad, action: () => { setModule("toplantilar"); activeToplantiTab = "rehberlik-raporu"; activeRehberlikRaporuId = r.id; } });
+    }
+  });
+  S.seflikRaporlari.forEach(r => {
+    if (trLower(r.ay).includes(q)) {
+      results.push({ tip: "Şeflik Raporu", ad: r.ay, action: () => { setModule("seflik-raporu"); activeSeflikRaporId = r.id; } });
+    }
+  });
   return results.slice(0, 20);
 }
 function onGlobalSearchInput(value) {
