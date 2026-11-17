@@ -169,6 +169,36 @@ function bulutCikisYap() {
   firebase.auth().signOut();
 }
 
+// KRİTİK BOYUT SINIRI: Firestore'da tek bir belge en fazla ~1 MiB
+// (1.048.487 bayt) olabiliyor. Bu sistemde Yıllık Plan / Günlük Plan'ın
+// gömülü varsayılan MEB içeriği (yillik-plan-varsayilan.js ~360KB,
+// gunluk-plan-varsayilan.js ~640KB) ve Soru Havuzu'nun hazır soru bankası
+// ilk açılışta S'ye kopyalanıyor — bunlar + gerçek kullanıcı verisi
+// (öğrenci listesi, ders programı, işletmeler vb.) toplamda bu sınırı
+// kolayca aşıyor ("The value of property json is longer than..." hatası
+// tam olarak budur). Bu üç alan HER ZAMAN her cihazın kendi JS dosyalarında
+// zaten aynen gömülü olduğu (yani buluta hiç gitmeden de her cihaz kendi
+// başına aynı varsayılanı üretebildiği) için, buluta YÜKLEMEDEN önce bu
+// alanlar boşaltılıyor; bir cihaz bulut verisini İNDİRİRKEN de bu üç alanı
+// kendi mevcut yerel halinden (ki o zaten kendi doğru/güncel içeriğini
+// taşıyor) koruyarak üzerine yazılmasını engelliyoruz. Yani bu üç alan
+// artık bulut üzerinden cihazlar arası senkronize OLMUYOR (her cihaz
+// kendi yerel kopyasını korur) — ama tüm diğer gerçek veri (öğrenci
+// listesi, ders programı, işletmeler, makineler, bakım kartları, staj vb.)
+// normal şekilde senkronize olmaya devam ediyor.
+function bulutSenkronPayloadiHazirla(state) {
+  return Object.assign({}, state, {
+    donemArsivi: [],
+    yillikPlanlar: [],
+    gunlukPlanlar: [],
+    sinavHavuzu: { sorular: [] }
+  });
+}
+// Yukarıdaki fonksiyonla buluta hiç gönderilmeyen alanlar — bulut verisi
+// İNDİRİLİRKEN bu alanlar bu cihazın KENDİ mevcut haliyle korunur (bkz.
+// bulutDinlemeyeBasla), ta ki her iki taraf da aynı liste üzerinden
+// tutarlı kalsın.
+const BULUT_SENKRON_DISINDA_TUTULAN_ALANLAR = ["yillikPlanlar", "gunlukPlanlar", "sinavHavuzu"];
 function bulutDinlemeyeBasla(uid) {
   if (bulutDinleyiciDurdur) bulutDinleyiciDurdur();
   const belge = bulutDb.collection("users").doc(uid).collection("data").doc("state");
@@ -209,8 +239,14 @@ function bulutDinlemeyeBasla(uid) {
     const yerelZaman = (typeof S !== "undefined" && S.__senkronZamani) || "";
     if (bulutZenginlik === yerelZenginlik && (!bulutZaman || bulutZaman <= yerelZaman)) return;
     // Bulut en az bu bilgisayar kadar zengin VE (daha zenginse ya da eşit
-    // zenginlikte daha yeniyse) — indirip uygula.
+    // zenginlikte daha yeniyse) — indirip uygula. Yıllık/Günlük Plan ve
+    // Soru Havuzu buluta hiç gönderilmediği için (bkz. yukarıdaki not)
+    // bulutState'te bunlar boş gelir — bu cihazın kendi mevcut (doğru)
+    // halini ezmemesi için indirmeden önce saklayıp sonra geri koyuyoruz.
+    const korunacaklar = {};
+    BULUT_SENKRON_DISINDA_TUTULAN_ALANLAR.forEach(alan => { korunacaklar[alan] = S[alan]; });
     S = normalizeState(bulutState);
+    BULUT_SENKRON_DISINDA_TUTULAN_ALANLAR.forEach(alan => { S[alan] = korunacaklar[alan]; });
     localStorage.setItem(LS_KEY, JSON.stringify(Object.assign({}, S, { donemArsivi: [] })));
     Promise.resolve(typeof arsivSenkronEt === "function" ? arsivSenkronEt() : null).then(() => {
       if (typeof renderTabbar === "function") renderTabbar();
@@ -240,7 +276,7 @@ function bulutaFirestoreSenkronEt() {
   if (!(bulutDb && typeof firebase !== "undefined" && firebase.auth().currentUser)) return;
   const uid = firebase.auth().currentUser.uid;
   bulutDb.collection("users").doc(uid).collection("data").doc("state")
-    .set({ json: JSON.stringify(Object.assign({}, S, { donemArsivi: [] })), updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
+    .set({ json: JSON.stringify(bulutSenkronPayloadiHazirla(S)), updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
     .then(() => { bulutSonYazmaHatasiGosterildi = false; })
     .catch(err => {
       console.error("Buluta yazılamadı:", err);
