@@ -72,9 +72,15 @@ function bulutBaslat() {
 function bulutDurumGoster(eposta) {
   const el = document.getElementById("bulut-durum");
   if (!el) return;
-  el.innerHTML = eposta
+  // Senkron yazma hatası artık sadece bir kerelik alert() ile değil, sorun
+  // çözülene kadar sidebar'da KALICI bir uyarı olarak da görünüyor — alert
+  // kapatıldıktan sonra sorun sürüyorsa kimse fark etmiyordu.
+  const hataUyarisi = bulutSonYazmaHatasiGosterildi
+    ? ` · <span style="color:var(--warn);font-weight:600;" title="Son değişiklikler buluta kaydedilemedi, bu cihazda güvende ama diğer cihaza henüz gitmedi">⚠ Senkron hatası</span>`
+    : "";
+  el.innerHTML = (eposta
     ? `☁️ ${escHtml(eposta)} · <a href="#" onclick="bulutCikisYap();return false;">Çıkış</a> · <a href="#" onclick="bulutDurumunuKontrolEt();return false;">Bulut Durumu</a>`
-    : `☁️ Bulut girişi yok · <a href="#" onclick="bulutGirisEkraniniGoster();return false;">Giriş yap</a>`;
+    : `☁️ Bulut girişi yok · <a href="#" onclick="bulutGirisEkraniniGoster();return false;">Giriş yap</a>`) + hataUyarisi;
 }
 // Tek tıkla tam teşhis — sorunu uzaktan takip ederken her defasında "ne
 // gördün" diye sormak yerine, kullanıcının tek bir ekran görüntüsüyle
@@ -322,11 +328,17 @@ function bulutaFirestoreSenkronEt() {
   const uid = firebase.auth().currentUser.uid;
   bulutDb.collection("users").doc(uid).collection("data").doc("state")
     .set({ json: JSON.stringify(bulutSenkronPayloadiHazirla(S)), updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
-    .then(() => { bulutSonYazmaHatasiGosterildi = false; })
+    .then(() => {
+      const hataVardi = bulutSonYazmaHatasiGosterildi;
+      bulutSonYazmaHatasiGosterildi = false;
+      if (hataVardi) bulutDurumGoster(firebase.auth().currentUser.email);
+    })
     .catch(err => {
       console.error("Buluta yazılamadı:", err);
-      if (!bulutSonYazmaHatasiGosterildi) {
-        bulutSonYazmaHatasiGosterildi = true;
+      const ilkHataMi = !bulutSonYazmaHatasiGosterildi;
+      bulutSonYazmaHatasiGosterildi = true;
+      bulutDurumGoster(firebase.auth().currentUser.email);
+      if (ilkHataMi) {
         alert("Veriler buluta kaydedilemedi: " + (err && err.message ? err.message : "bilinmeyen hata") + "\n\nBu bilgisayardaki verileriniz güvende (yerelde duruyor), ama diğer cihaza henüz gitmedi.");
       }
     });
