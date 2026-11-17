@@ -182,7 +182,39 @@ function setStajTab(id) { activeStajTab = id; renderTabbar(); renderMain(); }
 function setStajTakipTab(id) { activeStajTakipTab = id; renderTabbar(); renderMain(); }
 function setToplantiTab(id) { activeToplantiTab = id; renderTabbar(); renderMain(); }
 
+// Birçok ekranda (Devamsızlık, Performans, Kalfalık/Ustalık vb.) tablo
+// ekrandan taşıyor — önceden kullanıcı bunu ancak fare/trackpad ile elle
+// sağa kaydırarak (ya da bazı ekranlarda sadece bir metin ipucuyla)
+// keşfedebiliyordu, "sağa sola kaydır" butonu hiçbir yerde yoktu. Bu
+// fonksiyon her render sonrası GERÇEKTEN taşan (scrollWidth>clientWidth)
+// ve overflow-x:auto/scroll olan HER kapsayıcıyı otomatik bulup hemen
+// üstüne iki buton ekler — tek tek her ekranı elle düzenlemeye gerek
+// kalmadan, var olan ve ileride eklenecek her geniş tablo için çalışır.
+function yatayKaydirmaButonlariniGuncelle() {
+  const main = document.getElementById("main");
+  if (!main) return;
+  let sayac = 0;
+  main.querySelectorAll("div").forEach(el => {
+    if (el.classList.contains("yatay-kaydir-bar")) return;
+    if (el.scrollWidth <= el.clientWidth + 2) return;
+    const stil = getComputedStyle(el);
+    if (stil.overflowX !== "auto" && stil.overflowX !== "scroll") return;
+    if (!el.id) el.id = "ykw-" + (++sayac) + "-" + Math.random().toString(36).slice(2, 7);
+    const bar = document.createElement("div");
+    bar.className = "yatay-kaydir-bar no-print";
+    const hedefId = el.id;
+    bar.innerHTML = `<button type="button" class="btn" onclick="document.getElementById('${hedefId}').scrollBy({left:-280,behavior:'smooth'})">◀ Sola Kaydır</button><button type="button" class="btn" onclick="document.getElementById('${hedefId}').scrollBy({left:280,behavior:'smooth'})">Sağa Kaydır ▶</button>`;
+    el.parentNode.insertBefore(bar, el);
+  });
+}
+// renderMain() her çağrıldığında içeriği doldurur, sonra (hangi dalda erken
+// "return" olursa olsun) her zaman yatay kaydırma butonlarını güncelleyen
+// tek giriş noktası — gerçek içerik doldurma mantığı renderMainIcerik()'te.
 function renderMain() {
+  renderMainIcerik();
+  yatayKaydirmaButonlariniGuncelle();
+}
+function renderMainIcerik() {
   const el = document.getElementById("main");
   if (activeModule === "ana") { el.innerHTML = viewAna(); return; }
   if (activeModule === "ders-programi-secim") { el.innerHTML = viewDersProgramiChooser(); return; }
@@ -1243,15 +1275,15 @@ const DEVAMSIZLIK_ETIKET = {
   okulda: { kisa: "Okul", ad: "Okulda (işletme günü değil)" },
   resmiTatil: { kisa: "Tatil", ad: "Resmi Tatil" }
 };
-function stajTakipDevamsizlikDurumIlerlet(ogrenciId, tarih) {
+// Önceden hücreye her tıklamada DEVAMSIZLIK_SIRASI boyunca sırayla
+// ilerliyordu — istenen durum son sıradaysa 5 kez tıklamak gerekiyordu.
+// Artık açılır listeden istenen durum doğrudan, tek seferde seçiliyor.
+function stajTakipDevamsizlikDurumSec(ogrenciId, tarih, durum) {
   const st = S.stajdakiOgrenciler.find(x => x.id === ogrenciId);
   if (!st) return;
   if (!st.devamsizlik || typeof st.devamsizlik !== "object") st.devamsizlik = {};
-  const mevcut = st.devamsizlik[tarih] || "";
-  const idx = DEVAMSIZLIK_SIRASI.indexOf(mevcut);
-  const yeni = DEVAMSIZLIK_SIRASI[(idx + 1) % DEVAMSIZLIK_SIRASI.length];
-  if (yeni === "") delete st.devamsizlik[tarih];
-  else st.devamsizlik[tarih] = yeni;
+  if (durum === "") delete st.devamsizlik[tarih];
+  else st.devamsizlik[tarih] = durum;
   save(); renderMain();
 }
 function stajTakipDevamsizlikOzet(st, yil, ay) {
@@ -1314,7 +1346,14 @@ function viewStajTakipDevamsizlik() {
       const renk = durum === "tamYok" || durum === "sabahYok" || durum === "ogledenSonraYok" ? "color:var(--warn);font-weight:600;"
         : durum === "okulda" ? "color:var(--accent-ink);"
         : durum === "resmiTatil" ? "color:var(--teal-ink);" : "";
-      return `<td class="small" style="text-align:center;cursor:pointer;${renk}" title="${escHtml(etiket.ad)} — tıklayınca değişir" onclick="stajTakipDevamsizlikDurumIlerlet('${st.id}','${tarih}')">${etiket.kisa}</td>`;
+      // Önceden tıklandıkça sırayla ilerliyordu (istenen durum son sıradaysa
+      // 5 kez tıklamak gerekiyordu) — artık açılır listeden istenen durum
+      // doğrudan, tek seferde seçilebiliyor.
+      const secenekler = DEVAMSIZLIK_SIRASI.map(d => `<option value="${d}" ${d === durum ? "selected" : ""}>${DEVAMSIZLIK_ETIKET[d].kisa}</option>`).join("");
+      return `<td class="small" style="text-align:center;padding:1px;${renk}" title="${escHtml(etiket.ad)}">
+        <select class="no-print" style="width:100%;border:none;background:transparent;text-align:center;font-size:11px;${renk}" onchange="stajTakipDevamsizlikDurumSec('${st.id}','${tarih}',this.value)">${secenekler}</select>
+        <span class="print-only-inline">${etiket.kisa}</span>
+      </td>`;
     }).join("");
     return `<tr><td>${escHtml(st.sinif || "")}</td><td>${escHtml(st.ad)}</td><td>${escHtml(st.isletme || "—")}</td><td>${escHtml(ogretmenAdi)}</td>${gunler}<td class="small" style="text-align:center;">${tamYok} tam<br>${yarimYok} yarım</td><td class="small" style="text-align:center;">${esikAsildi ? `<span class="pill warn" title="Dönem eşiği aşıldı">${donemToplam.esdeger}</span>` : donemToplam.esdeger}</td></tr>`;
   }).join("") : `<tr><td colspan="${colCount}" class="small">Önce Öğrenciler sekmesinden öğrenci ekleyin.</td></tr>`;
@@ -1328,7 +1367,7 @@ function viewStajTakipDevamsizlik() {
       <div><label class="small">Sorumlu Öğretmen</label><select onchange="setStajTakipDevamOgretmenFiltre(this.value)"><option value="ALL" ${stajTakipDevamOgretmenFiltre === "ALL" ? "selected" : ""}>Tüm Öğretmenler</option>${ogretmenSecenekleri}</select></div>
       <div><label class="small" title="Dönem toplamında (yarım gün = 0.5) bu sayıya ulaşan/geçen öğrenci kırmızı işaretlenir ve Ana Sayfa'da uyarı verir. Boş bırakılırsa uyarı kapalı kalır.">Devamsızlık Uyarı Eşiği (tam gün)</label><input type="number" min="0" step="0.5" placeholder="kapalı" value="${S.stajDevamsizlikEsigi || ''}" style="width:110px" onchange="setStajDevamsizlikEsigi(this.value)"></div>
     </div>
-    ${belgeAracCubugu("Devamsızlık - " + ayAdlari[ay - 1] + " " + yil)}
+    ${belgeAracCubugu("Devamsızlık - " + ayAdlari[ay - 1] + " " + yil, true)}
   </div>
   <div class="print-area">
     ${belgeYazdirmaBasligi("Staj Devamsızlık Çizelgesi — " + ayAdlari[ay - 1] + " " + yil + baslikAciklama)}
@@ -1415,7 +1454,7 @@ function viewStajTakipNotFisi() {
       <div><label class="small">Dönem</label><select onchange="setStajNotFisiDonem(this.value)"><option value="1" ${donem === "1" ? "selected" : ""}>1. Dönem</option><option value="2" ${donem === "2" ? "selected" : ""}>2. Dönem</option></select></div>
       <div><label class="small">İşletme</label><select onchange="setStajNotFisiIsletme(this.value)"><option value="ALL" ${activeStajNotFisiIsletme === "ALL" ? "selected" : ""}>Tüm İşletmeler</option>${isletmeAdlari.map(ad => `<option value="${escHtml(ad)}" ${ad === activeStajNotFisiIsletme ? "selected" : ""}>${escHtml(ad)}</option>`).join("")}</select></div>
     </div>
-    ${belgeAracCubugu("Dönem Not Fişi - " + donem + ". Dönem")}
+    ${belgeAracCubugu("Dönem Not Fişi - " + donem + ". Dönem", true)}
   </div>
   <div class="print-area">
     ${belgeYazdirmaBasligi("Dönem Not Fişi — " + donem + ". Dönem")}
@@ -3283,7 +3322,7 @@ function viewNormKadro() {
     <h2>Norm Kadro Hesabı</h2>
     <p class="small">Ders Programı'ndaki güncel ders atamalarınızdan otomatik hesaplanır — sınıflara ders/öğretmen ekledikçe/çıkardıkça burası da güncellenir. Öğrenci sayılarını ve koordinatörlük satırlarını elle girin.</p>
     ${dalFiltresi !== "ALL" && dalTanimiById(dalFiltresi) ? `<p class="pill info">Gösterilen AMP dersleri "${escHtml(dalTanimiById(dalFiltresi).ad)}" ile sınırlı — Koordinatörlük ve Şeflik satırları her zaman alan geneli gösterilir. Resmî Norm Kadro sayısını kontrol ederken sol menüden "Tüm Dallar"ı seçin; Excel'e aktarma her zaman alan genelini içerir.</p>` : ""}
-    ${belgeAracCubugu(dosyaAdi, false, "indirNormKadroExcel")}
+    ${belgeAracCubugu(dosyaAdi, true, "indirNormKadroExcel")}
   </div>
   <div class="print-area">
     ${belgeYazdirmaBasligi(dosyaAdi)}
@@ -5390,7 +5429,7 @@ function viewPerformansBolum(tur) {
 
   const dosyaAdi = baslik + " - " + active.sinif + " " + active.donem + " " + active.ders;
   return ustBar + sinifBar + donemBar + dersBar + `
-  <div class="card no-print">${belgeAracCubugu(dosyaAdi)}</div>
+  <div class="card no-print">${belgeAracCubugu(dosyaAdi, true)}</div>
   <div class="print-area">
     ${belgeYazdirmaBasligi(dosyaAdi)}
     ${renderPerformansKayitDetay(active)}
@@ -5704,7 +5743,7 @@ function viewPerformansNotlari() {
   const n = performansNotlariOlusturVeyaGetir(bar.cls.name, bar.course.name, activeNotDonem);
   const dosyaAdi = "Performans Notları - " + bar.course.name + " - " + bar.cls.name + " - " + n.donem + ". Dönem";
   return `${bar.html}
-  <div class="card no-print">${belgeAracCubugu(dosyaAdi)}</div>
+  <div class="card no-print">${belgeAracCubugu(dosyaAdi, true)}</div>
   <div class="print-area"><div class="card" style="overflow-x:auto;">${renderPerformansNotlariDetay(n)}</div></div>`;
 }
 
@@ -5771,7 +5810,7 @@ function viewSonucKarnesi() {
   const pn = performansNotlariBul(bar.cls.name, bar.course.name, activeNotDonem);
   const dosyaAdi = "Sonuç Karnesi - " + bar.course.name + " - " + bar.cls.name + " - " + activeNotDonem + ". Dönem";
   return `${bar.html}
-  <div class="card no-print">${belgeAracCubugu(dosyaAdi)}</div>
+  <div class="card no-print">${belgeAracCubugu(dosyaAdi, true)}</div>
   <div class="print-area"><div class="card" style="overflow-x:auto;">${renderSonucKarnesi(bar, sn, pn)}</div></div>`;
 }
 
@@ -6044,7 +6083,7 @@ function viewKalfalikUstalik() {
       <button class="btn" onclick="snListedenTopluEkleModal('ku')">Öğrenci Listesinden Toplu Ekle</button>
     </div>
     ${snBelgeSeciciBar("ku")}
-    ${belgeAracCubugu(dosyaAdi)}
+    ${belgeAracCubugu(dosyaAdi, true)}
   </div>
   ${activeSnBelge === "cizelge" ? snIsDosyasiKriterAciklamasi() : ""}
   <div class="print-area">
@@ -6098,7 +6137,7 @@ function viewBeceriSinavi() {
       <button class="btn" onclick="snListedenTopluEkleModal('bs')">Öğrenci Listesinden Toplu Ekle</button>
     </div>
     ${snBelgeSeciciBar("bs")}
-    ${belgeAracCubugu(dosyaAdi)}
+    ${belgeAracCubugu(dosyaAdi, true)}
   </div>
   ${activeSnBelge === "cizelge" ? snIsDosyasiKriterAciklamasi() : ""}
   <div class="print-area">
