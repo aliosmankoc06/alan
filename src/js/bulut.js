@@ -95,6 +95,7 @@ function bulutGirisEkraniniGoster() {
         <input type="password" id="bulut-sifre" style="width:100%" autocomplete="current-password" onkeydown="if(event.key==='Enter'){event.preventDefault();bulutGirisYap();}">
         <div id="bulut-giris-hata" style="font-size:11px;color:#E8927F;margin-top:8px;min-height:1px;"></div>
         <button class="btn primary" id="bulut-giris-btn" onclick="bulutGirisYap()" style="width:100%;margin-top:14px;">Giriş Yap</button>
+        <button class="btn" id="bulut-kayit-btn" onclick="bulutHesapOlustur()" style="width:100%;margin-top:8px;background:transparent;border:1px solid #2C3752;color:#9AA5C0;">Hesap Oluştur</button>
         <p style="font-size:11px;margin-top:10px;text-align:center;"><a href="#" onclick="bulutSifremiUnuttum();return false;" style="color:#D4A572;">Şifremi unuttum</a></p>
         <div id="bulut-sifirla-mesaj" style="font-size:11px;color:#7FC9BD;margin-top:4px;text-align:center;"></div>
       </div>
@@ -130,8 +131,27 @@ function bulutSifremiUnuttum() {
     if (hataEl) hataEl.textContent = "Gönderilemedi: " + (err && err.message ? err.message : "bilinmeyen hata");
   });
 }
-// Hesap oluşturma artık arayüzde YOK (bkz. yukarıdaki not) — ama ilk
-// hesabın bir kere kurulması gerekiyor ve bunu buradan (bu oturumdan)
+// Hesap Oluştur butonu arayüzde duruyor ama HER tıklamada açıkça onay
+// isteniyor ("ben onay verirsem" — kullanıcının kendi isteği) — bu
+// yüzden rastgele biri bu sayfayı bulup tıklasa bile tek bir confirm()
+// penceresini de geçmesi gerekiyor; o pencerede ne olduğu açıkça yazıyor.
+function bulutHesapOlustur() {
+  const eposta = ((document.getElementById("bulut-eposta") || {}).value || "").trim();
+  const sifre = (document.getElementById("bulut-sifre") || {}).value || "";
+  const hataEl = document.getElementById("bulut-giris-hata");
+  const btn = document.getElementById("bulut-kayit-btn");
+  if (!eposta || !sifre) { if (hataEl) hataEl.textContent = "E-posta ve şifre girin."; return; }
+  if (sifre.length < 6) { if (hataEl) hataEl.textContent = "Şifre en az 6 karakter olmalı."; return; }
+  if (!confirm(`"${eposta}" adresiyle YENİ bir bulut hesabı oluşturulacak.\n\nOnaylıyor musunuz?`)) return;
+  if (hataEl) hataEl.textContent = "";
+  if (btn) { btn.disabled = true; btn.textContent = "Hesap oluşturuluyor..."; }
+  firebase.auth().createUserWithEmailAndPassword(eposta, sifre).catch(err => {
+    if (hataEl) hataEl.textContent = "Hesap oluşturulamadı: " + (err && err.message ? err.message : "bilinmeyen hata");
+    if (btn) { btn.disabled = false; btn.textContent = "Hesap Oluştur"; }
+  });
+}
+// Alternatif: hesap oluşturmanın tek seferlik, arayüze hiç bağlı olmayan
+// hâli — bunu buradan (bu oturumdan)
 // Firebase'e ağ erişimi olmadığı için ben kuramıyorum. Bu fonksiyon SADECE
 // tarayıcının geliştirici konsoluna yazılıp tek seferlik çalıştırılmak
 // üzere burada bırakıldı — arayüzde hiçbir düğmeye bağlı değil, o yüzden
