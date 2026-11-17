@@ -491,6 +491,8 @@ function viewStajOgrenciler() {
     <h2>Öğrenci Listesinden Ekle</h2>
     <p class="small">Öğrenci Listesi modülüne aktardığınız e-Okul listesinden bu sınıfın tüm öğrencilerini tek seferde ekleyin.</p>
     <div class="row" style="max-width:260px"><button class="btn primary" onclick="stajListedenTopluEkleModal()">Öğrenci Listesinden Toplu Ekle</button></div>
+    <p class="small" style="margin-top:12px;">Öğrenci Listesi'nde bir isim/sınıf düzeltildiyse (okulNo ile eşleştirip) buradaki kayıtları güncelleyin — işletme/tercih bilgilerine dokunulmaz.</p>
+    <div class="row" style="max-width:260px"><button class="btn" onclick="stajListesiniOgrenciListesiyleGuncelle()">Listeyle Güncelle</button></div>
   </div>
   <div class="card no-print">
     <h2>Öğrenci Ekle</h2>
@@ -949,6 +951,43 @@ function stajListedenTopluEkleUygula() {
   save(); closeModal(); renderMain();
   alert(eklenen ? `${eklenen} öğrenci eklendi.` : "Eklenecek yeni öğrenci bulunamadı (hepsi zaten listede ya da seçilen sınıfta kayıt yok).");
 }
+// Öğrenci Listesi'nde bir isim düzeltilirse veya öğrenci sınıf değiştirirse
+// (ogrenciSinifiDegistir), Staj Yerleştirme/Staj Takip'teki kopyası hiç
+// güncellenmiyordu — staj belgelerinde eski isim/sınıf basılı kalabilirdi.
+// okulNo eşleşen kayıtları güncel ad/sınıf/dal ile eşitler; işletme/tercih
+// gibi staj'a özgü alanlara dokunmaz.
+function ogrenciListesindenGuncelBilgi(okulNo) {
+  if (!okulNo) return null;
+  const o = S.ogrenciListesi.find(x => x.okulNo === okulNo);
+  if (!o) return null;
+  return { ad: (o.ad + " " + o.soyad).trim(), sinif: o.sinif, dal: dalForSinif(o.sinif) || "" };
+}
+function stajListesiniOgrenciListesiyleGuncelle() {
+  let n = 0;
+  S.students.forEach(s => {
+    const g = ogrenciListesindenGuncelBilgi(s.okulNo);
+    if (!g) return;
+    if (s.ad !== g.ad || s.sinif !== g.sinif || (g.dal && s.dal !== g.dal)) {
+      s.ad = g.ad; s.sinif = g.sinif; if (g.dal) s.dal = g.dal;
+      n++;
+    }
+  });
+  save(); renderMain();
+  alert(n ? `${n} öğrencinin adı/sınıfı/dalı Öğrenci Listesi'ndeki güncel haliyle eşleştirildi.` : "Güncellenecek bir fark bulunamadı.");
+}
+function stajTakipListesiniOgrenciListesiyleGuncelle() {
+  let n = 0;
+  S.stajdakiOgrenciler.forEach(s => {
+    const g = ogrenciListesindenGuncelBilgi(s.okulNo);
+    if (!g) return;
+    if (s.ad !== g.ad || s.sinif !== g.sinif || (g.dal && s.dal !== g.dal)) {
+      s.ad = g.ad; s.sinif = g.sinif; if (g.dal) s.dal = g.dal;
+      n++;
+    }
+  });
+  save(); renderMain();
+  alert(n ? `${n} öğrencinin adı/sınıfı/dalı Öğrenci Listesi'ndeki güncel haliyle eşleştirildi.` : "Güncellenecek bir fark bulunamadı.");
+}
 function nsSinifDegisti() {
   const sinif = document.getElementById("ns-sinif").value;
   const dalSel = document.getElementById("ns-dal");
@@ -1123,6 +1162,8 @@ function viewStajTakipOgrenciler() {
     <h2>Staj Yerleştirme'den Aktar</h2>
     <p class="small">Staj Yerleştirme'de (Otomatik Yerleştirme ile) işletmesi zaten atanmış öğrencileri, buraya işletme bilgisiyle birlikte tek tıkla aktarır — burada zaten kaydı olanlara dokunmaz.</p>
     <div class="row" style="max-width:260px"><button class="btn primary" onclick="stajYerlestirmedenAktarUygula()">Staj Yerleştirme'den Aktar</button></div>
+    <p class="small" style="margin-top:12px;">Öğrenci Listesi'nde bir isim/sınıf düzeltildiyse (okulNo ile eşleştirip) buradaki kayıtları güncelleyin — işletme/sorumlu öğretmen/devamsızlık bilgilerine dokunulmaz.</p>
+    <div class="row" style="max-width:260px"><button class="btn" onclick="stajTakipListesiniOgrenciListesiyleGuncelle()">Listeyle Güncelle</button></div>
   </div>
   <div class="card no-print">
     <h2>Öğrenci Ekle</h2>
