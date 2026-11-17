@@ -9831,7 +9831,7 @@ function refreshProgram() {
   showPreDistributionWarnings(() => {
     showWorkingOverlay("Program hesaplanıyor…");
     setTimeout(() => {
-      distributeAllBestAsync(900,
+      distributeAllBestAsync(3000,
         (r) => {
           hideWorkingOverlay();
           activeTab = "programlar";
