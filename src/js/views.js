@@ -5541,15 +5541,25 @@ function karneGenelOrtalama(o) {
   if (!degerler.length) return "";
   return Math.round((degerler.reduce((a, b) => a + b, 0) / degerler.length) * 10) / 10;
 }
+// Sınav Notları ve Performans Notları aynı öğrenciyi okulNo'suyla
+// birleştiriyor — ama "023" / "23" gibi baştaki sıfır farkı, ya da elle
+// eklenen bir satırda okulNo'nun hiç girilmemiş olması, trim/normalize
+// edilmeden birleştirilince aynı öğrenciyi SESSİZCE iki ayrı satıra
+// bölebiliyordu (biri sadece sınav notuyla, biri sadece performansla).
+function karneBirlestirmeAnahtari(k) {
+  const no = String(k.okulNo || "").trim().replace(/^0+(?=\d)/, "");
+  if (no) return "no:" + no;
+  return "ad:" + String(k.ad || "").trim().toLocaleUpperCase("tr-TR");
+}
 function renderSonucKarnesi(bar, sn, pn) {
   if (!sn && !pn) return `<p class="small" style="text-align:center;padding:24px 10px;">Bu sınıf/ders/dönem için henüz Sınav Notları ya da Performans Notları girilmemiş. Önce o modüllerden not girin, karne burada otomatik oluşsun.</p>`;
   const birlesik = {};
   (sn ? sn.kayitlar : []).forEach(k => {
-    const key = k.okulNo || k.ad;
+    const key = karneBirlestirmeAnahtari(k);
     birlesik[key] = Object.assign({ okulNo: k.okulNo, ad: k.ad }, birlesik[key] || {}, { sinav1: k.sinav1, sinav2: k.sinav2, uygulama: k.uygulama, uygulamaVarMi: sn.uygulamaSinaviVarMi });
   });
   (pn ? pn.kayitlar : []).forEach(k => {
-    const key = k.okulNo || k.ad;
+    const key = karneBirlestirmeAnahtari(k);
     birlesik[key] = Object.assign({ okulNo: k.okulNo, ad: k.ad }, birlesik[key] || {}, { perf1Ort: performansOrt(k.perf1), perf2Ort: performansOrt(k.perf2) });
   });
   const liste = Object.values(birlesik).sort((a, b) => (Number(a.okulNo) || 0) - (Number(b.okulNo) || 0));
