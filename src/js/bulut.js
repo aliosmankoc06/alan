@@ -73,8 +73,51 @@ function bulutDurumGoster(eposta) {
   const el = document.getElementById("bulut-durum");
   if (!el) return;
   el.innerHTML = eposta
-    ? `☁️ ${escHtml(eposta)} · <a href="#" onclick="bulutCikisYap();return false;">Çıkış</a>`
+    ? `☁️ ${escHtml(eposta)} · <a href="#" onclick="bulutCikisYap();return false;">Çıkış</a> · <a href="#" onclick="bulutDurumunuKontrolEt();return false;">Bulut Durumu</a>`
     : `☁️ Bulut girişi yok · <a href="#" onclick="bulutGirisEkraniniGoster();return false;">Giriş yap</a>`;
+}
+// Tek tıkla tam teşhis — sorunu uzaktan takip ederken her defasında "ne
+// gördün" diye sormak yerine, kullanıcının tek bir ekran görüntüsüyle
+// her şeyi (giriş durumu, yerel/bulut zenginlik skoru, hangi kararın
+// verileceği, varsa gerçek hata) gösterebilmesi için eklendi.
+function bulutDurumunuKontrolEt() {
+  if (!(bulutDb && typeof firebase !== "undefined" && firebase.auth().currentUser)) {
+    alert("Bulut Durumu: Giriş yapılmamış görünüyor.");
+    return;
+  }
+  const uid = firebase.auth().currentUser.uid;
+  const zenginlik = (st) => {
+    if (!st) return 0;
+    return (Array.isArray(st.ogrenciListesi) ? st.ogrenciListesi.length : 0) * 10
+      + (Array.isArray(st.students) ? st.students.length : 0) * 5
+      + (Array.isArray(st.stajdakiOgrenciler) ? st.stajdakiOgrenciler.length : 0) * 5
+      + (Array.isArray(st.isletmeler) ? st.isletmeler.length : 0)
+      + (st.schedule ? Object.keys(st.schedule).length : 0);
+  };
+  const yerelZenginlik = zenginlik(S);
+  const yerelOgrenci = Array.isArray(S.ogrenciListesi) ? S.ogrenciListesi.length : "?";
+  bulutDb.collection("users").doc(uid).collection("data").doc("state").get()
+    .then(snap => {
+      if (!snap.exists) {
+        alert(`Bulut Durumu\n\nE-posta: ${firebase.auth().currentUser.email}\nYerel zenginlik: ${yerelZenginlik} (öğrenci listesi: ${yerelOgrenci})\n\nBulutta HENÜZ hiç belge yok (ilk kayıt bekleniyor). Birkaç saniye sonra tekrar deneyin.`);
+        return;
+      }
+      const veri = snap.data();
+      let bulutState = null, parseHatasi = "";
+      try { bulutState = JSON.parse(veri.json); } catch (e) { parseHatasi = e.message; }
+      const bulutZenginlik = zenginlik(bulutState);
+      const bulutOgrenci = bulutState && Array.isArray(bulutState.ogrenciListesi) ? bulutState.ogrenciListesi.length : "?";
+      const boyutKB = Math.round((veri.json ? veri.json.length : 0) / 1024);
+      let karar;
+      if (parseHatasi) karar = "Bulut verisi okunamadı (bozuk JSON): " + parseHatasi;
+      else if (yerelZenginlik > bulutZenginlik) karar = "Bu cihaz buluta göndermeli (yerel daha zengin) — birkaç saniye içinde otomatik olmalı.";
+      else if (bulutZenginlik > yerelZenginlik) karar = "Bu cihaz buluttan indirmeli (bulut daha zengin) — birkaç saniye içinde otomatik olmalı.";
+      else karar = "İkisi de eşit zenginlikte — zaman damgasına göre karar verilir.";
+      alert(`Bulut Durumu\n\nE-posta: ${firebase.auth().currentUser.email}\nBulut belge boyutu: ${boyutKB} KB\n\nYerel zenginlik: ${yerelZenginlik} (öğrenci listesi: ${yerelOgrenci})\nBulut zenginlik: ${bulutZenginlik} (öğrenci listesi: ${bulutOgrenci})\n\nKarar: ${karar}`);
+    })
+    .catch(err => {
+      alert("Bulut Durumu — okuma hatası: " + (err && err.message ? err.message : "bilinmeyen hata"));
+    });
 }
 
 // Tam ekran, ARKADAKİ sistemi hiç göstermeyen (yarı saydam modal değil,
