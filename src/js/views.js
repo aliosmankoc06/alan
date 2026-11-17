@@ -3030,6 +3030,21 @@ function ogrenciSinifiDegistir(id, yeniSinif) {
   save(); renderMain();
 }
 function setOgrenciListesiSinif(sinif) { activeOgrenciListesiSinif = sinif; renderMain(); }
+// Mutator'lar (updateOgrenciListesi/deleteOgrenci/ogrenciSinifiDegistir) tek
+// satır eklemeyi desteklemiyordu — tek yol PDF/Word yüklemekti. Yıl ortasında
+// nakil gelen bir öğrenci, veya e-Okul PDF'inde eksik çıkan bir isim için
+// departman şefinin tek satır elle eklemesi gerekebiliyor.
+function addOgrenciListesiTek() {
+  if (!activeOgrenciListesiSinif) { alert("Önce bir sınıf seçin."); return; }
+  const ad = document.getElementById("ol-yeni-ad").value.trim();
+  if (!ad) { alert("Öğrenci adı girin."); return; }
+  const okulNo = document.getElementById("ol-yeni-okulno").value.trim();
+  const soyad = document.getElementById("ol-yeni-soyad").value.trim();
+  const cinsiyet = document.getElementById("ol-yeni-cinsiyet").value;
+  const pansiyon = document.getElementById("ol-yeni-pansiyon").value.trim();
+  S.ogrenciListesi.push({ id: uid("ol"), sinif: activeOgrenciListesiSinif, okulNo, ad, soyad, cinsiyet, pansiyon });
+  save(); renderMain();
+}
 function viewOgrenciListesi() {
   const siniflar = ogrenciListesiSiniflariDalaGore();
   if (!activeOgrenciListesiSinif || !siniflar.includes(activeOgrenciListesiSinif)) activeOgrenciListesiSinif = siniflar[0] || null;
@@ -3067,6 +3082,20 @@ function viewOgrenciListesi() {
     ${sinifBar}
     ${activeOgrenciListesiSinif ? belgeAracCubugu(dosyaAdi) : ''}
   </div>
+  ${activeOgrenciListesiSinif ? `
+  <div class="card no-print">
+    <h2>Tek Öğrenci Ekle — ${escHtml(activeOgrenciListesiSinif)}</h2>
+    <div class="grid3">
+      <div><label class="small">Öğrenci No</label><input type="text" id="ol-yeni-okulno" style="width:100%"></div>
+      <div><label class="small">Adı</label><input type="text" id="ol-yeni-ad" style="width:100%"></div>
+      <div><label class="small">Soyadı</label><input type="text" id="ol-yeni-soyad" style="width:100%"></div>
+      <div><label class="small">Cinsiyeti</label>
+        <select id="ol-yeni-cinsiyet" style="width:100%"><option value="Erkek">Erkek</option><option value="Kız">Kız</option></select>
+      </div>
+      <div><label class="small">Pansiyon</label><input type="text" id="ol-yeni-pansiyon" style="width:100%"></div>
+    </div>
+    <div class="row" style="max-width:200px"><button class="btn primary" onclick="addOgrenciListesiTek()">Ekle</button></div>
+  </div>` : ''}
   ${activeOgrenciListesiSinif ? `
   <div class="print-area">
     ${belgeYazdirmaBasligi(dosyaAdi)}
